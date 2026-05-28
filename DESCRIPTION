@@ -1,6 +1,6 @@
 Package: boosterpak
 Title: Declarative Project Package Bundles
-Version: 0.1.0.9000
+Version: 0.3.0
 Authors@R: 
     person("Sean", "Thimons", email = "sean@example.com", role = c("aut", "cre"))
 Author: Sean Thimons [aut, cre]

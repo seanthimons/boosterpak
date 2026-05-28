@@ -28,14 +28,26 @@ project-local `renv`.
 boosterpak::add_pack("example")
 ```
 
-The v0.1 built-in pack catalog contains:
+The built-in pack catalog contains:
 
 - `core`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`.
 - `example`: extends `core` and installs `cli`.
 - `github-example`: installs `ComptoxR` from `seanthimons/ComptoxR`.
 
-Pack mutation is additive in v0.1. Removing a pack updates `boosters.toml` and
+Pack mutation is additive. Removing a pack updates `boosters.toml` and
 can run sync, but it does not uninstall packages.
+
+## Capture and Reuse Packs
+
+```r
+boosterpak::save_pack("project_baseline")
+boosterpak::promote_pack("project_baseline")
+```
+
+`save_pack()` writes a flat TOML snapshot of the currently resolved project
+packages. Use `from = "core"` to fork one existing pack, or `scope = "user"` to
+write directly to the machine-wide user pack directory. `promote_pack()` copies a
+project pack to user scope, and `demote_pack()` copies it back into a project.
 
 ## Restore from a Lockfile
 
@@ -54,5 +66,5 @@ boosterpak::status()
 boosterpak::list_packs()
 ```
 
-Phase 1 intentionally excludes function materialization, `save_pack()`, pack
-promotion, and pruning.
+Current development includes function materialization and pack capture/promotion;
+pruning remains out of scope.

@@ -832,13 +832,12 @@ Verified result after hydration:
 - `renv.lock` contains 109 locked packages after snapshot.
 - The smoke folder proves both initialization mechanics and final package installation.
 
-### Next work after v0.1
+### Next work after v0.3
 
-The remaining PRD items are deferred Phase 3+ work, plus optional day-to-day installation:
+The remaining PRD items are deferred Phase 4+ work, plus optional day-to-day installation:
 
 1. Install `boosterpak` into the user's R library when ready for day-to-day use. Development so far has used `pkgload::load_all()` and package check installs, not a persistent user-library install.
-2. Phase 3: implement pack capture and promotion (`save_pack()`, `promote_pack()`, `demote_pack()`, and richer user-scope pack workflows).
-3. Phase 4/future: broaden `status()`, improve real-world error messages, explore an RStudio addin, keep `rv` integration deferred behind the installer abstraction, and revisit recipe/discovery ideas.
+2. Phase 4/future: broaden `status()`, improve real-world error messages, explore an RStudio addin, keep `rv` integration deferred behind the installer abstraction, and revisit recipe/discovery ideas.
 
 ### Phase 2 — Function materialization (v0.2)
 
@@ -876,6 +875,23 @@ Implemented and verified:
 - `promote_pack()` / `demote_pack()`
 - User-scope pack directory management (`tools::R_user_dir`)
 - `list_packs()` extended to show all three scopes
+
+### Phase 3 implementation status
+
+**Status as of 2026-05-28:** Implemented in the repository as package `boosterpak` version `0.3.0`.
+
+Implemented and verified:
+
+- Public v0.3 exports: `save_pack()`, `promote_pack()`, and `demote_pack()`.
+- `save_pack(name, scope = "project", from = NULL)` writes `boosters/packs/<name>.toml`.
+- `save_pack(scope = "user")` writes to `tools::R_user_dir("boosters", "config")/packs/<name>.toml`.
+- `save_pack(from = "<pack>")` forks one resolved pack into a flat snapshot without retaining `extends`.
+- Project snapshots fold `[extras].declared` and `[exclude].declared` into a self-contained package list, including non-CRAN extras as `[sources]` entries where needed.
+- Pack source overrides are preserved in saved packs for packages with non-CRAN install specs.
+- `promote_pack()` copies a project pack to user scope and `demote_pack()` copies a user pack to project scope.
+- Save/copy operations refuse to overwrite existing TOML files unless `overwrite = TRUE`.
+- `list_packs(scope = NULL)` continues to show project, user, and built-in packs with first-match shadowing.
+- Targeted tests cover flat project snapshots, named-pack forks, overwrite refusal/replacement, user-scope save, and promote/demote copy behavior.
 
 ### Phase 4 — Polish and ecosystem (v0.4+)
 
