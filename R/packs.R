@@ -292,6 +292,160 @@ list_packs <- function(scope = NULL, root = ".", verbose = NULL) {
   invisible(packs)
 }
 
+pack_scope_dir <- function(scope, root = ".") {
+  switch(
+    scope,
+    project = project_packs_dir(root),
+    user = user_packs_dir(),
+    cli::cli_abort("Unsupported pack scope {.val {scope}}.", call = NULL)
+  )
+}
+
+validate_new_pack_name <- function(name) {
+  if (!is.character(name) || length(name) != 1 || !grepl("^[A-Za-z][A-Za-z0-9._-]*$", name)) {
+    cli::cli_abort(
+      "{.arg name} must be one pack name starting with a letter and containing only letters, numbers, dot, underscore, or hyphen.",
+      call = NULL
+    )
+  }
+  invisible(name)
+}
+
+pack_description <- function(name, from = NULL) {
+  if (is.null(from)) {
+    sprintf("Captured package snapshot for %s.", name)
+  } else {
+    sprintf("Captured package snapshot from %s.", from)
+  }
+}
+
+write_pack_file <- function(path, name, description, packages, sources = character(), overwrite = FALSE) {
+  if (file.exists(path) && !isTRUE(overwrite)) {
+    cli::cli_abort("{.file {path}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
+  }
+
+  lines <- c(
+    sprintf('name = "%s"', escape_toml_string(name)),
+    sprintf('description = "%s"', escape_toml_string(description)),
+    sprintf("packages = [%s]", paste(sprintf('"%s"', vapply(packages, escape_toml_string, character(1))), collapse = ", "))
+  )
+  if (length(sources) > 0) {
+    lines <- c(
+      lines,
+      "",
+      "[sources]",
+      sprintf('"%s" = "%s"', vapply(names(sources), escape_toml_string, character(1)), vapply(unname(sources), escape_toml_string, character(1)))
+    )
+  }
+  lines <- c(lines, "")
+
+  dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
+  writeLines(lines, path, useBytes = TRUE)
+  invisible(path)
+}
+
+pack_sources_for_packages <- function(packages, sources) {
+  sources <- unlist(sources %||% list(), use.names = TRUE)
+  if (length(sources) == 0) {
+    return(character())
+  }
+  sources <- sources[names(sources) %in% packages]
+  sources[!duplicated(names(sources), fromLast = TRUE)]
+}
+
+resolve_save_pack_contents <- function(from = NULL, root = ".") {
+  if (is.null(from)) {
+    config <- read_config(root)
+    validate_config(config, root)
+    packages <- resolve_config_packages(config, root)
+    install_specs <- resolve_config_install_specs(config, root)
+    sources <- install_specs[install_specs != packages]
+    names(sources) <- packages[install_specs != packages]
+  } else {
+    load_pack(from, root)
+    packages <- resolve_pack(from, root)
+    sources <- pack_sources_for_packages(packages, resolve_pack_sources(from, root))
+  }
+  list(packages = unique(packages), sources = sources)
+}
+
+#' Save a resolved package set as a pack
+#'
+#' @param name Pack name to write.
+#' @param scope Destination scope: `"project"` or `"user"`.
+#' @param from Optional existing pack name to fork. When `NULL`, captures the
+#'   current project's resolved package set.
+#' @param root Project root.
+#' @param overwrite Whether to replace an existing pack file.
+#' @param verbose Whether to print routine summaries.
+#' @return Path to the saved pack, invisibly.
+#' @export
+save_pack <- function(name, scope = c("project", "user"), from = NULL, root = ".", overwrite = FALSE, verbose = NULL) {
+  check_verbose(verbose)
+  validate_new_pack_name(name)
+  scope <- match.arg(scope)
+  root <- normalizePath(root, winslash = "/", mustWork = TRUE)
+
+  contents <- resolve_save_pack_contents(from, root)
+  target <- file.path(pack_scope_dir(scope, root), sprintf("%s.toml", name))
+  write_pack_file(target, name, pack_description(name, from), contents$packages, contents$sources, overwrite)
+
+  if (should_emit(verbose)) {
+    cli::cli_alert_success("Saved pack {.val {name}} to {.file {target}}.")
+  }
+  invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
+}
+
+copy_pack_between_scopes <- function(name, from_scope, to_scope, root = ".", overwrite = FALSE, verbose = NULL) {
+  check_verbose(verbose)
+  validate_new_pack_name(name)
+  root <- normalizePath(root, winslash = "/", mustWork = TRUE)
+  source <- file.path(pack_scope_dir(from_scope, root), sprintf("%s.toml", name))
+  target <- file.path(pack_scope_dir(to_scope, root), sprintf("%s.toml", name))
+
+  if (!file.exists(source)) {
+    cli::cli_abort("Pack {.val {name}} does not exist in {from_scope} scope.", call = NULL)
+  }
+  if (file.exists(target) && !isTRUE(overwrite)) {
+    cli::cli_abort("{.file {target}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
+  }
+
+  dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
+  ok <- file.copy(source, target, overwrite = isTRUE(overwrite))
+  if (!isTRUE(ok)) {
+    cli::cli_abort("Failed to copy pack {.val {name}} to {.file {target}}.", call = NULL)
+  }
+
+  if (should_emit(verbose)) {
+    cli::cli_alert_success("Copied pack {.val {name}} to {to_scope} scope.")
+  }
+  invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
+}
+
+#' Promote a project pack to user scope
+#'
+#' @param name Pack name.
+#' @param root Project root.
+#' @param overwrite Whether to replace an existing user-scope pack.
+#' @param verbose Whether to print routine summaries.
+#' @return Path to the copied user-scope pack, invisibly.
+#' @export
+promote_pack <- function(name, root = ".", overwrite = FALSE, verbose = NULL) {
+  copy_pack_between_scopes(name, "project", "user", root, overwrite, verbose)
+}
+
+#' Demote a user pack to project scope
+#'
+#' @param name Pack name.
+#' @param root Project root.
+#' @param overwrite Whether to replace an existing project-scope pack.
+#' @param verbose Whether to print routine summaries.
+#' @return Path to the copied project-scope pack, invisibly.
+#' @export
+demote_pack <- function(name, root = ".", overwrite = FALSE, verbose = NULL) {
+  copy_pack_between_scopes(name, "user", "project", root, overwrite, verbose)
+}
+
 `%||%` <- function(x, y) {
   if (is.null(x)) y else x
 }

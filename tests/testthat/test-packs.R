@@ -154,3 +154,71 @@ test_that("pack cycles are detected clearly", {
     "Pack cycle detected: a -> b -> a"
   )
 })
+
+test_that("save_pack captures resolved project packages as a flat project pack", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  path <- boosters_file(root)
+  lines <- readLines(path, warn = FALSE)
+  lines[lines == "declared = []"][1] <- 'declared = ["withr", "rstudio/pointblank"]'
+  lines[lines == "declared = []"][1] <- 'declared = ["digest"]'
+  writeLines(lines, path, useBytes = TRUE)
+
+  saved <- save_pack("project_baseline", root = root, verbose = FALSE)
+  data <- boosterpak:::read_toml_file(saved)
+
+  expect_equal(saved, normalizePath(file.path(root, "boosters", "packs", "project_baseline.toml"), winslash = "/", mustWork = FALSE))
+  expect_equal(data$name, "project_baseline")
+  expect_null(data$extends)
+  expect_setequal(data$packages, c("fs", "here", "janitor", "rio", "tidyverse", "cli", "withr", "pointblank"))
+  expect_equal(data$sources[["pointblank"]], "rstudio/pointblank")
+})
+
+test_that("save_pack can fork one named pack and refuses overwrite by default", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  saved <- save_pack("core_fork", from = "core", root = root, verbose = FALSE)
+  data <- boosterpak:::read_toml_file(saved)
+
+  expect_equal(data$packages, c("fs", "here", "janitor", "rio", "tidyverse", "digest"))
+  expect_error(
+    save_pack("core_fork", from = "core", root = root, verbose = FALSE),
+    "already exists"
+  )
+  expect_no_error(save_pack("core_fork", from = "example", root = root, overwrite = TRUE, verbose = FALSE))
+  expect_equal(boosterpak:::read_toml_file(saved)$packages, "cli")
+})
+
+test_that("save_pack writes to user scope", {
+  withr::local_envvar(R_USER_CONFIG_DIR = withr::local_tempdir())
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  saved <- save_pack("user_baseline", scope = "user", root = root, verbose = FALSE)
+
+  expect_true(file.exists(saved))
+  expect_true(startsWith(saved, normalizePath(boosterpak:::user_packs_dir(), winslash = "/", mustWork = FALSE)))
+  expect_true("user_baseline" %in% list_packs(root = root, scope = "user", verbose = FALSE)$name)
+})
+
+test_that("promote_pack and demote_pack copy between project and user scopes", {
+  withr::local_envvar(R_USER_CONFIG_DIR = withr::local_tempdir())
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  save_pack("portable", from = "example", root = root, verbose = FALSE)
+
+  user_path <- promote_pack("portable", root = root, verbose = FALSE)
+  expect_true(file.exists(user_path))
+  expect_equal(
+    readLines(user_path, warn = FALSE),
+    readLines(file.path(root, "boosters", "packs", "portable.toml"), warn = FALSE)
+  )
+  expect_error(promote_pack("portable", root = root, verbose = FALSE), "already exists")
+
+  unlink(file.path(root, "boosters", "packs", "portable.toml"))
+  project_path <- demote_pack("portable", root = root, verbose = FALSE)
+  expect_true(file.exists(project_path))
+  expect_equal(readLines(project_path, warn = FALSE), readLines(user_path, warn = FALSE))
+})
