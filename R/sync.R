@@ -25,7 +25,7 @@ sync <- function(mode = c("apply", "restore"), root = ".", verbose = NULL) {
   sync_functions(config, root)
 
   if (isTRUE(config$settings$auto_snapshot %||% TRUE)) {
-    call_renv_snapshot(root)
+    call_renv_snapshot(root, packages)
   }
 
   if (should_emit(verbose)) {

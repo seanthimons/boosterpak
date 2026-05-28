@@ -38,3 +38,24 @@ test_that("restore consistency warning reports direct packages absent from lockf
     "cli"
   )
 })
+
+test_that("sync snapshots declared packages explicitly", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  snapshot_packages <- NULL
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages) character(),
+    install_via = function(specs, root = ".") TRUE,
+    call_renv_snapshot = function(root = ".", packages = NULL) {
+      snapshot_packages <<- packages
+    },
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+
+  expect_setequal(snapshot_packages, c("fs", "here", "janitor", "rio", "tidyverse", "digest", "cli"))
+})

@@ -71,7 +71,7 @@ test_that("sync rematerializes TOML-installed missing function files", {
     ensure_project_renv = function(root = ".") TRUE,
     missing_packages = function(packages) character(),
     install_via = function(specs, root = ".") TRUE,
-    call_renv_snapshot = function(root = ".") TRUE,
+    call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
     .package = "boosterpak"
   )
 
@@ -91,7 +91,7 @@ test_that("sync leaves existing materialized function files untouched", {
     ensure_project_renv = function(root = ".") TRUE,
     missing_packages = function(packages) character(),
     install_via = function(specs, root = ".") TRUE,
-    call_renv_snapshot = function(root = ".") TRUE,
+    call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
     .package = "boosterpak"
   )
 
