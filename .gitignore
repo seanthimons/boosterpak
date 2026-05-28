@@ -4,3 +4,7 @@
 .Rhistory
 .RData
 .Ruserdata
+
+/.quarto/
+README_files/*
+README.html
