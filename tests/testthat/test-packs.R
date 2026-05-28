@@ -40,3 +40,17 @@ test_that("source overrides become install specs", {
   expect_true("pointblank" %in% boosterpak:::resolve_config_packages(config, root))
   expect_true("rstudio/pointblank" %in% boosterpak:::resolve_config_install_specs(config, root))
 })
+
+test_that("GitHub extras are install specs but resolve to package-like names", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines[lines == "declared = []"][1] <- 'declared = ["rstudio/pointblank"]'
+  writeLines(lines, path)
+
+  config <- boosterpak:::read_config(root)
+
+  expect_true("pointblank" %in% boosterpak:::resolve_config_packages(config, root))
+  expect_true("rstudio/pointblank" %in% boosterpak:::resolve_config_install_specs(config, root))
+})

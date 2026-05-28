@@ -147,7 +147,12 @@ resolve_pack_sources <- function(name, root = ".", stack = character()) {
 
 resolve_config_packages <- function(config, root = ".") {
   declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
-  extras <- toml_string_array(config$extras$declared %||% character(), "[extras].declared")
+  extras <- vapply(
+    toml_string_array(config$extras$declared %||% character(), "[extras].declared"),
+    package_name_from_spec,
+    character(1),
+    USE.NAMES = FALSE
+  )
   exclude <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
   packages <- unlist(lapply(declared, resolve_pack, root = root), use.names = FALSE)
   setdiff(unique(c(packages, extras)), exclude)
@@ -158,6 +163,11 @@ resolve_config_install_specs <- function(config, root = ".") {
   exclude <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
   packages <- resolve_config_packages(config, root)
   sources <- c(unlist(lapply(declared, resolve_pack_sources, root = root), recursive = FALSE), unlist(config$sources %||% list(), use.names = TRUE))
+  extras <- toml_string_array(config$extras$declared %||% character(), "[extras].declared")
+  if (length(extras) > 0) {
+    extra_names <- vapply(extras, package_name_from_spec, character(1), USE.NAMES = FALSE)
+    sources <- c(sources, stats::setNames(extras, extra_names))
+  }
   vapply(packages, function(package) {
     if (!package %in% exclude && package %in% names(sources)) {
       as.character(sources[[package]])
@@ -165,6 +175,16 @@ resolve_config_install_specs <- function(config, root = ".") {
       package
     }
   }, character(1), USE.NAMES = FALSE)
+}
+
+package_name_from_spec <- function(spec) {
+  if (grepl("^[A-Za-z][A-Za-z0-9.]*$", spec)) {
+    return(spec)
+  }
+  if (grepl("^[^/]+/[^/]+$", spec)) {
+    return(sub("\\.git$", "", basename(spec)))
+  }
+  spec
 }
 
 #' List available packs
