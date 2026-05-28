@@ -1,0 +1,4 @@
+name = "analysis-scaffold"
+description = "Create a compact analysis project folder scaffold."
+packages = ["fs", "here"]
+functions = ["scaffold_analysis"]

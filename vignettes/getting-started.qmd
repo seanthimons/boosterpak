@@ -74,6 +74,22 @@ If the pack carries helper functions, `add_pack()` also copies the bundled
 `fn_*.R` files into `boosters/` and refuses to overwrite existing function files
 unless `overwrite_functions = TRUE`.
 
+Packs can mix ordinary CRAN package names with package-specific source specs.
+Declare every package in `packages`, then use `[sources]` only for packages that
+should install from another source:
+
+```toml
+name = "plotting"
+description = "Plotting packages from CRAN and GitHub."
+packages = ["ggplot2", "patchwork", "ggtext"]
+
+[sources]
+"ggtext" = "wilkelab/ggtext"
+```
+
+Here, `ggplot2` and `patchwork` install by package name, while `ggtext` uses the
+GitHub source spec.
+
 ## Add a Helper Function
 
 ```{r}
