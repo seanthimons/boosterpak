@@ -80,6 +80,26 @@ test_that("sync rematerializes TOML-installed missing function files", {
   expect_true(file.exists(path))
 })
 
+test_that("sync leaves existing materialized function files untouched", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- add_function("ni", root = root, verbose = FALSE)
+  edited <- c(readLines(path, warn = FALSE), "# local edit")
+  writeLines(edited, path)
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages) character(),
+    install_via = function(specs, root = ".") TRUE,
+    call_renv_snapshot = function(root = ".") TRUE,
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+
+  expect_equal(readLines(path, warn = FALSE), edited)
+})
+
 test_that("function validation uses did-you-mean for unknown functions", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)

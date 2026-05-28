@@ -73,7 +73,11 @@ materialize_function <- function(name, root = ".", overwrite = FALSE) {
 
 sync_functions <- function(config, root = ".") {
   installed <- installed_functions(config)
-  invisible(lapply(installed, function(name) materialize_function(name, root = root, overwrite = FALSE)))
+  invisible(lapply(installed, function(name) {
+    if (!file.exists(function_file(name, root))) {
+      materialize_function(name, root = root, overwrite = FALSE)
+    }
+  }))
   installed
 }
 
