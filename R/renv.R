@@ -38,13 +38,13 @@ call_renv_load <- function(root = ".") {
 call_renv_snapshot <- function(root = ".") {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
-  renv::snapshot(prompt = FALSE)
+  renv::snapshot(project = root, prompt = FALSE)
 }
 
 call_renv_restore <- function(root = ".") {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
-  renv::restore(prompt = FALSE)
+  renv::restore(project = root, prompt = FALSE)
 }
 
 install_via <- function(packages, root = ".") {

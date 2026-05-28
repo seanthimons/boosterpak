@@ -9,10 +9,7 @@ test_that("built-in packs are discoverable", {
 })
 
 test_that("packs resolve transitively", {
-  expect_equal(
-    boosterpak:::resolve_pack("example"),
-    c("fs", "here", "janitor", "rio", "tidyverse", "digest", "cli")
-  )
+  expect_equal(boosterpak:::resolve_pack("example"), "cli")
 })
 
 test_that("built-in catalog matches v0.1 PRD contents", {

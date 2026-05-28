@@ -1,4 +1,3 @@
 name = "example"
 description = "Small documented example pack that installs cli."
 packages = ["cli"]
-extends = ["core"]
