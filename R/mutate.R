@@ -10,7 +10,7 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
   }
 
   current <- config$packs$declared %||% character()
-  next <- if (identical(action, "add")) {
+  next_packs <- if (identical(action, "add")) {
     unique(c(current, name))
   } else {
     setdiff(current, name)
@@ -20,14 +20,14 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
     ensure_project_renv(root)
   }
 
-  update_declared_array(boosters_file(root), "packs", "declared", next)
+  update_declared_array(boosters_file(root), "packs", "declared", next_packs)
 
   if (isTRUE(sync)) {
     sync(mode = "apply", root = root, verbose = verbose)
   } else if (should_emit(verbose)) {
     cli::cli_alert_success("{if (action == 'add') 'Added' else 'Removed'} pack {.val {name}} in {.file boosters.toml}.")
   }
-  invisible(next)
+  invisible(next_packs)
 }
 
 #' Add a pack declaration

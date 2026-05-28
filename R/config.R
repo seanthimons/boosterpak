@@ -24,9 +24,9 @@ read_config <- function(root = ".") {
 }
 
 validate_config <- function(config, root = ".") {
-  check_string_array(config$packs$declared %||% character(), "[packs].declared")
-  check_string_array(config$extras$declared %||% character(), "[extras].declared")
-  check_string_array(config$exclude$declared %||% character(), "[exclude].declared")
+  config$packs$declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
+  config$extras$declared <- toml_string_array(config$extras$declared %||% character(), "[extras].declared")
+  config$exclude$declared <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
 
   declared <- config$packs$declared %||% character()
   invisible(lapply(declared, load_pack, root = root))
@@ -54,11 +54,14 @@ validate_config <- function(config, root = ".") {
   invisible(TRUE)
 }
 
-check_string_array <- function(value, field) {
+toml_string_array <- function(value, field) {
+  if (is.list(value) && length(value) == 0) {
+    return(character())
+  }
   if (!is.character(value)) {
     cli::cli_abort("{.field {field}} must be a string array.", call = NULL)
   }
-  invisible(TRUE)
+  value
 }
 
 warn_unknown_keys <- function(config) {

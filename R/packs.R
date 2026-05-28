@@ -1,5 +1,5 @@
 read_toml_file <- function(path) {
-  tryCatch(
+  data <- tryCatch(
     toml::read_toml(path),
     error = function(err) {
       cli::cli_abort(c(
@@ -8,6 +8,20 @@ read_toml_file <- function(path) {
       ), call = NULL)
     }
   )
+  normalize_toml_arrays(data)
+}
+
+normalize_toml_arrays <- function(x) {
+  if (is.list(x) && !is.data.frame(x)) {
+    if (length(x) == 0) {
+      return(x)
+    }
+    if (all(vapply(x, is.character, logical(1))) && all(vapply(x, length, integer(1)) <= 1)) {
+      return(unlist(x, use.names = FALSE))
+    }
+    return(lapply(x, normalize_toml_arrays))
+  }
+  x
 }
 
 pack_paths <- function(root = ".") {
@@ -99,12 +113,8 @@ validate_pack_schema <- function(expected_name, path, data) {
   if (is.null(data$packages)) {
     cli::cli_abort("{.file {path}} must declare {.field packages}, even if empty.", call = NULL)
   }
-  if (!is.character(data$packages)) {
-    cli::cli_abort("{.file {path}} field {.field packages} must be a string array.", call = NULL)
-  }
-  if (!is.null(data$extends) && !is.character(data$extends)) {
-    cli::cli_abort("{.file {path}} field {.field extends} must be a string array.", call = NULL)
-  }
+  data$packages <- toml_string_array(data$packages, sprintf("%s packages", path))
+  data$extends <- toml_string_array(data$extends %||% character(), sprintf("%s extends", path))
   invisible(TRUE)
 }
 
@@ -115,15 +125,16 @@ resolve_pack <- function(name, root = ".", stack = character()) {
   }
 
   pack <- load_pack(name, root)
-  parents <- pack$extends %||% character()
+  pack$packages <- toml_string_array(pack$packages, sprintf("%s packages", pack$.__path__))
+  parents <- toml_string_array(pack$extends %||% character(), sprintf("%s extends", pack$.__path__))
   parent_packages <- unlist(lapply(parents, resolve_pack, root = root, stack = c(stack, name)), use.names = FALSE)
   unique(c(parent_packages, pack$packages))
 }
 
 resolve_config_packages <- function(config, root = ".") {
-  declared <- config$packs$declared %||% character()
-  extras <- config$extras$declared %||% character()
-  exclude <- config$exclude$declared %||% character()
+  declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
+  extras <- toml_string_array(config$extras$declared %||% character(), "[extras].declared")
+  exclude <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
   packages <- unlist(lapply(declared, resolve_pack, root = root), use.names = FALSE)
   setdiff(unique(c(packages, extras)), exclude)
 }
