@@ -11,6 +11,11 @@ status <- function(root = ".", verbose = NULL) {
   valid <- FALSE
   packages <- character()
   packs <- character()
+  resolved_packs <- character()
+  extras <- character()
+  exclude <- character()
+  functions <- character()
+  function_status <- function_status_frame()
   parse_error <- NULL
   if (config_exists) {
     config <- tryCatch(
@@ -30,14 +35,36 @@ status <- function(root = ".", verbose = NULL) {
     if (isTRUE(valid)) {
       packages <- resolve_config_packages(config, root)
       packs <- config$packs$declared %||% character()
+      resolved_packs <- resolve_config_pack_names(config, root)
+      extras <- toml_string_array(config$extras$declared %||% character(), "[extras].declared")
+      exclude <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
+      functions <- installed_functions(config)
+      function_status <- collect_function_status(functions, root)
     }
   }
+  pack_catalog <- available_packs(root)
+  missing <- missing_packages(packages)
   out <- list(
     config_exists = config_exists,
     config_valid = valid,
     packs = packs,
+    resolved_packs = resolved_packs,
+    extras = extras,
+    exclude = exclude,
     packages = packages,
-    missing_packages = missing_packages(packages),
+    package_count = length(packages),
+    missing_packages = missing,
+    missing_package_count = length(missing),
+    functions = functions,
+    function_status = function_status,
+    function_count = length(functions),
+    function_missing_count = sum(!function_status$exists),
+    function_drift_count = sum(function_status$exists & !function_status$matches),
+    pack_catalog = pack_catalog,
+    pack_counts = stats::setNames(
+      vapply(c("project", "user", "builtin"), function(scope) sum(pack_catalog$scope == scope), integer(1)),
+      c("project", "user", "builtin")
+    ),
     renv_active = is_project_renv_active(root),
     lockfile_exists = file.exists(file.path(root, "renv.lock")),
     rprofile_hook = has_rprofile_line(root),
@@ -50,6 +77,39 @@ status <- function(root = ".", verbose = NULL) {
     cli::cli_li("renv active: {out$renv_active}")
     cli::cli_li("renv.lock: {if (out$lockfile_exists) 'present' else 'missing'}")
     cli::cli_li(".Rprofile hook: {out$rprofile_hook}")
+    cli::cli_li("declared packs: {format_status_values(out$packs)}")
+    cli::cli_li("resolved packages: {out$package_count} ({out$missing_package_count} missing)")
+    cli::cli_li("materialized functions: {out$function_count} ({out$function_missing_count} missing, {out$function_drift_count} drifted)")
+    cli::cli_li("pack catalog: {out$pack_counts[['project']]} project, {out$pack_counts[['user']]} user, {out$pack_counts[['builtin']]} built-in")
   }
   invisible(out)
+}
+
+function_status_frame <- function() {
+  data.frame(
+    name = character(),
+    path = character(),
+    exists = logical(),
+    matches = logical(),
+    stringsAsFactors = FALSE
+  )
+}
+
+collect_function_status <- function(functions, root) {
+  rows <- lapply(functions, function(name) {
+    local <- function_file(name, root)
+    package <- catalog_function_file(name)
+    exists <- file.exists(local)
+    matches <- exists && identical(readLines(local, warn = FALSE), readLines(package, warn = FALSE))
+    data.frame(name = name, path = local, exists = exists, matches = matches, stringsAsFactors = FALSE)
+  })
+  do.call(rbind, rows) %||% function_status_frame()
+}
+
+format_status_values <- function(values) {
+  if (length(values) == 0) {
+    "(none)"
+  } else {
+    paste(values, collapse = ", ")
+  }
 }

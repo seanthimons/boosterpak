@@ -81,6 +81,47 @@ test_that("status reports malformed config as invalid without aborting", {
   expect_match(s$config_error, "TOML|toml|Expected|parse")
 })
 
+test_that("status reports broader package, pack, and function state", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  add_function("ni", root = root, verbose = FALSE)
+  path <- boosterpak:::function_file("ni", root)
+  writeLines(c(readLines(path, warn = FALSE), "# local edit"), path)
+
+  local_mocked_bindings(
+    missing_packages = function(packages) packages[packages %in% "cli"],
+    .package = "boosterpak"
+  )
+
+  s <- status(root = root, verbose = FALSE)
+
+  expect_true(s$config_valid)
+  expect_equal(s$packs, c("core", "example"))
+  expect_setequal(s$resolved_packs, c("core", "example"))
+  expect_true(s$package_count >= 1)
+  expect_equal(s$missing_packages, "cli")
+  expect_equal(s$missing_package_count, 1L)
+  expect_equal(s$functions, "ni")
+  expect_equal(s$function_count, 1L)
+  expect_equal(s$function_missing_count, 0L)
+  expect_equal(s$function_drift_count, 1L)
+  expect_true(all(c("project", "user", "builtin") %in% names(s$pack_counts)))
+  expect_true(all(c("name", "scope", "path") %in% names(s$pack_catalog)))
+})
+
+test_that("status reports TOML-installed functions with missing files", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_function("ni", root = root, verbose = FALSE)
+  unlink(boosterpak:::function_file("ni", root))
+
+  s <- status(root = root, verbose = FALSE)
+
+  expect_equal(s$function_missing_count, 1L)
+  expect_false(s$function_status$exists[s$function_status$name == "ni"])
+})
+
 test_that("v0.1 settings validation accepts documented shapes", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
