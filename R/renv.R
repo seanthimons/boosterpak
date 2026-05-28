@@ -1,14 +1,25 @@
 is_project_renv_active <- function(root = ".") {
   renv_dir <- file.path(root, "renv")
   activate <- file.path(renv_dir, "activate.R")
+  if (!dir.exists(renv_dir) || !file.exists(activate)) {
+    return(FALSE)
+  }
+  lib <- renv::paths$library(project = root)
+  any(normalizePath(.libPaths(), winslash = "/", mustWork = FALSE) ==
+    normalizePath(lib, winslash = "/", mustWork = FALSE))
+}
+
+has_project_renv <- function(root = ".") {
+  renv_dir <- file.path(root, "renv")
+  activate <- file.path(renv_dir, "activate.R")
   dir.exists(renv_dir) && file.exists(activate)
 }
 
 ensure_project_renv <- function(root = ".") {
   if (!is_project_renv_active(root)) {
     cli::cli_abort(c(
-      "No active project-local renv was found.",
-      "i" = "Run {.code boosterpak::init(renv = 'yes')} or {.code renv::init()} first."
+      "No active project-local renv library was found.",
+      "i" = "Run {.code boosterpak::init(renv = 'yes')} or {.code renv::init()}, then restart R in the project."
     ), call = NULL)
   }
   invisible(TRUE)
