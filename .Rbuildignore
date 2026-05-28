@@ -1,9 +1,9 @@
-^\\.git$
-^\\.github$
-^\\.Rproj\\.user$
+^\.git$
+^\.github$
+^\.Rproj\.user$
 ^.*\\.Rproj$
-^\\.Rhistory$
-^\\.RData$
-^\\.Ruserdata$
+^\.Rhistory$
+^\.RData$
+^\.Ruserdata$
 ^booster_pak_PRD\\.md$
-^\\.gitignore$
+^\.gitignore$
