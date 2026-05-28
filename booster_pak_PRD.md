@@ -902,6 +902,28 @@ Implemented and verified:
 - User-authored function sources from external repos (the deferred feature in §9.5)
 - Sharing/discovery features (deferred from non-goals)
 
+### Phase 4 implementation status
+
+**Status as of 2026-05-28:** Initial v0.4 polish implemented in the repository
+as package `boosterpak` version `0.4.0`.
+
+Implemented and verified:
+
+- `status()` now reports declared and resolved packs, extras, excludes, package
+  counts, missing direct package counts, installed function names, materialized
+  function missing/drift counts, pack catalog entries, pack counts by scope,
+  `renv` state, `renv.lock` presence, `.Rprofile` hook state, and parse or
+  validation errors.
+- Targeted tests cover the broader status payload, missing package counting,
+  materialized function drift, and missing materialized function files.
+
+Still deferred beyond this v0.4 increment:
+
+- Optional RStudio addin.
+- `rv` backend exploration.
+- User-authored function sources from external repos.
+- Sharing/discovery features.
+
 ---
 
 ## 13. Decisions and deferred questions

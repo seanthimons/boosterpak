@@ -2,7 +2,10 @@
 #'
 #' @param root Project root.
 #' @param verbose Whether to print routine summaries.
-#' @return A list describing project status, invisibly.
+#' @return A list describing project status, invisibly. Includes config
+#'   validity, declared and resolved packs, package and missing-package counts,
+#'   materialized function drift/missing counts, pack catalog counts, renv state,
+#'   lockfile presence, and `.Rprofile` hook state.
 #' @export
 status <- function(root = ".", verbose = NULL) {
   check_verbose(verbose)

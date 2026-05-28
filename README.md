@@ -66,5 +66,9 @@ boosterpak::status()
 boosterpak::list_packs()
 ```
 
-Current development includes function materialization and pack capture/promotion;
-pruning remains out of scope.
+`status()` reports config validity, declared and resolved packs, package counts,
+missing direct packages, function drift or missing materialized files, pack
+catalog counts, `renv` state, lockfile presence, and the `.Rprofile` hook.
+
+Current development includes function materialization, pack capture/promotion,
+and broader project status reporting; pruning remains out of scope.
