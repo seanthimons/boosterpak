@@ -822,32 +822,22 @@ The manual smoke project lives at `~/Documents/boosterpak_test/smoke_20260528_11
 - `air.toml` was written.
 - `status()` can detect the config, active `renv`, lockfile, and `.Rprofile` hook.
 
-It does **not** currently prove final package hydration for the final v0.1 catalog. The smoke project's `boosters.toml` declares `["core", "example"]`, but its existing `renv.lock` only contains `renv`, and current `status()` reports most declared packages missing (`fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`). Yes: this means the smoke project still needs to be hydrated by running `boosterpak::sync(mode = "apply")` with an active project-local `renv` so `pak` installs the missing packages and `renv::snapshot()` updates `renv.lock`.
+It now also proves final package hydration for the final v0.1 catalog. On 2026-05-28, the smoke project was repaired by installing `pak` into its project-local `renv`, running `boosterpak::sync(mode = "apply")`, repairing two missing transitive dependencies reported by `renv::snapshot()` (`cpp11` and `progress`), and rerunning `sync()`.
 
-Recommended smoke-project repair:
+Verified result after hydration:
 
-```r
-pkgload::load_all("C:/Users/sxthi/Documents/boosterpak")
-source("renv/activate.R")
-boosterpak::sync(mode = "apply", verbose = TRUE)
-boosterpak::status(verbose = TRUE)
-```
-
-Expected result after hydration:
-
-- `status()$missing_packages` is empty for packages declared by `["core", "example"]`;
-- `renv.lock` includes the directly declared packages installed from `core` and `example`;
-- the smoke folder proves both initialization mechanics and final package installation.
+- `status()$missing_packages` is empty for packages declared by `["core", "example"]`.
+- `renv.lock` includes the directly declared packages installed from `core` and `example`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, `digest`, and `cli`.
+- `renv.lock` contains 109 locked packages after snapshot.
+- The smoke folder proves both initialization mechanics and final package installation.
 
 ### Next work after v0.1
 
-The remaining PRD items are deferred Phase 2+ work, plus one manual verification task:
+The remaining PRD items are deferred Phase 3+ work, plus optional day-to-day installation:
 
-1. Hydrate the manual smoke project at `~/Documents/boosterpak_test/smoke_20260528_111948` and confirm `status()` reports no missing declared packages.
-2. Install `boosterpak` into the user's R library when ready for day-to-day use. Development so far has used `pkgload::load_all()` and package check installs, not a persistent user-library install.
-3. Phase 2: implement function materialization (`add_function()`, `remove_function()`, `list_functions()`, `check_functions()`, `diff_function()`, `inst/functions/`, and `[functions].installed`).
-4. Phase 3: implement pack capture and promotion (`save_pack()`, `promote_pack()`, `demote_pack()`, and richer user-scope pack workflows).
-5. Phase 4/future: broaden `status()`, improve real-world error messages, explore an RStudio addin, keep `rv` integration deferred behind the installer abstraction, and revisit recipe/discovery ideas.
+1. Install `boosterpak` into the user's R library when ready for day-to-day use. Development so far has used `pkgload::load_all()` and package check installs, not a persistent user-library install.
+2. Phase 3: implement pack capture and promotion (`save_pack()`, `promote_pack()`, `demote_pack()`, and richer user-scope pack workflows).
+3. Phase 4/future: broaden `status()`, improve real-world error messages, explore an RStudio addin, keep `rv` integration deferred behind the installer abstraction, and revisit recipe/discovery ideas.
 
 ### Phase 2 — Function materialization (v0.2)
 
@@ -859,6 +849,23 @@ The remaining PRD items are deferred Phase 2+ work, plus one manual verification
 - `[functions].installed` in TOML
 - `check_functions()` drift detection
 - `diff_function()` for inspection
+
+### Phase 2 implementation status
+
+**Status as of 2026-05-28:** Implemented in the repository.
+
+Implemented and verified:
+
+- Built-in function catalog in `inst/functions/` for `ni`, `my_skim`, `theme_custom`, and `geo_mean`.
+- Exported defaults: `%ni%`, `my_skim()`, `theme_custom()`, and `geo_mean()`.
+- Public v0.2 exports: `add_function()`, `remove_function()`, `list_functions()`, `check_functions()`, and `diff_function()`.
+- Materialization to `boosters/fn_<name>.R`.
+- `[functions].installed` TOML tracking.
+- Validation of installed function names with did-you-mean suggestions.
+- `sync(mode = "apply")` rematerializes missing installed function files without overwriting existing local edits.
+- Drift detection uses literal line comparison against `inst/functions/<name>.R`.
+- `diff_function()` returns and optionally prints a simple package-vs-local line diff.
+- Targeted tests cover catalog listing, materialization, overwrite safety, removal, drift/diff reporting, sync rematerialization, sync preservation of local edits, and unknown function validation.
 
 ### Phase 3 — Pack capture and promotion (v0.3)
 
