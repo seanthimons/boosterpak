@@ -1,3 +1,10 @@
 name = "core"
 description = "Minimal baseline pack for boosterpak projects."
-packages = []
+packages = [
+  "fs",
+  "here",
+  "janitor",
+  "rio",
+  "tidyverse",
+  "digest",
+]

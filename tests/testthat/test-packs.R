@@ -5,7 +5,22 @@ test_that("built-in packs are discoverable", {
 })
 
 test_that("packs resolve transitively", {
-  expect_equal(boosterpak:::resolve_pack("example"), "cli")
+  expect_equal(
+    boosterpak:::resolve_pack("example"),
+    c("fs", "here", "janitor", "rio", "tidyverse", "digest", "cli")
+  )
+})
+
+test_that("built-in catalog matches v0.1 PRD contents", {
+  expect_equal(
+    boosterpak:::resolve_pack("core"),
+    c("fs", "here", "janitor", "rio", "tidyverse", "digest")
+  )
+  expect_equal(boosterpak:::resolve_pack("github-example"), "ComptoxR")
+  expect_equal(
+    boosterpak:::resolve_pack_sources("github-example"),
+    c(ComptoxR = "seanthimons/ComptoxR")
+  )
 })
 
 test_that("source overrides become install specs", {
@@ -22,6 +37,6 @@ test_that("source overrides become install specs", {
   add_pack("custom", root = root, sync = FALSE, verbose = FALSE)
 
   config <- boosterpak:::read_config(root)
-  expect_equal(boosterpak:::resolve_config_packages(config, root), "pointblank")
-  expect_equal(boosterpak:::resolve_config_install_specs(config, root), "rstudio/pointblank")
+  expect_true("pointblank" %in% boosterpak:::resolve_config_packages(config, root))
+  expect_true("rstudio/pointblank" %in% boosterpak:::resolve_config_install_specs(config, root))
 })

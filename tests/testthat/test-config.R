@@ -31,3 +31,14 @@ test_that("non-interactive ask errors when Rprofile action is needed", {
     "rprofile = 'yes'"
   )
 })
+
+test_that("status reports malformed config as invalid without aborting", {
+  root <- withr::local_tempdir()
+  writeLines("[packs", file.path(root, "boosters.toml"))
+
+  s <- status(root = root, verbose = FALSE)
+
+  expect_true(s$config_exists)
+  expect_false(s$config_valid)
+  expect_match(s$config_error, "TOML|toml|Expected|parse")
+})

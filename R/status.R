@@ -11,13 +11,23 @@ status <- function(root = ".", verbose = NULL) {
   valid <- FALSE
   packages <- character()
   packs <- character()
+  parse_error <- NULL
   if (config_exists) {
-    config <- read_config(root)
-    valid <- tryCatch({
+    config <- tryCatch(
+      read_config(root),
+      error = function(err) {
+        parse_error <<- conditionMessage(err)
+        NULL
+      }
+    )
+    valid <- !is.null(config) && tryCatch({
       validate_config(config, root)
       TRUE
-    }, error = function(err) FALSE)
-    if (valid) {
+    }, error = function(err) {
+      parse_error <<- conditionMessage(err)
+      FALSE
+    })
+    if (isTRUE(valid)) {
       packages <- resolve_config_packages(config, root)
       packs <- config$packs$declared %||% character()
     }
@@ -30,7 +40,8 @@ status <- function(root = ".", verbose = NULL) {
     missing_packages = missing_packages(packages),
     renv_active = is_project_renv_active(root),
     lockfile_exists = file.exists(file.path(root, "renv.lock")),
-    rprofile_hook = has_rprofile_line(root)
+    rprofile_hook = has_rprofile_line(root),
+    config_error = parse_error
   )
   if (should_emit(verbose)) {
     cli::cli_h1("boosterpak status")

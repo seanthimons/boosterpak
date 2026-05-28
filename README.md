@@ -30,9 +30,9 @@ boosterpak::add_pack("example")
 
 The v0.1 built-in pack catalog contains:
 
-- `core`: a minimal baseline pack.
+- `core`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`.
 - `example`: extends `core` and installs `cli`.
-- `github-example`: demonstrates source override structure.
+- `github-example`: installs `ComptoxR` from `seanthimons/ComptoxR`.
 
 Pack mutation is additive in v0.1. Removing a pack updates `boosters.toml` and
 can run sync, but it does not uninstall packages.

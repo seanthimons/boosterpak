@@ -1,5 +1,6 @@
 name = "github-example"
-description = "Example pack showing a GitHub source override without adding install weight by default."
-packages = []
+description = "Example pack showing a GitHub source override through pak."
+packages = ["ComptoxR"]
 
 [sources]
+"ComptoxR" = "seanthimons/ComptoxR"

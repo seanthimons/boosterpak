@@ -141,7 +141,7 @@ resolve_pack_sources <- function(name, root = ".", stack = character()) {
   pack <- load_pack(name, root)
   parents <- toml_string_array(pack$extends %||% character(), sprintf("%s extends", pack$.__path__))
   parent_sources <- lapply(parents, resolve_pack_sources, root = root, stack = c(stack, name))
-  sources <- c(unlist(parent_sources, recursive = FALSE), as.list(pack$sources %||% list()))
+  sources <- c(unlist(parent_sources, recursive = FALSE), unlist(pack$sources %||% list(), use.names = TRUE))
   sources[!duplicated(names(sources), fromLast = TRUE)]
 }
 
@@ -157,9 +157,9 @@ resolve_config_install_specs <- function(config, root = ".") {
   declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
   exclude <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
   packages <- resolve_config_packages(config, root)
-  sources <- c(unlist(lapply(declared, resolve_pack_sources, root = root), recursive = FALSE), as.list(config$sources %||% list()))
+  sources <- c(unlist(lapply(declared, resolve_pack_sources, root = root), recursive = FALSE), unlist(config$sources %||% list(), use.names = TRUE))
   vapply(packages, function(package) {
-    if (!package %in% exclude && !is.null(sources[[package]])) {
+    if (!package %in% exclude && package %in% names(sources)) {
       as.character(sources[[package]])
     } else {
       package
