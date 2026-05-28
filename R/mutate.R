@@ -69,6 +69,12 @@ update_declared_array <- function(path, section, key, values) {
     cli::cli_abort("Could not safely update [{section}].{key} in {.file {path}}.", call = NULL)
   }
   target <- section_start + key_lines[[1]] - 1
+  if (!grepl("\\[.*\\]", lines[[target]])) {
+    cli::cli_abort(
+      "Could not safely update multi-line [{section}].{key} in {.file {path}}.",
+      call = NULL
+    )
+  }
   lines[[target]] <- sprintf("%s = [%s]", key, paste(sprintf('"%s"', vapply(values, escape_toml_string, character(1))), collapse = ", "))
   writeLines(lines, path, useBytes = TRUE)
   invisible(path)

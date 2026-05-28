@@ -24,6 +24,26 @@ test_that("init inserts Rprofile hook after renv activation", {
   expect_equal(hook_line, renv_line + 1L)
 })
 
+test_that("init leaves existing Rprofile hook unchanged", {
+  root <- withr::local_tempdir()
+  writeLines(c("before <- TRUE", boosterpak:::rprofile_line(), "after <- TRUE"), file.path(root, ".Rprofile"))
+  before <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+
+  expect_equal(readLines(file.path(root, ".Rprofile"), warn = FALSE), before)
+})
+
+test_that("init does not overwrite existing boosters.toml", {
+  root <- withr::local_tempdir()
+  writeLines(c("[project]", 'name = "kept"'), file.path(root, "boosters.toml"))
+  before <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
+
+  expect_error(init(root = root, renv = "no", rprofile = "no", verbose = FALSE), NA)
+
+  expect_equal(readLines(file.path(root, "boosters.toml"), warn = FALSE), before)
+})
+
 test_that("non-interactive ask errors when Rprofile action is needed", {
   root <- withr::local_tempdir()
   expect_error(

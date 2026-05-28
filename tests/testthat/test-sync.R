@@ -23,3 +23,18 @@ test_that("sync restore requires boosters.toml and renv.lock", {
     "renv.lock"
   )
 })
+
+test_that("restore consistency warning reports direct packages absent from lockfile", {
+  root <- withr::local_tempdir()
+  lockfile <- file.path(root, "renv.lock")
+  jsonlite::write_json(
+    list(R = list(Version = "4.5.1"), Packages = list(renv = list(Package = "renv"))),
+    lockfile,
+    auto_unbox = TRUE
+  )
+
+  expect_warning(
+    boosterpak:::warn_missing_lock_packages(c("cli"), lockfile),
+    "cli"
+  )
+})
