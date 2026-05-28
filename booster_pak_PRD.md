@@ -1,4 +1,4 @@
-# `boosters` — Product Requirements Document
+# `boosterpak` — Product Requirements Document
 
 **Status:** Draft v0.1
 **Author:** Sean Thimons
@@ -24,7 +24,7 @@ The cost is real:
 3. **Drift across projects.** Two of *your own* projects begun three months apart will diverge in non-obvious ways, making it hard to move code between them.
 4. **No clean upgrade path.** When you learn a better idiom (`pak` over `install.packages()`, `nanoparquet` over `arrow` for some use cases), updating every project is manual.
 
-`boosters` is an R package that solves these problems by giving practitioners a UV/Cargo-style declarative project manifest, a small but composable system of curated package bundles ("boosters"), and an opt-in mechanism for materializing personal helper functions into projects.
+`boosterpak` is an R package that solves these problems by giving practitioners a UV/Cargo-style declarative project manifest, a small but composable system of curated package bundles ("boosters"), and an opt-in mechanism for materializing personal helper functions into projects.
 
 The design borrows from package managers that have demonstrably reduced friction in adjacent ecosystems: **Cargo** (Rust), **UV** (Python), and to a lesser extent **renv** (R) and **shadcn/ui** (TypeScript/React). It does not attempt to replace `renv`, `pak`, or `usethis` — it composes with them.
 
@@ -50,7 +50,7 @@ The design borrows from package managers that have demonstrably reduced friction
 
 | # | Goal |
 |---|------|
-| G1 | One-command onboarding: `pak::pkg_install("seanthimons/boosters"); boosters::sync()` reproduces the author's environment in a cloned project. |
+| G1 | One-command onboarding: `pak::pkg_install("seanthimons/boosterpak"); boosterpak::sync()` reproduces the author's environment in a cloned project. |
 | G2 | Human-edited project config in a single, forgiving file format (TOML). |
 | G3 | Composable package bundles via "packs," with three scopes: built-in, user, project. |
 | G4 | Personal helper functions (`%ni%`, `my_skim`, etc.) ship as defaults in the package and can be opt-in materialized into projects as editable files. |
@@ -62,7 +62,7 @@ The design borrows from package managers that have demonstrably reduced friction
 
 | # | Non-goal | Rationale |
 |---|---|---|
-| NG1 | Replacing `renv` as the lockfile system. | `renv` already does this well. `boosters` produces `renv.lock` via `renv::snapshot()` and considers it the source of truth for installed versions. |
+| NG1 | Replacing `renv` as the lockfile system. | `renv` already does this well. `boosters` can produce `renv.lock` via `renv::snapshot()` and can restore from it explicitly, but normal project intent remains in `boosters.toml`. |
 | NG2 | Cross-language environment management. | UV does this for Python; `boosters` is R-only. |
 | NG3 | A package registry or hosting service for community packs. | v0.1 supports sharing packs via TOML files exchanged out-of-band (Slack, GitHub gists, etc.). Centralized discovery is deferred. |
 | NG4 | User-authored functions sourced from arbitrary external repos. | Materialized functions ship with `boosters` itself; community functions are deferred (see §9). |
@@ -77,15 +77,15 @@ These are the user stories the design must serve. Every design decision in this 
 
 ### Scenario A: Starting a new project
 
-> Sean creates a new project in RStudio. He runs `boosters::init()`. A `boosters.toml` appears in the project root with sensible defaults. He runs `boosters::sync()`. The tidyverse plus a handful of his standard packages are installed. He opens a Quarto doc and starts working.
+> Sean creates a new project in RStudio. He runs `boosterpak::init()`. A `boosters.toml` appears in the project root with sensible defaults. He runs `boosterpak::sync()`. The tidyverse plus a handful of his standard packages are installed. He opens a Quarto doc and starts working.
 
 ### Scenario B: Adding a capability to an existing project
 
-> Sean is mid-project and realizes he needs spatial analysis. He runs `boosters::add_pack("spatial")`. The pack's packages are installed immediately. He restarts R and `sf` is available.
+> Sean is mid-project and realizes he needs the documented example pack. He runs `boosterpak::add_pack("example")`. The pack's packages are installed immediately. He restarts R and `cli` is available.
 
 ### Scenario C: Onboarding a coworker
 
-> Sean's coworker clones the project's git repo. They run `boosters::sync()`. Every package the project declares is installed (or restored from `renv.lock` if present). The project's custom helper functions (`my_skim`, `theme_custom`, `%ni%`) appear in `boosters/` and are sourced at session start. The coworker opens R and is working in Sean's environment without further setup.
+> Sean's coworker clones the project's git repo. They run `boosterpak::sync()`, which applies the package intent declared in `boosters.toml` and installs missing packages. If the project owner wants exact lockfile fidelity, the coworker instead runs `boosterpak::sync(mode = "restore")`, which restores from `renv.lock`. The coworker opens R and is working in Sean's declared environment without further setup.
 
 ### Scenario D: Capturing a working environment as a reusable pack
 
@@ -108,11 +108,11 @@ This is the mental model the entire system is built around. Everything below is 
 ```mermaid
 flowchart TB
     subgraph setup["Setup (once per project)"]
-        init["boosters::init()<br/>Writes boosters.toml,<br/>updates .Rprofile"]
+        init["boosterpak::init()<br/>Writes boosters.toml,<br/>updates .Rprofile"]
     end
 
     subgraph files["Project files (committed to git)"]
-        toml["boosters.toml<br/>Declared packs & functions"]
+        toml["boosters.toml<br/>Declared packs & settings"]
         dir["boosters/<br/>Materialized fn files"]
         lock["renv.lock<br/>Resolved versions"]
         packs["boosters/packs/<br/>Project-scoped packs"]
@@ -127,12 +127,12 @@ flowchart TB
     end
 
     subgraph reconcile["Reconcile"]
-        sync["boosters::sync()"]
+        sync["boosterpak::sync()"]
     end
 
     subgraph effects["Effects"]
         pak["pak::pkg_install()"]
-        write["Materialize files in boosters/"]
+        write["Materialize in-scope files"]
         snap["renv::snapshot()"]
     end
 
@@ -157,9 +157,10 @@ flowchart TB
 **Key invariants:**
 
 - **TOML is always the source of truth.** Every mutation flows through it. The filesystem (`boosters/*.R`) and the installed environment are projections.
-- **`sync()` is the reconciliation function.** It exists to make the filesystem and environment match what TOML declares.
-- **Mutate verbs are eager by default.** `add_pack("spatial")` installs `sf` immediately; it doesn't just edit TOML and defer.
-- **`renv.lock` is downstream.** `boosters` produces `renv.lock` as a side effect of sync, but never reads from it for intent — TOML is intent, `renv.lock` is reality.
+- **`sync()` is the reconciliation function.** By default, `sync(mode = "apply")` makes the filesystem and environment match what TOML declares. `sync(mode = "restore")` is the explicit path for restoring exact package versions from `renv.lock`.
+- **Mutate verbs are eager by default.** `add_pack("example")` installs missing packages immediately; it doesn't just edit TOML and defer.
+- **Package sync is additive only in v0.1.** `remove_pack()` removes declarations from TOML. `remove_pack(sync = TRUE)` then runs additive sync, but it never uninstalls packages in v0.1.
+- **`renv.lock` is downstream of normal sync.** In `mode = "apply"`, `boosters` treats TOML as intent and `renv.lock` as output. Exact lockfile restoration is available only through `mode = "restore"`.
 
 ---
 
@@ -169,17 +170,16 @@ flowchart TB
 
 ```
 my-project/
-├── boosters.toml              # human-edited config (intent)
-├── boosters/                  # tool-managed (projection)
-│   ├── fn_ni.R                # one file per materialized function
-│   ├── fn_my_skim.R
-│   └── packs/                 # project-scoped pack definitions
-│       └── project_baseline.toml
-├── renv.lock                  # machine-managed (reality)
-├── renv/                      # renv's internals
-├── air.toml                   # written by init() if requested
-├── .Rprofile                  # contains the boosters source line
-└── (rest of project)
+|-- boosters.toml              # human-edited config (intent)
+|-- boosters/                  # tool-managed (projection)
+|   |-- packs/                 # project-scoped pack definitions
+|   |   `-- project_baseline.toml
+|   `-- fn_*.R                 # Phase 2+: materialized function files
+|-- renv.lock                  # machine-managed lockfile output
+|-- renv/                      # renv's internals
+|-- air.toml                   # written by init() if requested
+|-- .Rprofile                  # contains the boosters source line if accepted
+`-- (rest of project)
 ```
 
 ### 6.2 Why `boosters/` and not `R/`?
@@ -199,7 +199,7 @@ Materialized function files use the prefix `fn_` (e.g., `fn_ni.R`, `fn_my_skim.R
 1. Makes it visually obvious which files are managed by `boosters` vs. user-added.
 2. Reserves the un-prefixed namespace for future tool use (e.g., `init_*.R`, `recipe_*.R`).
 
-> **[AMBIGUITY 6.3.A]** Should the `fn_` prefix appear in the function name itself, or only in the filename? Recommend filename-only — `boosters::add_function("ni")` materializes `boosters/fn_ni.R` which defines `` `%ni%` ``. The user-facing identifier ("ni") and the file naming convention are separable. **Coding agent: confirm with author before implementing.**
+> **[DEFERRED 6.3.A | Phase 2]** Should the `fn_` prefix appear in the function name itself, or only in the filename? Current recommendation: filename-only — `boosters::add_function("ni")` materializes `boosters/fn_ni.R` which defines `` `%ni%` ``. The user-facing identifier ("ni") and the file naming convention are separable.
 
 ### 6.4 The `.Rprofile` line
 
@@ -216,9 +216,12 @@ This is the only piece of "automatic" behavior in the system. It sources every `
 - The pattern `^fn_.*\\.R$` ensures only function files are sourced. Pack TOMLs in `boosters/packs/` are unaffected (different extension), and any future `boosters/`-managed files with other prefixes won't accidentally execute.
 - `init()` MUST show the user the exact line being added and ask for confirmation before modifying `.Rprofile`.
 - If `.Rprofile` already exists and the line is already present, do nothing.
-- If the user removes the line manually, `boosters` does not re-add it on subsequent `init()` calls.
+- If `.Rprofile` exists and the line is absent, prompt to add it.
+- If `.Rprofile` contains a project-local `renv` activation line such as `source("renv/activate.R")`, insert the boosters line after that activation line so `renv` remains responsible for library activation before helpers are sourced.
+- If no `renv` activation line is present, append the boosters line using the same prompt and non-interactive rules.
+- If the user removes the line manually, a later `init()` prompts again because absence is treated as unresolved setup. It never silently re-adds the line.
 
-> **[AMBIGUITY 6.4.A]** What's the behavior if `.Rprofile` exists but doesn't have the boosters line, and the user re-runs `init()`? Options: (a) error; (b) prompt to add; (c) silently add. Recommend (b). **Coding agent: confirm before implementing.**
+> **[DECISION 6.4.A]** If `.Rprofile` exists but does not have the boosters line, `init()` prompts to add it. No silent re-add.
 
 ---
 
@@ -230,14 +233,14 @@ The project-level config file. Human-edited (though normally mutated by verbs). 
 
 ```toml
 # boosters.toml — project configuration
-# Edit this file directly or use boosters::add_pack() / remove_pack() etc.
+# Edit this file directly or use boosterpak::add_pack() / remove_pack() etc.
 
 [project]
 name = "my-water-quality-analysis"
 boosters_version = "0.1.0"   # the version of boosters that wrote this file
 
 [packs]
-declared = ["core", "eda", "spatial"]
+declared = ["core", "example", "github-example"]
 
 [extras]
 # One-off packages not in any pack
@@ -250,20 +253,10 @@ declared = [
 # Packages a pack would normally include, but you don't want
 declared = ["arrow"]
 
-[functions]
-installed = ["ni", "my_skim"]
-
 [settings]
 air_toml = true                          # write air.toml on init
 parallel_daemons = "auto"                # or an integer
 auto_snapshot = true                     # call renv::snapshot() at end of sync()
-
-[settings.camcorder]
-enabled = false
-dpi = 320
-width = 10
-height = 7
-units = "in"
 ```
 
 ### 7.2 Schema notes
@@ -271,13 +264,13 @@ units = "in"
 - **`[project].boosters_version`** is written by `init()` and updated by `sync()`. It's informational, not a constraint — `boosters` does not refuse to operate on TOMLs from older versions, but `sync()` may warn if the file was written by a newer version than the installed `boosters`.
 - **`[packs].declared`** is the list of pack names to install. Resolution order: project → user → built-in (see §8.3).
 - **`[extras].declared`** holds packages not bundled in any pack. Strings can be plain CRAN names (`"pointblank"`), `user/repo` GitHub references, or anything `pak` understands.
-- **`[exclude].declared`** is a deny-list applied after pack resolution. If `spatial` includes `arrow` but you don't want it, list `arrow` here.
-- **`[functions].installed`** tracks which function files have been materialized via `add_function()`. `sync()` ensures every name here corresponds to a file in `boosters/`.
-- **`[settings]`** holds `boosters`-specific options. The nested `[settings.camcorder]` is a worked example; settings are NOT a general-purpose config bag for unrelated tools.
+- **`[exclude].declared`** is a deny-list applied after pack resolution. If a future curated pack includes `arrow` but you don't want it, list `arrow` here.
+- **`[functions].installed`** is introduced in Phase 2/v0.2. It tracks which function files have been materialized via `add_function()`, and Phase 2 `sync()` ensures every name here corresponds to a file in `boosters/`.
+- **`[settings]`** holds `boosters`-specific options. Phase 1/v0.1 consumes only `air_toml`, `auto_snapshot`, and `parallel_daemons`; settings are NOT a general-purpose config bag for unrelated tools.
 
-> **[AMBIGUITY 7.2.A]** Should `[settings.camcorder]` actually drive runtime behavior in v0.1, or is it purely declarative (the user copies values into their own code)? Recommend: declarative only in v0.1. `boosters` ships a `boosters::camcorder_config()` helper that reads the TOML and returns a list the user passes to `camcorder::gg_record()`. Don't auto-call `gg_record()` on session start — too magical. **Coding agent: confirm scope of settings consumption.**
+> **[DECISION 7.2.A]** `[settings.camcorder]` is declarative only and deferred beyond v0.1. A future `boosters::camcorder_config()` helper may read the TOML and return a list the user passes to `camcorder::gg_record()`. v0.1 does not auto-call `camcorder::gg_record()`.
 
-> **[AMBIGUITY 7.2.B]** Format of the `boosters_version` field — semver string? Or include the package version object? Recommend plain string matching `utils::packageVersion("boosters")`. **Coding agent: confirm.**
+> **[DECISION 7.2.B]** `boosters_version` is a plain string matching `utils::packageVersion("boosters")`.
 
 ### 7.3 Validation requirements
 
@@ -285,10 +278,11 @@ When `sync()` runs, it validates `boosters.toml` BEFORE any `pak` calls:
 
 1. **TOML parses.** Surface the parser's error verbatim with file and line.
 2. **All declared pack names resolve.** Unknown names get a did-you-mean suggestion via `agrep` or `stringdist::amatch` against the union of available packs.
-3. **All function names in `[functions].installed` exist in the package's catalog.** Same did-you-mean treatment.
-4. **No cycles in pack `extends` chains** (see §8.4).
-5. **Type checks on settings.** `parallel_daemons` is `"auto"` or a positive integer; `dpi` is a positive integer; etc.
-6. **Unknown keys produce warnings, not errors.** Forward-compat for newer `boosters` versions writing fields older versions don't understand.
+3. **No cycles in pack `extends` chains** (see §8.4).
+4. **Type checks on Phase 1 settings.** `parallel_daemons` is `"auto"` or a positive integer; `air_toml` and `auto_snapshot` are booleans.
+5. **Unknown keys produce warnings, not errors.** Forward-compat for newer `boosters` versions writing fields older versions don't understand.
+
+Phase 2 adds validation that all function names in `[functions].installed` exist in the package's catalog, with the same did-you-mean treatment used for packs.
 
 The validator's error messages should look like this:
 
@@ -296,15 +290,15 @@ The validator's error messages should look like this:
 ✖ boosters.toml is invalid:
 
   In [packs].declared (line 9):
-    "spatail" is not a known pack.
-    Did you mean: "spatial"?
+    "exampel" is not a known pack.
+    Did you mean: "example"?
 
   Available packs:
-    Built-in: core, eda, spatial, web, plot, modeling, shiny, report
-    User:     my_eda
-    Project:  project_baseline
+    Built-in: core, example, github-example
+    User:     (none)
+    Project:  (none)
 
-  Run boosters::list_packs() for descriptions.
+  Run boosterpak::list_packs() for descriptions.
 ```
 
 This is the difference between a tool that's pleasant and one that isn't. Budget real time for error-message design.
@@ -354,11 +348,11 @@ extends = ["core"]
 
 ### 8.3 Resolution order
 
-When the user references pack `"eda"`:
+When the user references pack `"example"`:
 
-1. Look in `./boosters/packs/eda.toml` (project scope).
-2. If not found, look in `<user_config>/packs/eda.toml` (user scope).
-3. If not found, look in `system.file("packs/eda.toml", package = "boosters")` (built-in).
+1. Look in `./boosters/packs/example.toml` (project scope).
+2. If not found, look in `<user_config>/packs/example.toml` (user scope).
+3. If not found, look in `system.file("packs/example.toml", package = "boosters")` (built-in).
 4. If still not found: validation error with did-you-mean.
 
 **First match wins.** This means user and project packs can shadow built-in packs of the same name. This is intentional — it lets users customize without forking. `list_packs()` always shows the source so there's no mystery.
@@ -392,36 +386,31 @@ The cycle check is non-optional. Implement it in v0.1 even though users are unli
 - `scope = "project"` (default): writes to `boosters/packs/<name>.toml`.
 - `scope = "user"`: writes to `<user_config>/packs/<name>.toml`.
 - `from = NULL` (default): captures all packages currently resolved from the project's `boosters.toml`.
-- `from = "spatial"`: captures only what the named pack contributes (useful for forking a built-in pack to customize).
+- `from = "core"`: captures only what the named pack contributes (useful for forking a built-in pack to customize).
 
 The saved pack flattens to actual package names; it does not retain `extends` references to other packs. This is intentional — the captured pack is a snapshot, not a live composition. If the parent pack changes upstream, the saved pack does not drift.
 
 `boosters::promote_pack(name)` copies a project pack to user scope. `boosters::demote_pack(name)` is the inverse. Both refuse to overwrite without `overwrite = TRUE`.
 
-> **[AMBIGUITY 8.5.A]** When `save_pack` runs in a project that has `[extras]` and `[exclude]` declared, should those be folded into the saved pack? Recommend: yes, fold them into `packages` (extras included, excludes removed). The saved pack should be self-contained. **Coding agent: confirm before implementing.**
+> **[DEFERRED 8.5.A | Phase 3]** When `save_pack` runs in a project that has `[extras]` and `[exclude]` declared, should those be folded into the saved pack? Current recommendation: yes, fold them into `packages` (extras included, excludes removed). The saved pack should be self-contained.
 
 ### 8.6 Built-in pack catalog (v0.1)
 
-The initial built-in packs, drawn from the author's gist. Each lives in `inst/packs/<name>.toml` in the package source.
+The v0.1 built-in catalog is intentionally small. It should prove the pack mechanism, local template/example behavior, and non-CRAN `pak` source routing without requiring the full personal catalog to be curated before the walking skeleton ships. Each pack lives in `inst/packs/<name>.toml` in the package source.
 
 | Pack | Purpose | Approximate contents |
 |---|---|---|
 | `core` | Always-useful foundation | `fs`, `here`, `janitor`, `rio`, `tidyverse`, `digest` |
-| `parallel` | Parallel/async execution | `futureverse`, `mirai`, `parallel` |
-| `db` | Local databases & columnar storage | `nanoparquet`, `duckdb`, `duckplyr`, `dbplyr` |
-| `eda` | Exploratory data analysis | `skimr`, `fuzzyjoin`, `powerjoin` |
-| `web` | HTTP & scraping | `rvest`, `polite`, `httr2` |
-| `plot` | Plotting extensions | `paletteer`, `ragg`, `camcorder`, `patchwork`, `ggtext`, `ggrepel`, `ggdist` |
-| `spatial` | Geospatial workflows | `sf`, `geoarrow`, `duckdbfs`, `tidycensus`, `mapgl`, `dataRetrieval`, `StreamCatTools` |
-| `modeling` | Statistical modeling | `tidymodels`, `MuMIn`, `infer`, `tidytext` |
-| `shiny` | Web apps | `shiny`, `bslib`, `DT`, `plotly` |
-| `report` | Reporting | `quarto`, `gt`, `gtsummary` |
+| `example` | Minimal template pack used in docs/tests | `cli` |
+| `github-example` | Demonstrates non-CRAN source routing through `pak` | `ComptoxR` with source `"seanthimons/ComptoxR"` |
 
-> **[AMBIGUITY 8.6.A]** The exact package list per pack is a curatorial decision. The list above mirrors the author's current gist; coding agent should treat these as initial values, not requirements. The author should review and adjust before v0.1 ships. **Coding agent: present this list to author for final approval before implementation.**
+> **[DECISION 8.6.A]** v0.1 ships only `core`, `example`, and `github-example`. The broader curated catalog is deferred to later phases. Exact contents: `core` contains `fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`; `example` contains `cli`; `github-example` contains `ComptoxR` with `[sources] "ComptoxR" = "seanthimons/ComptoxR"`.
 
 ---
 
 ## 9. Functions
+
+Function materialization is a Phase 2/v0.2 feature. Phase 1/v0.1 does not require function catalog files, does not validate function catalog entries, and does not include `[functions]` in the main `boosters.toml` example. This section records the intended Phase 2 contract so the v0.1 schema can remain forward-compatible without carrying dormant implementation complexity.
 
 ### 9.1 The default-vs-materialized model
 
@@ -437,7 +426,7 @@ This is the [shadcn/ui](https://ui.shadcn.com/) pattern adapted to R. It serves 
 - **Defaults work out of the box.** A coworker who never touches `add_function()` still gets `boosters::my_skim()`.
 - **Customization is non-destructive.** Editing `boosters/fn_my_skim.R` does not affect any other project, and the package's default version stays as a reference.
 
-### 9.2 Catalog (v0.1)
+### 9.2 Catalog (v0.2)
 
 Initial functions, drawn from the author's gist:
 
@@ -448,14 +437,21 @@ Initial functions, drawn from the author's gist:
 | `theme_custom` | Minimal ggplot2 theme with white panels and angled x-axis labels |
 | `geo_mean` | Geometric mean of positive values |
 
-> **[AMBIGUITY 9.2.A]** Are there other helper functions in the author's day-to-day workflow that should ship in the initial catalog? The gist is heavily commented; some functions may be intentional inclusions and others abandoned experiments. **Coding agent: ask the author to confirm the v0.1 catalog before implementation.**
+> **[DEFERRED 9.2.A | Phase 2]** Are there other helper functions in the author's day-to-day workflow that should ship in the Phase 2 catalog? The gist is heavily commented; some functions may be intentional inclusions and others abandoned experiments. Confirm the v0.2 catalog before implementing Phase 2.
 
-### 9.3 Verbs
+### 9.3 Verbs (v0.2)
 
 - `boosters::list_functions()` — show all available functions with descriptions and current installation status.
 - `boosters::add_function(name)` — copy the package's version of the function into `boosters/fn_<name>.R` and add `name` to `[functions].installed`.
 - `boosters::remove_function(name)` — delete `boosters/fn_<name>.R` and remove from TOML.
 - `boosters::check_functions()` — diff installed local copies against the current package versions; report drift.
+
+Phase 2 introduces this TOML table:
+
+```toml
+[functions]
+installed = ["ni", "my_skim"]
+```
 
 ### 9.4 The `check_functions()` drift detector
 
@@ -472,7 +468,7 @@ boosters::check_functions()
 
 This is the same pattern shadcn implements (`npx shadcn diff`).
 
-> **[AMBIGUITY 9.4.A]** How is the "package version" of a function determined for diffing? Options: (a) literal string comparison against the file in `inst/functions/<name>.R`; (b) tracking a hash in `[functions]` (e.g., `installed = [{ name = "my_skim", hash = "..." }]`); (c) version stamp in the materialized file's comment header. Recommend (a) for simplicity in v0.1, (b) if it turns out users frequently want "I'm on a known-good snapshot, don't bother me about drift." **Coding agent: confirm.**
+> **[DEFERRED 9.4.A | Phase 2]** How is the "package version" of a function determined for diffing? Options: (a) literal string comparison against the file in `inst/functions/<name>.R`; (b) tracking a hash in `[functions]` (e.g., `installed = [{ name = "my_skim", hash = "..." }]`); (c) version stamp in the materialized file's comment header. Current recommendation: (a) for simplicity in v0.2, (b) if it turns out users frequently want "I'm on a known-good snapshot, don't bother me about drift."
 
 ### 9.5 Deferred: user-authored function sources
 
@@ -484,6 +480,21 @@ The compelling but underspecified feature is `add_function("my_thing", source = 
 
 When this returns in v0.3 or later, it'll need its own mini-PRD.
 
+### 9.6 Deferred: camcorder settings
+
+`camcorder` remains useful for the author's plotting workflow, but its settings are not consumed by Phase 1/v0.1. A future declarative section may look like this:
+
+```toml
+[settings.camcorder]
+enabled = false
+dpi = 320
+width = 10
+height = 7
+units = "in"
+```
+
+In v0.2 or later, `boosters::camcorder_config()` may return these values as a list the user passes to `camcorder::gg_record()`. `boosters` does not auto-call `camcorder::gg_record()` on session start.
+
 ---
 
 ## 10. The verb surface
@@ -494,22 +505,93 @@ Complete inventory of public functions.
 
 | Verb | Purpose |
 |---|---|
-| `boosters::init()` | Initialize a new project. Writes `boosters.toml`, optionally `air.toml`, and the `.Rprofile` line. Errors if `boosters.toml` already exists. |
-| `boosters::sync()` | Reconcile the installed environment to match `boosters.toml`. Installs/removes packages, materializes function files, optionally calls `renv::snapshot()`. |
-| `boosters::status()` | Show what's declared in TOML vs. what's actually present (untracked function files, missing packages, drifted functions). |
+| `boosterpak::init(renv = c("ask", "yes", "no"), rprofile = c("ask", "yes", "no"))` | Initialize or repair project setup. Creates `boosters.toml` if absent, never overwrites it by default, and continues checking setup items such as `air.toml`, project-local `renv`, and the `.Rprofile` line when the TOML already exists. |
+| `boosterpak::sync(mode = c("apply", "restore"))` | `mode = "apply"` reconciles the project to TOML intent by installing missing packages and materializing in-scope files. `mode = "restore"` restores exact package versions from `renv.lock`. v0.1 sync is additive only and never uninstalls packages. |
+| `boosterpak::status()` | Show the current project setup state for cold-boot debugging: config presence/validity, resolved packs, missing declared packages, `renv` state, and `.Rprofile` hook state. |
+
+`boosterpak::sync()` defaults to `mode = "apply"`.
+
+`boosterpak::init()` is idempotent for setup:
+
+- If `boosters.toml` is absent, create it.
+- If `boosters.toml` exists, do not overwrite it and continue checking other setup items.
+- If `.Rprofile` exists and the boosters line is absent, prompt to add it.
+- If a setup file would be overwritten, refuse unless the relevant explicit overwrite or repair option is provided.
+
+`boosterpak::init()` manages project-local `renv` only through the explicit `renv` argument:
+
+- `renv = "ask"` default: in interactive sessions, prompt before calling `renv::init()` if no active project-local `renv` is detected.
+- `renv = "ask"` in non-interactive sessions: do not initialize `renv`; report that the caller can use `renv = "yes"` to opt in.
+- `renv = "yes"`: call `renv::init()` if no active project-local `renv` is detected.
+- `renv = "no"`: never call `renv::init()`.
+- If a project-local `renv` is already active, do nothing.
+
+`boosterpak::init()` manages `.Rprofile` only through the explicit `rprofile` argument:
+
+- `rprofile = "ask"` default: in interactive sessions, prompt before adding the boosters line if absent.
+- `rprofile = "ask"` in non-interactive sessions: error if the line is absent and tell the caller to use `rprofile = "yes"` or `rprofile = "no"`.
+- `rprofile = "yes"`: add the boosters line if absent.
+- `rprofile = "no"`: do not add the boosters line; report that helper auto-sourcing is disabled.
+- If the boosters line is already present, do nothing.
+
+**`mode = "apply"` semantics:**
+
+- Require an active project-local `renv` library; otherwise error clearly and suggest running `boosterpak::init(renv = "yes")` or `renv::init()`.
+- Read `boosters.toml`.
+- Resolve packs, extras, and excludes.
+- Install missing declared packages via `pak` into the project-local `renv` library.
+- Materialize any in-scope files for the current phase.
+- If `auto_snapshot = true`, call `renv::snapshot()` after installation.
+- Treat `renv.lock` as downstream output, not intent.
+
+**`mode = "restore"` semantics:**
+
+- Require `boosters.toml` to exist; otherwise error clearly and suggest `renv::restore()` directly for lockfile-only projects or `boosterpak::init()` to create a boosters project.
+- Require `renv.lock` to exist; otherwise error clearly.
+- Call `renv::restore()`.
+- Validate `boosters.toml` after restore.
+- Resolve direct package names from declared packs and extras, then warn only if any direct resolved package name is absent from `renv.lock`.
+- Ignore transitive dependencies, package versions, and source-reference drift in v0.1 restore consistency checks.
+- Do not update `boosters.toml`.
+- Do not snapshot automatically.
+
+**Pruning semantics:**
+
+- v0.1 has no `prune` argument and never uninstalls packages.
+- Pruning is deferred until ownership, transitive dependency handling, and user-installed package safety are designed explicitly.
+
+`boosterpak::status()` is included in v0.1 as a narrow diagnostic verb for cold-boot setup and debugging. It reports:
+
+- whether `boosters.toml` exists and validates;
+- resolved pack names and package names;
+- declared packages missing from the active library;
+- whether a project-local `renv` is active;
+- whether `renv.lock` exists;
+- whether `.Rprofile` contains the boosters source line.
+
+It does not report function drift in v0.1 because function materialization is Phase 2.
 
 ### 10.2 Pack management
 
 | Verb | Purpose |
 |---|---|
-| `boosters::add_pack(name)` | Add a pack to `[packs].declared`. Eagerly syncs by default. |
-| `boosters::remove_pack(name)` | Remove a pack from `[packs].declared`. Eagerly syncs by default. |
-| `boosters::list_packs(scope = NULL)` | List available packs (built-in + user + project) with descriptions and sources. |
-| `boosters::save_pack(name, scope = "project", from = NULL)` | Capture the current resolved package set as a new pack TOML. |
-| `boosters::promote_pack(name)` | Copy a project pack to user scope. |
-| `boosters::demote_pack(name)` | Copy a user pack to project scope. |
+| `boosterpak::add_pack(name)` | Add a pack to `[packs].declared`. Eagerly syncs by default. |
+| `boosterpak::remove_pack(name)` | Remove a pack from `[packs].declared`. Eagerly runs additive sync by default, but does not uninstall packages. |
+| `boosterpak::list_packs(scope = NULL)` | List available packs (built-in + user + project) with descriptions and sources. |
+| `boosterpak::save_pack(name, scope = "project", from = NULL)` | Phase 3: capture the current resolved package set as a new pack TOML. |
+| `boosterpak::promote_pack(name)` | Phase 3: copy a project pack to user scope. |
+| `boosterpak::demote_pack(name)` | Phase 3: copy a user pack to project scope. |
 
-### 10.3 Function management
+Mutate verbs that default to eager sync must preflight sync requirements before writing TOML:
+
+- With `sync = TRUE`, validate the requested mutation and verify an active project-local `renv` library before mutating `boosters.toml`.
+- If preflight fails, leave `boosters.toml` unchanged.
+- After a successful preflight, mutate TOML and run additive `sync(mode = "apply")`.
+- With `sync = FALSE`, mutate TOML without requiring active project-local `renv`; the user is responsible for running `sync()` later.
+
+Mutating verbs must validate TOML with a TOML parser before writing. They then make targeted edits to known arrays such as `[packs].declared`, preserving unrelated comments, section order, and user formatting where possible. If a targeted edit cannot be made safely, the verb should fail clearly rather than rewriting the full file.
+
+### 10.3 Function management (Phase 2)
 
 | Verb | Purpose |
 |---|---|
@@ -523,6 +605,7 @@ Complete inventory of public functions.
 
 - **`sync = TRUE/FALSE`** on mutate verbs. Default `TRUE` (eager). `sync = FALSE` edits TOML only, defers installation.
 - **`overwrite = FALSE`** on operations that could clobber. Always default `FALSE`; refuse with a clear error message that suggests the explicit flag.
+- **`verbose = NULL/TRUE/FALSE`** on public verbs with routine user-facing output. The choices are exclusive: `NULL` uses the default context-aware behavior, `TRUE` always prints routine summaries, and `FALSE` suppresses routine summaries. Warnings and errors are never suppressed.
 
 ### 10.5 Output style
 
@@ -535,7 +618,7 @@ All verbs use `cli` for output. Conventions:
 
 Verbs return invisibly (typically the updated config or affected file paths) so they compose in scripts but don't clutter interactive sessions.
 
-> **[AMBIGUITY 10.5.A]** Should verbs print a summary by default in interactive sessions and stay silent in scripts (`rlang::is_interactive()`)? Recommend yes, with a `verbose` argument to override. **Coding agent: confirm.**
+> **[DECISION 10.5.A]** Verbs print routine summaries by default in interactive sessions and stay quiet by default in non-interactive sessions. `verbose = TRUE` forces summaries on; `verbose = FALSE` suppresses routine summaries; warnings and errors still print.
 
 ---
 
@@ -580,12 +663,12 @@ flowchart TB
 
 | Task | Tool |
 |---|---|
-| Declaring intent (which packages, which functions) | `boosters` (`boosters.toml`) |
+| Declaring intent (packages in Phase 1; functions added in Phase 2) | `boosters` (`boosters.toml`) |
 | Resolving pack names to package lists | `boosters` |
 | Installing packages | `pak` (called by `boosters`) |
 | Locking installed versions | `renv` (called by `boosters` when `auto_snapshot = true`) |
-| Restoring environment from lockfile (e.g. on `sync()` in a clone) | `renv::restore()` if `renv.lock` exists, else `pak::pkg_install()` from declared packs |
-| Project initialization | `boosters::init()`, NOT `usethis::create_project()` |
+| Restoring exact package versions from lockfile | `boosterpak::sync(mode = "restore")` calls `renv::restore()` and requires `renv.lock` |
+| Project initialization | `boosterpak::init()`, NOT `usethis::create_project()` |
 
 ### 11.1 Workflow comparison
 
@@ -598,15 +681,16 @@ flowchart TB
 
 **`renv` + `boosters`:**
 
-1. `boosters::init()` writes `boosters.toml` (intent) and optionally calls `renv::init()`.
-2. User runs `boosters::add_pack("eda")` — installs via `pak`, snapshots via `renv` if enabled.
-3. Collaborator runs `boosters::sync()` — installs from `renv.lock` if present, else from declared packs.
+1. `boosterpak::init()` writes `boosters.toml` (intent) and handles `renv::init()` according to `renv = c("ask", "yes", "no")`.
+2. User runs `boosterpak::add_pack("example")` — installs missing packages via `pak`, snapshots via `renv` if enabled.
+3. Collaborator runs `boosterpak::sync()` — applies TOML intent by resolving declared packs and installing missing packages.
+4. If exact lockfile fidelity is required, collaborator runs `boosterpak::sync(mode = "restore")` — restores from `renv.lock` via `renv::restore()` and does not snapshot.
 
-The key difference: `boosters.toml` is the *intent layer* that `renv.lock` alone doesn't provide. A `renv.lock` says "these exact 47 packages at these exact versions"; a `boosters.toml` says "I want the spatial pack and the eda pack" — which generates the 47-package list.
+The key difference: `boosters.toml` is the *intent layer* that `renv.lock` alone doesn't provide. A `renv.lock` says "these exact packages at these exact versions"; a `boosters.toml` says "I want the core pack and the github-example pack" — which generates the package list.
 
 ### 11.2 Interop with `rv`
 
-> **[AMBIGUITY 11.2.A]** The author mentioned `rv` (Posit's nascent Rust-based R package manager) in conversation. As of writing, `rv` is early-stage and its CLI is not stable. `boosters` should NOT depend on `rv` in v0.1, but the design should not preclude a future "use `rv` instead of `pak`" option. Recommend treating the installer as a hidden internal abstraction (`boosters:::install_via()` with a `pak` implementation in v0.1) so a future `rv` backend is additive. **Coding agent: confirm direction; defer concrete `rv` work.**
+> **[DEFERRED 11.2.A | Future]** The author mentioned `rv` (Posit's nascent Rust-based R package manager) in conversation. As of writing, `rv` is early-stage and its CLI is not stable. `boosters` should NOT depend on `rv` in v0.1, but the design should not preclude a future "use `rv` instead of `pak`" option. Current recommendation: treat the installer as a hidden internal abstraction (`boosters:::install_via()` with a `pak` implementation in v0.1) so a future `rv` backend is additive.
 
 ---
 
@@ -618,9 +702,9 @@ The key difference: `boosters.toml` is the *intent layer* that `renv.lock` alone
 
 **Goal:** End-to-end happy path for Scenarios A, B, and C.
 
-- `init()`, `sync()`, `add_pack()`, `remove_pack()`, `list_packs()`
+- `init()`, `sync()`, `status()`, `add_pack()`, `remove_pack()`, `list_packs()`
 - TOML schema for project config and pack files
-- Built-in pack catalog (10 packs from §8.6)
+- Built-in seed pack catalog (3 packs from §8.6)
 - Pack resolution (project → user → built-in) with cycle detection
 - Validation with did-you-mean for typos
 - `pak`-backed installation
@@ -628,6 +712,142 @@ The key difference: `boosters.toml` is the *intent layer* that `renv.lock` alone
 - `cli`-styled output
 
 **Out of scope for v0.1:** function management, `save_pack`, drift detection.
+
+### Phase 1 acceptance scenarios
+
+**Sync authority:**
+
+- Given `boosters.toml` declares `example` and `renv.lock` is stale, `sync(mode = "apply")` installs packages resolved from `example` and snapshots if enabled.
+- Given `renv.lock` exists, `sync(mode = "restore")` calls `renv::restore()` and does not snapshot.
+- Given `renv.lock` is missing, `sync(mode = "restore")` errors clearly.
+- Given `boosters.toml` is missing, `sync(mode = "restore")` errors clearly and suggests `renv::restore()` for lockfile-only projects.
+- Given `renv.lock` lacks a direct package resolved from `boosters.toml`, `sync(mode = "restore")` warns after restore but does not fail solely for that mismatch.
+
+**Removal safety:**
+
+- Given a user removes `example` from TOML after `cli` has been installed, `sync()` does not uninstall `cli`.
+- Given `sync()` outside an active project-local `renv` project, it errors.
+
+**v0.1 schema:**
+
+- A v0.1 config without `[functions]` validates.
+- Function validation is introduced only in Phase 2.
+- Phase 1 implementation does not need function catalog files.
+
+**`.Rprofile`:**
+
+- Existing `.Rprofile` with the boosters line is unchanged.
+- Existing `.Rprofile` without the line causes an interactive prompt.
+- Existing `.Rprofile` with `source("renv/activate.R")` receives the boosters line after the `renv` activation line.
+- Non-interactive `init(rprofile = "ask")` with the boosters line absent errors with an actionable message requiring `rprofile = "yes"` or `rprofile = "no"`.
+
+**TOML mutation:**
+
+- `add_pack("example")` preserves unrelated comments and sections while adding `"example"` to `[packs].declared`.
+- `remove_pack("example")` preserves unrelated comments and sections while removing `"example"` from `[packs].declared`.
+
+**Settings:**
+
+- v0.1 validates `air_toml`, `auto_snapshot`, and `parallel_daemons`.
+- `[settings.camcorder]` is documented as future/declarative and not consumed in Phase 1.
+
+### Phase 1 implementation status
+
+**Status as of 2026-05-28:** Implemented in the repository as package `boosterpak` version `0.1.0.9000`.
+
+Implemented and verified:
+
+- Package scaffold: `DESCRIPTION`, `NAMESPACE`, `R/`, `inst/packs/`, `man/`, `tests/`, README, getting-started vignette, and GitHub Actions R CMD check workflow.
+- Public v0.1 exports: `init()`, `sync()`, `status()`, `add_pack()`, `remove_pack()`, and `list_packs()`.
+- `boosters.toml` project config creation and validation.
+- Built-in v0.1 pack catalog:
+  - `core`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, `digest`
+  - `example`: `cli`
+  - `github-example`: `ComptoxR` with source override `"seanthimons/ComptoxR"`
+- Project/user/built-in pack resolution with first-match wins and project pack shadowing.
+- Pack `extends` resolution and cycle detection.
+- Did-you-mean validation for unknown pack names, including grouped available packs.
+- `[extras].declared` handling for plain CRAN names and `pak`-style refs such as `user/repo`.
+- `[exclude].declared` filtering after pack and extras resolution.
+- Pack `[sources]` and config-level source overrides converted into `pak` install specs.
+- `init()` behavior:
+  - creates `boosters.toml` only when absent;
+  - creates `boosters/packs/`;
+  - writes `air.toml` when `air_toml = true`;
+  - manages `.Rprofile` through `rprofile = c("ask", "yes", "no")`;
+  - inserts the booster source line after `source("renv/activate.R")`;
+  - handles `renv = c("ask", "yes", "no")`;
+  - loads an existing inactive project `renv` when `renv = "yes"`.
+- `sync(mode = "apply")` behavior:
+  - requires an active project-local `renv` library;
+  - resolves packs, extras, excludes, and source overrides;
+  - installs missing declared packages through `pak`;
+  - snapshots with `renv` when `auto_snapshot = true`;
+  - remains additive-only and never uninstalls packages.
+- `sync(mode = "restore")` behavior:
+  - requires both `boosters.toml` and `renv.lock`;
+  - calls `renv::restore(project = root)`;
+  - validates `boosters.toml` after restore;
+  - warns when direct declared package names are absent from `renv.lock`;
+  - does not snapshot automatically.
+- `status()` diagnostic surface:
+  - reports config presence and validity;
+  - reports resolved packs and packages;
+  - reports missing declared packages from the active library;
+  - reports project-local `renv` activity;
+  - reports `renv.lock` presence;
+  - reports `.Rprofile` hook presence;
+  - reports malformed config as invalid instead of aborting.
+- TOML mutation behavior:
+  - `add_pack()` and `remove_pack()` preserve unrelated comments and sections for supported one-line arrays;
+  - eager mutation preflights active `renv` before editing;
+  - unsupported multi-line `[packs].declared` edits fail clearly instead of corrupting the file.
+- Tests:
+  - normal `testthat` suite covers config, packs, mutation, sync error paths, settings validation, source overrides, pack shadowing, and cycle detection;
+  - opt-in live tests exercise real `pak` and `renv` behavior in temporary projects with `BOOSTERPAK_LIVE_TESTS=true`.
+- Package checks:
+  - local `R CMD check --no-manual --ignore-vignettes` passes;
+  - local vignette building was not run because Pandoc was unavailable in the development environment;
+  - CI is configured to run R CMD check on Ubuntu, macOS, and Windows.
+
+**Manual smoke project status:**
+
+The manual smoke project lives at `~/Documents/boosterpak_test/smoke_20260528_111948`. It currently proves initialization mechanics:
+
+- `boosters.toml` was created.
+- `boosters/` and `boosters/packs/` were created.
+- `.Rprofile` contains both `source("renv/activate.R")` and the booster helper-source line.
+- `renv/` was initialized.
+- `renv.lock` was created.
+- `air.toml` was written.
+- `status()` can detect the config, active `renv`, lockfile, and `.Rprofile` hook.
+
+It does **not** currently prove final package hydration for the final v0.1 catalog. The smoke project's `boosters.toml` declares `["core", "example"]`, but its existing `renv.lock` only contains `renv`, and current `status()` reports most declared packages missing (`fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`). Yes: this means the smoke project still needs to be hydrated by running `boosterpak::sync(mode = "apply")` with an active project-local `renv` so `pak` installs the missing packages and `renv::snapshot()` updates `renv.lock`.
+
+Recommended smoke-project repair:
+
+```r
+pkgload::load_all("C:/Users/sxthi/Documents/boosterpak")
+source("renv/activate.R")
+boosterpak::sync(mode = "apply", verbose = TRUE)
+boosterpak::status(verbose = TRUE)
+```
+
+Expected result after hydration:
+
+- `status()$missing_packages` is empty for packages declared by `["core", "example"]`;
+- `renv.lock` includes the directly declared packages installed from `core` and `example`;
+- the smoke folder proves both initialization mechanics and final package installation.
+
+### Next work after v0.1
+
+The remaining PRD items are deferred Phase 2+ work, plus one manual verification task:
+
+1. Hydrate the manual smoke project at `~/Documents/boosterpak_test/smoke_20260528_111948` and confirm `status()` reports no missing declared packages.
+2. Install `boosterpak` into the user's R library when ready for day-to-day use. Development so far has used `pkgload::load_all()` and package check installs, not a persistent user-library install.
+3. Phase 2: implement function materialization (`add_function()`, `remove_function()`, `list_functions()`, `check_functions()`, `diff_function()`, `inst/functions/`, and `[functions].installed`).
+4. Phase 3: implement pack capture and promotion (`save_pack()`, `promote_pack()`, `demote_pack()`, and richer user-scope pack workflows).
+5. Phase 4/future: broaden `status()`, improve real-world error messages, explore an RStudio addin, keep `rv` integration deferred behind the installer abstraction, and revisit recipe/discovery ideas.
 
 ### Phase 2 — Function materialization (v0.2)
 
@@ -651,7 +871,7 @@ The key difference: `boosters.toml` is the *intent layer* that `renv.lock` alone
 
 ### Phase 4 — Polish and ecosystem (v0.4+)
 
-- `status()` command (declared vs. reality reporting)
+- Broader `status()` reporting beyond the v0.1 cold-boot diagnostic surface
 - Better error messages from real usage
 - Optional RStudio addin
 - `rv` backend exploration (if `rv` stabilizes)
@@ -660,34 +880,46 @@ The key difference: `boosters.toml` is the *intent layer* that `renv.lock` alone
 
 ---
 
-## 13. Open questions & decisions deferred
+## 13. Decisions and deferred questions
 
-Consolidated index of every `[AMBIGUITY]` marker above, plus broader open questions. The coding agent should resolve these *before* implementing the relevant section.
+This section separates implementation-ready v0.1 decisions from questions intentionally deferred to later phases. Phase 1 implementation should not be blocked by deferred Phase 2+ decisions.
 
-### 13.1 Specific ambiguities
+### 13.1 Resolved v0.1 decisions
 
-| ID | Question | Recommendation |
-|---|---|---|
-| 6.3.A | `fn_` prefix in function name or filename only? | Filename only. |
-| 6.4.A | Behavior of `init()` when `.Rprofile` exists without the boosters line? | Prompt to add. |
-| 7.2.A | Should `[settings.camcorder]` drive runtime behavior or just be declarative? | Declarative only; expose via `boosters::camcorder_config()`. |
-| 7.2.B | Format of `boosters_version` in TOML? | Plain string matching `utils::packageVersion("boosters")`. |
-| 8.5.A | Should `save_pack` fold `[extras]` and `[exclude]` into the saved pack? | Yes. Saved packs are self-contained snapshots. |
-| 8.6.A | Final v0.1 built-in pack catalog and exact contents? | Use §8.6 as a starting point; require author sign-off. |
-| 9.2.A | Final v0.1 function catalog? | Use §9.2 as a starting point; require author sign-off. |
-| 9.4.A | Mechanism for detecting function drift? | Literal string comparison against `inst/functions/<name>.R` in v0.1. |
-| 10.5.A | Default verbosity — silent in scripts, verbose interactive? | Yes, with `verbose` override. |
-| 11.2.A | `rv` integration strategy? | Abstract behind internal installer interface; defer concrete work. |
+| ID | Decision |
+|---|---|
+| 6.4.A | If `.Rprofile` exists but does not have the boosters line, `init()` prompts to add it. No silent re-add. |
+| 6.4.B | If `.Rprofile` contains project-local `renv` activation, insert the boosters source line after it. |
+| 7.2.A | `[settings.camcorder]` is declarative only and not consumed in v0.1. A future helper may expose it. |
+| 7.2.B | `boosters_version` is a plain string matching `utils::packageVersion("boosters")`. |
+| 8.6.A | v0.1 ships only `core`, `example`, and `github-example`; the broader catalog is deferred. |
+| 10.1.A | `init()` is idempotent setup/repair and does not hard-stop just because `boosters.toml` exists. |
+| 10.1.B | `init(renv = c("ask", "yes", "no"))` controls project-local `renv::init()` behavior. |
+| 10.1.C | `init(rprofile = c("ask", "yes", "no"))` controls `.Rprofile` hook behavior; non-interactive `ask` errors if action is needed. |
+| 10.1.D | v0.1 `sync()` is additive only and has no `prune` argument. |
+| 10.5.A | `verbose = NULL/TRUE/FALSE` provides exclusive context-aware/always/suppressed routine output modes. |
 
-### 13.2 Broader open questions
+### 13.2 Deferred decisions
 
-These don't have a specific `[AMBIGUITY]` marker but should be addressed before or during implementation:
+| ID | Phase | Question | Current recommendation |
+|---|---|---|---|
+| 6.3.A | Phase 2 | Should the `fn_` prefix appear in function names or only filenames? | Filename only. |
+| 8.5.A | Phase 3 | Should `save_pack` fold `[extras]` and `[exclude]` into the saved pack? | Yes; saved packs are self-contained snapshots. |
+| 9.2.A | Phase 2 | Final function catalog? | Use §9.2 as a starting point; require author sign-off before Phase 2. |
+| 9.4.A | Phase 2 | Mechanism for detecting function drift? | Literal string comparison against `inst/functions/<name>.R`. |
+| 10.1.E | Future | Package pruning semantics? | Defer until ownership, transitive dependencies, and user-installed packages have a safety design. |
+| 11.2.A | Future | `rv` integration strategy? | Abstract behind internal installer interface; defer concrete work. |
 
-- **Naming.** Is `boosters` the right package name? Alternatives considered: `scaffold`, `bench` (taken), `loadout`. `boosters` matches the user's mental model and existing gist terminology.
-- **Versioning policy.** Will `boosters` follow strict semver? When the built-in pack catalog changes, is that a breaking change? Recommend: pack catalog changes are *minor* version bumps; verb signature changes are *major*.
-- **Testing strategy.** `boosters` is hard to unit test because most of it is filesystem mutation and subprocess calls. Recommend `withr` + temporary directories for integration tests; explicit mocking for `pak`/`renv` calls.
-- **Documentation.** Vignettes for: getting started (covers Scenarios A–C), customizing functions (Scenario F), authoring and sharing packs (Scenarios D–E).
-- **CI matrix.** What R versions and OSes need testing? Recommend: latest 3 R minors × {Ubuntu, Windows, macOS}. The Linux binary repo trick in the current gist is environment-specific and should be guarded.
+### 13.3 Implementation policy
+
+These implementation policy items are resolved for v0.1:
+
+- **Naming.** The R package name is `boosterpak`. The project manifest remains `boosters.toml`, and the project helper directory remains `boosters/`, because "booster" is the domain noun users interact with.
+- **Versioning policy.** Use the default `usethis` / `devtools` `A.B.C.D` development version numbering scheme.
+- **Testing strategy.** v0.1 should include live tests against real `pak` / `renv` behavior, with test projects created in temporary directories so the package repository is not mutated as the project under test.
+- **Manual live-test project.** Use `~/Documents/boosterpak_test` for human-operated smoke testing. Keep it outside the package repo, and do not use the package source root itself as the project being initialized by `boosterpak`.
+- **Documentation.** Ship both a README and a getting-started vignette covering Scenarios A-C: `init()`, `add_pack()`, `sync()`, and `sync(mode = "restore")`.
+- **CI matrix.** Target latest R across Ubuntu, Windows, and macOS.
 
 ---
 
@@ -708,6 +940,7 @@ Captured here so future contributors don't relitigate decisions already made.
 
 - User-authored function sources from external repos (§9.5).
 - Centralized pack registry / discovery service (§3.2 NG3).
+- Broader built-in pack catalog beyond the v0.1 `core`, `example`, and `github-example` seed packs.
 - Recipe / snippet retrieval system (`boosters::recipe("high_res_plot")`).
 - RStudio addin.
 - `rv` backend (§11.2.A).
@@ -731,8 +964,8 @@ If revisited, recipes would live as `.R` files in `inst/recipes/` inside the pac
 - **Pack** — A named collection of R packages, defined in a small TOML file. Comes in three scopes: built-in, user, project.
 - **Materialized function** — A helper function that has been copied from the `boosters` package into the project's `boosters/` directory as an editable `.R` file.
 - **Default function** — The version of a helper function that ships exported by the `boosters` package itself.
-- **Eager sync** — The default behavior where mutate verbs immediately install/uninstall packages rather than just editing TOML.
-- **Reconciliation** — `boosters::sync()`'s job: make the filesystem and installed environment match what `boosters.toml` declares.
+- **Eager sync** — The default behavior where mutate verbs immediately run additive sync after editing TOML. Eager sync installs missing packages but does not uninstall packages in v0.1.
+- **Reconciliation** — `boosterpak::sync()`'s job: make the filesystem and installed environment match what `boosters.toml` declares.
 - **Drift** — A materialized function file diverging from the package's current default version.
 
 ---
