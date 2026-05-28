@@ -21,6 +21,7 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
   }
 
   update_declared_array(boosters_file(root), "packs", "declared", next_packs)
+  materialize_config_packs(read_config(root), root)
 
   if (isTRUE(sync)) {
     sync(mode = "apply", root = root, verbose = verbose)

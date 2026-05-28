@@ -765,6 +765,7 @@ Implemented and verified:
   - `example`: `cli`
   - `github-example`: `ComptoxR` with source override `"seanthimons/ComptoxR"`
 - Project/user/built-in pack resolution with first-match wins and project pack shadowing.
+- Declared/resolved packs are materialized into `boosters/packs/` by default so users can inspect the TOML that drives package installation; existing project-local pack files are preserved.
 - Pack `extends` resolution and cycle detection.
 - Did-you-mean validation for unknown pack names, including grouped available packs.
 - `[extras].declared` handling for plain CRAN names and `pak`-style refs such as `user/repo`.

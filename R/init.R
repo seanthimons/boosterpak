@@ -24,6 +24,7 @@ init <- function(root = ".", renv = c("ask", "yes", "no"), rprofile = c("ask", "
   if (isTRUE(read_config(root)$settings$air_toml) && !file.exists(file.path(root, "air.toml"))) {
     writeLines(c("# air formatter configuration", ""), file.path(root, "air.toml"), useBytes = TRUE)
   }
+  materialize_config_packs(read_config(root), root)
 
   if (!is_project_renv_active(root)) {
     handle_renv_init(root, renv)

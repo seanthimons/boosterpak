@@ -24,6 +24,60 @@ test_that("built-in catalog matches v0.1 PRD contents", {
   )
 })
 
+test_that("init materializes declared built-in packs into the project", {
+  root <- withr::local_tempdir()
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  path <- file.path(root, "boosters", "packs", "core.toml")
+  expect_true(file.exists(path))
+  expect_equal(
+    readLines(path, warn = FALSE),
+    readLines(system.file("packs", "core.toml", package = "boosterpak"), warn = FALSE)
+  )
+  expect_equal(list_packs(root = root, scope = "project", verbose = FALSE)$name, "core")
+})
+
+test_that("add_pack materializes newly declared packs even without sync", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+
+  expect_true(file.exists(file.path(root, "boosters", "packs", "example.toml")))
+})
+
+test_that("pack materialization preserves existing project-local pack files", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "boosters", "packs"), recursive = TRUE)
+  writeLines(c(
+    'name = "core"',
+    'description = "Project core"',
+    'packages = ["cli"]'
+  ), file.path(root, "boosters", "packs", "core.toml"))
+  before <- readLines(file.path(root, "boosters", "packs", "core.toml"), warn = FALSE)
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  expect_equal(readLines(file.path(root, "boosters", "packs", "core.toml"), warn = FALSE), before)
+  expect_equal(boosterpak:::resolve_pack("core", root = root), "cli")
+})
+
+test_that("materialization includes extended parent packs", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  writeLines(c(
+    'name = "child"',
+    'description = "Project child"',
+    'packages = ["digest"]',
+    'extends = ["example"]'
+  ), file.path(root, "boosters", "packs", "child.toml"))
+
+  add_pack("child", root = root, sync = FALSE, verbose = FALSE)
+
+  expect_true(file.exists(file.path(root, "boosters", "packs", "example.toml")))
+})
+
 test_that("source overrides become install specs", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)

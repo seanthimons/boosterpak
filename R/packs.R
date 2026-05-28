@@ -168,6 +168,46 @@ resolve_pack <- function(name, root = ".", stack = character()) {
   unique(c(parent_packages, pack$packages))
 }
 
+resolve_pack_names <- function(name, root = ".", stack = character()) {
+  if (name %in% stack) {
+    cycle <- paste(c(stack, name), collapse = " -> ")
+    cli::cli_abort("Pack cycle detected: {cycle}.", call = NULL)
+  }
+
+  pack <- load_pack(name, root)
+  parents <- toml_string_array(pack$extends %||% character(), sprintf("%s extends", pack$.__path__))
+  parent_names <- unlist(lapply(parents, resolve_pack_names, root = root, stack = c(stack, name)), use.names = FALSE)
+  unique(c(parent_names, name))
+}
+
+resolve_config_pack_names <- function(config, root = ".") {
+  declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
+  unique(unlist(lapply(declared, resolve_pack_names, root = root), use.names = FALSE))
+}
+
+materialize_pack <- function(name, root = ".") {
+  pack <- load_pack(name, root)
+  dir.create(project_packs_dir(root), recursive = TRUE, showWarnings = FALSE)
+  target <- file.path(project_packs_dir(root), sprintf("%s.toml", name))
+  if (identical(normalizePath(pack$.__path__, winslash = "/", mustWork = FALSE), normalizePath(target, winslash = "/", mustWork = FALSE))) {
+    return(invisible(target))
+  }
+  if (file.exists(target)) {
+    return(invisible(target))
+  }
+  copied <- file.copy(pack$.__path__, target, overwrite = FALSE)
+  if (!isTRUE(copied)) {
+    cli::cli_abort("Failed to write pack {.val {name}} to {.file {target}}.", call = NULL)
+  }
+  invisible(target)
+}
+
+materialize_config_packs <- function(config, root = ".") {
+  names <- resolve_config_pack_names(config, root)
+  invisible(lapply(names, materialize_pack, root = root))
+  names
+}
+
 resolve_pack_sources <- function(name, root = ".", stack = character()) {
   if (name %in% stack) {
     cycle <- paste(c(stack, name), collapse = " -> ")

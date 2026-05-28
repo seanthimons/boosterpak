@@ -17,6 +17,7 @@ sync <- function(mode = c("apply", "restore"), root = ".", verbose = NULL) {
   ensure_project_renv(root)
   config <- read_config(root)
   validate_config(config, root)
+  materialize_config_packs(config, root)
   packages <- resolve_config_packages(config, root)
   install_specs <- resolve_config_install_specs(config, root)
   missing <- missing_packages(packages)
