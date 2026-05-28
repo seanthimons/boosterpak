@@ -63,3 +63,40 @@ test_that("unknown pack errors include suggestion and grouped availability", {
     class = "rlang_error"
   )
 })
+
+test_that("project packs shadow built-in packs", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  writeLines(c(
+    'name = "example"',
+    'description = "Project-local example shadow"',
+    'packages = ["digest"]'
+  ), file.path(root, "boosters", "packs", "example.toml"))
+
+  packs <- list_packs(root = root, verbose = FALSE)
+
+  expect_equal(packs$scope[packs$name == "example"], "project")
+  expect_equal(boosterpak:::resolve_pack("example", root = root), "digest")
+})
+
+test_that("pack cycles are detected clearly", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  writeLines(c(
+    'name = "a"',
+    'description = "Cycle A"',
+    'packages = []',
+    'extends = ["b"]'
+  ), file.path(root, "boosters", "packs", "a.toml"))
+  writeLines(c(
+    'name = "b"',
+    'description = "Cycle B"',
+    'packages = []',
+    'extends = ["a"]'
+  ), file.path(root, "boosters", "packs", "b.toml"))
+
+  expect_error(
+    boosterpak:::resolve_pack("a", root = root),
+    "Pack cycle detected: a -> b -> a"
+  )
+})
