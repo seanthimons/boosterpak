@@ -55,3 +55,11 @@ test_that("GitHub extras are install specs but resolve to package-like names", {
   expect_true("pointblank" %in% boosterpak:::resolve_config_packages(config, root))
   expect_true("rstudio/pointblank" %in% boosterpak:::resolve_config_install_specs(config, root))
 })
+
+test_that("unknown pack errors include suggestion and grouped availability", {
+  expect_error(
+    boosterpak:::load_pack("exampel"),
+    regexp = "Did you mean.+example.+Built-in.+core.+User:.+Project:",
+    class = "rlang_error"
+  )
+})

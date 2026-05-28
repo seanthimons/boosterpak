@@ -87,17 +87,7 @@ load_pack <- function(name, root = ".") {
   packs <- available_packs(root)
   match <- packs[packs$name == name, , drop = FALSE]
   if (nrow(match) == 0) {
-    suggest <- utils::adist(name, packs$name)
-    hint <- NULL
-    if (length(suggest) > 0 && min(suggest) <= 3) {
-      hint <- packs$name[which.min(suggest)]
-    }
-    msg <- c(
-      "{.val {name}} is not a known pack.",
-      if (!is.null(hint)) "i" = "Did you mean {.val {hint}}?",
-      "i" = "Run {.code boosterpak::list_packs()} for available packs."
-    )
-    cli::cli_abort(msg, call = NULL)
+    abort_unknown_pack(name, packs)
   }
 
   path <- match$path[[1]]
@@ -106,6 +96,41 @@ load_pack <- function(name, root = ".") {
   data$.__path__ <- path
   data$.__scope__ <- match$scope[[1]]
   data
+}
+
+abort_unknown_pack <- function(name, packs) {
+  hint <- suggest_pack_name(name, packs$name)
+  msg <- c(
+    "{.val {name}} is not a known pack.",
+    if (!is.null(hint)) "i" = "Did you mean {.val {hint}}?",
+    "Available packs:",
+    " " = "Built-in: {format_pack_group(packs, 'builtin')}",
+    " " = "User:     {format_pack_group(packs, 'user')}",
+    " " = "Project:  {format_pack_group(packs, 'project')}",
+    "i" = "Run {.code boosterpak::list_packs()} for descriptions."
+  )
+  cli::cli_abort(msg, call = NULL)
+}
+
+suggest_pack_name <- function(name, choices) {
+  if (length(choices) == 0) {
+    return(NULL)
+  }
+  distance <- utils::adist(name, choices)
+  if (min(distance) <= 3) {
+    choices[[which.min(distance)]]
+  } else {
+    NULL
+  }
+}
+
+format_pack_group <- function(packs, scope) {
+  names <- packs$name[packs$scope == scope]
+  if (length(names) == 0) {
+    "(none)"
+  } else {
+    paste(names, collapse = ", ")
+  }
 }
 
 validate_pack_schema <- function(expected_name, path, data) {
