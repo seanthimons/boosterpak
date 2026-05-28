@@ -19,8 +19,10 @@ Imports:
     toml,
     utils
 Suggests:
+    ggplot2,
     knitr,
     rmarkdown,
+    skimr,
     testthat (>= 3.0.0),
     withr
 VignetteBuilder: knitr

@@ -6,6 +6,18 @@ boosters_dir <- function(root = ".") {
   file.path(root, "boosters")
 }
 
+functions_dir <- function(root = ".") {
+  boosters_dir(root)
+}
+
+function_file <- function(name, root = ".") {
+  file.path(functions_dir(root), sprintf("fn_%s.R", name))
+}
+
+catalog_function_file <- function(name) {
+  system.file("functions", sprintf("%s.R", name), package = "boosterpak")
+}
+
 project_packs_dir <- function(root = ".") {
   file.path(boosters_dir(root), "packs")
 }

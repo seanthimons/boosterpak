@@ -27,6 +27,7 @@ validate_config <- function(config, root = ".") {
   config$packs$declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
   config$extras$declared <- toml_string_array(config$extras$declared %||% character(), "[extras].declared")
   config$exclude$declared <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
+  validate_config_functions(config)
 
   declared <- config$packs$declared %||% character()
   invisible(lapply(declared, load_pack, root = root))
@@ -96,6 +97,9 @@ write_default_config <- function(root = ".") {
     "",
     "[exclude]",
     "declared = []",
+    "",
+    "[functions]",
+    "installed = []",
     "",
     "[settings]",
     "air_toml = true",
