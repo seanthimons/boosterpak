@@ -25,7 +25,7 @@ init <- function(root = ".", renv = c("ask", "yes", "no"), rprofile = c("ask", "
     writeLines(c("# air formatter configuration", ""), file.path(root, "air.toml"), useBytes = TRUE)
   }
 
-  if (!has_project_renv(root)) {
+  if (!is_project_renv_active(root)) {
     handle_renv_init(root, renv)
   }
 
@@ -53,6 +53,10 @@ handle_renv_init <- function(root, renv) {
       return(invisible(FALSE))
     }
   }
-  call_renv_init(root)
+  if (has_project_renv(root)) {
+    call_renv_load(root)
+  } else {
+    call_renv_init(root)
+  }
   invisible(TRUE)
 }

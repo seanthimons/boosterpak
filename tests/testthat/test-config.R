@@ -44,6 +44,24 @@ test_that("init does not overwrite existing boosters.toml", {
   expect_equal(readLines(file.path(root, "boosters.toml"), warn = FALSE), before)
 })
 
+test_that("init with renv yes loads existing project renv when inactive", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  dir.create(file.path(root, "renv"), recursive = TRUE)
+  writeLines("", file.path(root, "renv", "activate.R"))
+
+  calls <- character()
+  local_mocked_bindings(
+    call_renv_load = function(root = ".") calls <<- c(calls, "load"),
+    call_renv_init = function(root = ".") calls <<- c(calls, "init"),
+    .package = "boosterpak"
+  )
+
+  init(root = root, renv = "yes", rprofile = "no", verbose = FALSE)
+
+  expect_equal(calls, "load")
+})
+
 test_that("non-interactive ask errors when Rprofile action is needed", {
   root <- withr::local_tempdir()
   expect_error(

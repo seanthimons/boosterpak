@@ -31,6 +31,10 @@ call_renv_init <- function(root = ".") {
   renv::init(bare = TRUE)
 }
 
+call_renv_load <- function(root = ".") {
+  renv::load(project = root, quiet = TRUE)
+}
+
 call_renv_snapshot <- function(root = ".") {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
