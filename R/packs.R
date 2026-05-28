@@ -17,7 +17,8 @@ normalize_toml_arrays <- function(x) {
       return(x)
     }
     if (all(vapply(x, is.character, logical(1))) && all(vapply(x, length, integer(1)) <= 1)) {
-      return(unlist(x, use.names = FALSE))
+      preserve_names <- !is.null(names(x)) && all(nzchar(names(x)))
+      return(unlist(x, use.names = preserve_names))
     }
     return(lapply(x, normalize_toml_arrays))
   }
@@ -131,12 +132,39 @@ resolve_pack <- function(name, root = ".", stack = character()) {
   unique(c(parent_packages, pack$packages))
 }
 
+resolve_pack_sources <- function(name, root = ".", stack = character()) {
+  if (name %in% stack) {
+    cycle <- paste(c(stack, name), collapse = " -> ")
+    cli::cli_abort("Pack cycle detected: {cycle}.", call = NULL)
+  }
+
+  pack <- load_pack(name, root)
+  parents <- toml_string_array(pack$extends %||% character(), sprintf("%s extends", pack$.__path__))
+  parent_sources <- lapply(parents, resolve_pack_sources, root = root, stack = c(stack, name))
+  sources <- c(unlist(parent_sources, recursive = FALSE), as.list(pack$sources %||% list()))
+  sources[!duplicated(names(sources), fromLast = TRUE)]
+}
+
 resolve_config_packages <- function(config, root = ".") {
   declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
   extras <- toml_string_array(config$extras$declared %||% character(), "[extras].declared")
   exclude <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
   packages <- unlist(lapply(declared, resolve_pack, root = root), use.names = FALSE)
   setdiff(unique(c(packages, extras)), exclude)
+}
+
+resolve_config_install_specs <- function(config, root = ".") {
+  declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
+  exclude <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
+  packages <- resolve_config_packages(config, root)
+  sources <- c(unlist(lapply(declared, resolve_pack_sources, root = root), recursive = FALSE), as.list(config$sources %||% list()))
+  vapply(packages, function(package) {
+    if (!package %in% exclude && !is.null(sources[[package]])) {
+      as.character(sources[[package]])
+    } else {
+      package
+    }
+  }, character(1), USE.NAMES = FALSE)
 }
 
 #' List available packs

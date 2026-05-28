@@ -18,8 +18,10 @@ sync <- function(mode = c("apply", "restore"), root = ".", verbose = NULL) {
   config <- read_config(root)
   validate_config(config, root)
   packages <- resolve_config_packages(config, root)
+  install_specs <- resolve_config_install_specs(config, root)
   missing <- missing_packages(packages)
-  install_via(missing, root)
+  missing_specs <- install_specs[packages %in% missing]
+  install_via(missing_specs, root)
 
   if (isTRUE(config$settings$auto_snapshot %||% TRUE)) {
     call_renv_snapshot(root)
