@@ -80,3 +80,50 @@ test_that("status reports malformed config as invalid without aborting", {
   expect_false(s$config_valid)
   expect_match(s$config_error, "TOML|toml|Expected|parse")
 })
+
+test_that("v0.1 settings validation accepts documented shapes", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines[lines == 'parallel_daemons = "auto"'] <- "parallel_daemons = 2"
+  lines <- c(lines, "", "[settings.camcorder]", "enabled = false")
+  writeLines(lines, path)
+
+  expect_silent(boosterpak:::validate_config(boosterpak:::read_config(root), root))
+})
+
+test_that("v0.1 settings validation rejects invalid setting types", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines[lines == "air_toml = true"] <- 'air_toml = "yes"'
+  writeLines(lines, path)
+
+  expect_error(
+    boosterpak:::validate_config(boosterpak:::read_config(root), root),
+    "air_toml"
+  )
+
+  lines[lines == 'air_toml = "yes"'] <- "air_toml = true"
+  lines[lines == 'parallel_daemons = "auto"'] <- "parallel_daemons = 0"
+  writeLines(lines, path)
+
+  expect_error(
+    boosterpak:::validate_config(boosterpak:::read_config(root), root),
+    "parallel_daemons"
+  )
+})
+
+test_that("unknown TOML keys warn instead of erroring", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  writeLines(c(readLines(path, warn = FALSE), "", "[future]", "value = true"), path)
+
+  expect_warning(
+    boosterpak:::validate_config(boosterpak:::read_config(root), root),
+    "Unknown top-level key"
+  )
+})
