@@ -41,6 +41,7 @@ discover_pack_scope <- function(scope, dir) {
       name = character(),
       description = character(),
       scope = character(),
+      sources = character(),
       path = character()
     ))
   }
@@ -52,6 +53,7 @@ discover_pack_scope <- function(scope, dir) {
       name = data$name %||% tools::file_path_sans_ext(basename(path)),
       description = data$description %||% "",
       scope = scope,
+      sources = summarize_sources(data$sources %||% list()),
       path = normalizePath(path, winslash = "/", mustWork = FALSE),
       stringsAsFactors = FALSE
     )
@@ -61,8 +63,17 @@ discover_pack_scope <- function(scope, dir) {
     name = character(),
     description = character(),
     scope = character(),
+    sources = character(),
     path = character()
   )
+}
+
+summarize_sources <- function(sources) {
+  sources <- unlist(sources, use.names = TRUE)
+  if (length(sources) == 0) {
+    return("")
+  }
+  paste(sprintf("%s=%s", names(sources), unname(sources)), collapse = ", ")
 }
 
 available_packs <- function(root = ".") {
@@ -208,7 +219,8 @@ list_packs <- function(scope = NULL, root = ".", verbose = NULL) {
     } else {
       cli::cli_h1("Available booster packs")
       apply(packs, 1, function(row) {
-        cli::cli_li("{.val {row[['name']]}} [{row[['scope']]}]: {row[['description']]}")
+        source_text <- if (nzchar(row[["sources"]])) paste0(" sources: ", row[["sources"]]) else ""
+        cli::cli_li("{.val {row[['name']]}} [{row[['scope']]}]: {row[['description']]}{source_text}")
       })
     }
   }

@@ -1,7 +1,11 @@
 test_that("built-in packs are discoverable", {
   packs <- list_packs(verbose = FALSE)
   expect_setequal(packs$name, c("core", "example", "github-example"))
-  expect_true(all(c("name", "description", "scope", "path") %in% names(packs)))
+  expect_true(all(c("name", "description", "scope", "sources", "path") %in% names(packs)))
+  expect_equal(
+    packs$sources[packs$name == "github-example"],
+    "ComptoxR=seanthimons/ComptoxR"
+  )
 })
 
 test_that("packs resolve transitively", {
