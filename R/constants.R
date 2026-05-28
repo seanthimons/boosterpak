@@ -14,6 +14,14 @@ function_file <- function(name, root = ".") {
   file.path(functions_dir(root), sprintf("fn_%s.R", name))
 }
 
+pack_sidecar_dir <- function(pack_path) {
+  file.path(dirname(pack_path), tools::file_path_sans_ext(basename(pack_path)), "functions")
+}
+
+pack_function_file <- function(pack_path, name) {
+  file.path(pack_sidecar_dir(pack_path), sprintf("fn_%s.R", name))
+}
+
 catalog_function_file <- function(name) {
   system.file("functions", sprintf("%s.R", name), package = "boosterpak")
 }

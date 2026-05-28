@@ -4,7 +4,13 @@
 \alias{add_pack}
 \title{Add a pack declaration}
 \usage{
-add_pack(name, root = ".", sync = TRUE, verbose = NULL)
+add_pack(
+  name,
+  root = ".",
+  sync = TRUE,
+  overwrite_functions = FALSE,
+  verbose = NULL
+)
 }
 \arguments{
 \item{name}{Pack name.}
@@ -12,6 +18,9 @@ add_pack(name, root = ".", sync = TRUE, verbose = NULL)
 \item{root}{Project root.}
 
 \item{sync}{Whether to run additive sync after editing TOML.}
+
+\item{overwrite_functions}{Whether to overwrite existing function files
+provided by the pack.}
 
 \item{verbose}{Whether to print routine summaries.}
 }

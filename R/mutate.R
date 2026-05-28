@@ -1,4 +1,4 @@
-mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TRUE, verbose = NULL) {
+mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TRUE, overwrite_functions = FALSE, remove_functions = FALSE, verbose = NULL) {
   check_verbose(verbose)
   action <- match.arg(action)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
@@ -19,9 +19,17 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
   if (isTRUE(sync)) {
     ensure_project_renv(root)
   }
+  if (identical(action, "add") && !name %in% current && !isTRUE(overwrite_functions)) {
+    check_pack_function_conflicts(name, root)
+  }
 
   update_declared_array(boosters_file(root), "packs", "declared", next_packs)
   materialize_config_packs(read_config(root), root)
+  if (identical(action, "add")) {
+    materialize_pack_functions(name, root = root, overwrite = overwrite_functions)
+  } else if (isTRUE(remove_functions)) {
+    remove_pack_functions(name, next_packs, root = root)
+  }
 
   if (isTRUE(sync)) {
     sync(mode = "apply", root = root, verbose = verbose)
@@ -36,11 +44,13 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
 #' @param name Pack name.
 #' @param root Project root.
 #' @param sync Whether to run additive sync after editing TOML.
+#' @param overwrite_functions Whether to overwrite existing function files
+#'   provided by the pack.
 #' @param verbose Whether to print routine summaries.
 #' @return Updated declared pack names, invisibly.
 #' @export
-add_pack <- function(name, root = ".", sync = TRUE, verbose = NULL) {
-  mutate_pack(name, "add", root, sync, verbose)
+add_pack <- function(name, root = ".", sync = TRUE, overwrite_functions = FALSE, verbose = NULL) {
+  mutate_pack(name, "add", root, sync, overwrite_functions = overwrite_functions, verbose = verbose)
 }
 
 #' Remove a pack declaration
@@ -48,11 +58,13 @@ add_pack <- function(name, root = ".", sync = TRUE, verbose = NULL) {
 #' @param name Pack name.
 #' @param root Project root.
 #' @param sync Whether to run additive sync after editing TOML.
+#' @param remove_functions Whether to remove unchanged function files provided
+#'   only by the removed pack.
 #' @param verbose Whether to print routine summaries.
 #' @return Updated declared pack names, invisibly.
 #' @export
-remove_pack <- function(name, root = ".", sync = TRUE, verbose = NULL) {
-  mutate_pack(name, "remove", root, sync, verbose)
+remove_pack <- function(name, root = ".", sync = TRUE, remove_functions = FALSE, verbose = NULL) {
+  mutate_pack(name, "remove", root, sync, remove_functions = remove_functions, verbose = verbose)
 }
 
 update_declared_array <- function(path, section, key, values) {

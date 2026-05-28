@@ -1,5 +1,7 @@
 # boosterpak
 
+<img src="man/figures/boosterpak_hex.png" align="right" width="140" alt="boosterpak hex logo" />
+
 `boosterpak` is an R package for declaring project package intent in a
 human-edited `boosters.toml` file. It resolves named "booster" packs from
 project, user, and built-in scopes, installs missing packages with `pak`, and
@@ -21,6 +23,32 @@ boosterpak::sync()
 `init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes
 `air.toml`, manages the `.Rprofile` helper-source line, and can initialize
 project-local `renv`.
+
+## Typical Workflow
+
+```mermaid
+flowchart TD
+  A[Start or clone project] --> B[Initialize boosterpak]
+  B --> C[Add reusable intent]
+  C --> D[Add packs]
+  C --> E[Add helper functions]
+  D --> F[Sync project]
+  E --> F
+  F --> G[Packages installed in renv]
+  F --> H[Helper files copied into boosters]
+  G --> I[Edit code and helper files]
+  H --> I
+  I --> J[Save a reusable pack]
+  J --> K[Pack TOML plus function sidecar]
+  K --> L[Promote to user scope]
+  L --> M[Reuse in another project]
+  M --> D
+```
+
+The usual loop is to initialize once, add packs and helper functions as project
+intent, run `sync()`, then capture a useful baseline with `save_pack()`. Packs
+can be package-only, or they can carry exact copied `boosters/fn_*.R` helper
+files in a sidecar directory for reuse across projects.
 
 ## Add a Pack
 
@@ -45,9 +73,12 @@ boosterpak::promote_pack("project_baseline")
 ```
 
 `save_pack()` writes a flat TOML snapshot of the currently resolved project
-packages. Use `from = "core"` to fork one existing pack, or `scope = "user"` to
-write directly to the machine-wide user pack directory. `promote_pack()` copies a
-project pack to user scope, and `demote_pack()` copies it back into a project.
+packages and, by default, the helper functions listed in `[functions].installed`.
+Use `functions = "all"` to capture every `boosters/fn_*.R` file,
+`functions = "none"` for a package-only pack, `from = "core"` to fork one
+existing pack, or `scope = "user"` to write directly to the machine-wide user
+pack directory. `promote_pack()` copies a project pack and its function sidecar
+to user scope, and `demote_pack()` copies both back into a project.
 
 ## Restore from a Lockfile
 

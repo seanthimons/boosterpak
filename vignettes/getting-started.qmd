@@ -1,0 +1,140 @@
+---
+title: "Getting started with boosterpak"
+format: html
+execute:
+  warning: false
+  message: false
+vignette: >
+  %\VignetteIndexEntry{Getting started with boosterpak}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+`boosterpak` adds a small intent layer above `pak` and `renv`. A project declares
+the packs it wants in `boosters.toml`; `boosterpak::sync()` resolves those packs
+and installs missing packages into the active project-local `renv` library.
+Packs can also carry exact copied helper files, so a useful project setup can be
+reused without separating "packages" from customized `boosters/fn_*.R` files.
+
+## Typical workflow
+
+```{mermaid}
+flowchart TD
+  A[Start or clone project] --> B[Initialize boosterpak]
+  B --> C[Add reusable intent]
+  C --> D[Add packs]
+  C --> E[Add helper functions]
+  D --> F[Sync project]
+  E --> F
+  F --> G[Packages installed in renv]
+  F --> H[Helper files copied into boosters]
+  G --> I[Edit code and helper files]
+  H --> I
+  I --> J[Save a reusable pack]
+  J --> K[Pack TOML plus function sidecar]
+  K --> L[Promote to user scope]
+  L --> M[Reuse in another project]
+  M --> D
+```
+
+In practice, initialize once, add pack and function intent over time, run
+`sync()` whenever the project should match that intent, then save and promote a
+pack when the setup is worth reusing.
+
+## Initialize
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::init(renv = "yes", rprofile = "yes")
+```
+
+This creates:
+
+- `boosters.toml`
+- `boosters/packs/`
+- `air.toml`, when enabled by settings
+- a `.Rprofile` helper-source line, when requested
+
+In non-interactive sessions, use explicit `renv` and `rprofile` arguments. The
+default `"ask"` mode never silently changes `.Rprofile` when user confirmation
+would be required.
+
+## Add a Pack
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::add_pack("example")
+```
+
+The `example` pack installs `cli`. `add_pack()` preserves unrelated comments and
+sections in `boosters.toml` while updating `[packs].declared`.
+If the pack carries helper functions, `add_pack()` also copies the bundled
+`fn_*.R` files into `boosters/` and refuses to overwrite existing function files
+unless `overwrite_functions = TRUE`.
+
+## Add a Helper Function
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::add_function("ni")
+```
+
+Helper functions are materialized as `boosters/fn_*.R` files and tracked in
+`[functions].installed`. They are ordinary project files, so you can edit them
+after materialization. `sync()` restores missing installed helper files, but it
+does not overwrite local edits.
+
+## Apply Project Intent
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::sync()
+```
+
+Apply mode is additive. It installs missing declared packages, materializes
+missing bundled or installed helper functions, and, when `auto_snapshot = true`,
+snapshots with `renv`.
+
+## Capture and Reuse
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::save_pack("project_baseline")
+boosterpak::promote_pack("project_baseline")
+```
+
+`save_pack()` captures the resolved package set and, by default, helper functions
+listed in `[functions].installed`. Use `functions = "all"` to capture every
+`boosters/fn_*.R` file, `functions = "none"` for a package-only pack, or a
+character vector for specific function names. `promote_pack()` and
+`demote_pack()` copy both the pack TOML and any function sidecar directory.
+
+## Restore Exact Versions
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::sync(mode = "restore")
+```
+
+Restore mode requires both `boosters.toml` and `renv.lock`, calls
+`renv::restore()`, validates the manifest, and warns if direct declared packages
+are absent from the lockfile.
+
+## Inspect
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::status()
+boosterpak::list_packs()
+```
+
+`status()` reports whether the manifest exists and validates, what packs and
+packages resolve, whether project-local `renv` appears active, whether
+`renv.lock` exists, and whether `.Rprofile` contains the helper hook.

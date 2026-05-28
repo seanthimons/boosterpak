@@ -6,4 +6,5 @@
 ^\.RData$
 ^\.Ruserdata$
 ^booster_pak_PRD[.]md$
+^booster_pak_v0[.]5_PRD[.]md$
 ^\.gitignore$

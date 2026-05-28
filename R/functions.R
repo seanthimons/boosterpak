@@ -71,6 +71,59 @@ materialize_function <- function(name, root = ".", overwrite = FALSE) {
   invisible(target)
 }
 
+materialize_pack_function <- function(pack_path, name, root = ".", overwrite = FALSE) {
+  source <- pack_function_file(pack_path, name)
+  target <- function_file(name, root)
+  if (!file.exists(source)) {
+    cli::cli_abort("Pack function source {.file {source}} is missing.", call = NULL)
+  }
+  dir.create(functions_dir(root), recursive = TRUE, showWarnings = FALSE)
+  if (file.exists(target) && !isTRUE(overwrite)) {
+    cli::cli_abort(
+      "{.file {target}} already exists. Use {.code overwrite_functions = TRUE} to replace it.",
+      call = NULL
+    )
+  }
+  copied <- file.copy(source, target, overwrite = TRUE)
+  if (!isTRUE(copied)) {
+    cli::cli_abort("Failed to write {.file {target}}.", call = NULL)
+  }
+  invisible(target)
+}
+
+materialize_pack_functions <- function(names, root = ".", overwrite = FALSE) {
+  packs <- unique(unlist(lapply(names, resolve_pack_names, root = root), use.names = FALSE))
+  invisible(lapply(packs, function(pack_name) {
+    pack <- load_pack(pack_name, root)
+    functions <- toml_string_array(pack$functions %||% character(), sprintf("%s functions", pack$.__path__))
+    invisible(lapply(functions, function(name) {
+      target <- function_file(name, root)
+      if (!file.exists(target) || isTRUE(overwrite)) {
+        materialize_pack_function(pack$.__path__, name, root, overwrite)
+      }
+    }))
+  }))
+}
+
+check_pack_function_conflicts <- function(names, root = ".") {
+  packs <- unique(unlist(lapply(names, resolve_pack_names, root = root), use.names = FALSE))
+  conflicts <- character()
+  invisible(lapply(packs, function(pack_name) {
+    pack <- load_pack(pack_name, root)
+    functions <- toml_string_array(pack$functions %||% character(), sprintf("%s functions", pack$.__path__))
+    conflicts <<- c(conflicts, functions[file.exists(function_file(functions, root))])
+  }))
+  conflicts <- unique(conflicts)
+  if (length(conflicts) > 0) {
+    paths <- paste(function_file(conflicts, root), collapse = ", ")
+    cli::cli_abort(
+      "Function file{?s} already exist{?s}: {paths}. Use {.code overwrite_functions = TRUE} to replace {?it/them}.",
+      call = NULL
+    )
+  }
+  invisible(TRUE)
+}
+
 sync_functions <- function(config, root = ".") {
   installed <- installed_functions(config)
   invisible(lapply(installed, function(name) {
@@ -78,7 +131,33 @@ sync_functions <- function(config, root = ".") {
       materialize_function(name, root = root, overwrite = FALSE)
     }
   }))
+  declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
+  materialize_pack_functions(declared, root = root, overwrite = FALSE)
   installed
+}
+
+pack_provided_function_names <- function(config, root = ".") {
+  declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
+  unique(unlist(lapply(declared, resolve_pack_functions, root = root), use.names = FALSE))
+}
+
+remove_pack_functions <- function(name, remaining_packs, root = ".") {
+  pack <- load_pack(name, root)
+  removable <- toml_string_array(pack$functions %||% character(), sprintf("%s functions", pack$.__path__))
+  if (length(removable) == 0) {
+    return(invisible(character()))
+  }
+  still_provided <- unique(unlist(lapply(remaining_packs, resolve_pack_functions, root = root), use.names = FALSE))
+  removed <- character()
+  for (function_name in setdiff(removable, still_provided)) {
+    target <- function_file(function_name, root)
+    source <- pack_function_file(pack$.__path__, function_name)
+    if (file.exists(target) && file.exists(source) && identical(readLines(target, warn = FALSE), readLines(source, warn = FALSE))) {
+      unlink(target)
+      removed <- c(removed, function_name)
+    }
+  }
+  invisible(removed)
 }
 
 #' List available materializable functions

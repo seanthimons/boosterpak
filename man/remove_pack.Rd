@@ -4,7 +4,13 @@
 \alias{remove_pack}
 \title{Remove a pack declaration}
 \usage{
-remove_pack(name, root = ".", sync = TRUE, verbose = NULL)
+remove_pack(
+  name,
+  root = ".",
+  sync = TRUE,
+  remove_functions = FALSE,
+  verbose = NULL
+)
 }
 \arguments{
 \item{name}{Pack name.}
@@ -12,6 +18,9 @@ remove_pack(name, root = ".", sync = TRUE, verbose = NULL)
 \item{root}{Project root.}
 
 \item{sync}{Whether to run additive sync after editing TOML.}
+
+\item{remove_functions}{Whether to remove unchanged function files provided
+only by the removed pack.}
 
 \item{verbose}{Whether to print routine summaries.}
 }

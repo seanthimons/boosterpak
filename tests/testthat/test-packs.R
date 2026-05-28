@@ -173,6 +173,29 @@ test_that("save_pack captures resolved project packages as a flat project pack",
   expect_null(data$extends)
   expect_setequal(data$packages, c("fs", "here", "janitor", "rio", "tidyverse", "cli", "withr", "pointblank"))
   expect_equal(data$sources[["pointblank"]], "rstudio/pointblank")
+  expect_equal(boosterpak:::toml_string_array(data$functions, "functions"), character())
+})
+
+test_that("save_pack captures installed, all, none, and explicit function sidecars", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  ni <- add_function("ni", root = root, verbose = FALSE)
+  writeLines("custom_helper <- function() TRUE", file.path(root, "boosters", "fn_custom_helper.R"))
+
+  installed <- save_pack("installed_fns", root = root, verbose = FALSE)
+  expect_equal(boosterpak:::read_toml_file(installed)$functions, "ni")
+  expect_equal(readLines(boosterpak:::pack_function_file(installed, "ni"), warn = FALSE), readLines(ni, warn = FALSE))
+
+  all <- save_pack("all_fns", root = root, functions = "all", verbose = FALSE)
+  expect_setequal(boosterpak:::read_toml_file(all)$functions, c("ni", "custom_helper"))
+
+  none <- save_pack("no_fns", root = root, functions = "none", verbose = FALSE)
+  expect_equal(boosterpak:::toml_string_array(boosterpak:::read_toml_file(none)$functions, "functions"), character())
+  expect_false(dir.exists(boosterpak:::pack_sidecar_dir(none)))
+
+  explicit <- save_pack("explicit_fns", root = root, functions = "custom_helper", verbose = FALSE)
+  expect_equal(boosterpak:::read_toml_file(explicit)$functions, "custom_helper")
+  expect_error(save_pack("missing_fns", root = root, functions = "missing", verbose = FALSE), "missing")
 })
 
 test_that("save_pack can fork one named pack and refuses overwrite by default", {
@@ -221,4 +244,20 @@ test_that("promote_pack and demote_pack copy between project and user scopes", {
   project_path <- demote_pack("portable", root = root, verbose = FALSE)
   expect_true(file.exists(project_path))
   expect_equal(readLines(project_path, warn = FALSE), readLines(user_path, warn = FALSE))
+})
+
+test_that("promote_pack and demote_pack copy function sidecars", {
+  withr::local_envvar(R_USER_CONFIG_DIR = withr::local_tempdir())
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_function("ni", root = root, verbose = FALSE)
+  save_pack("portable_fns", root = root, verbose = FALSE)
+
+  user_path <- promote_pack("portable_fns", root = root, verbose = FALSE)
+  expect_true(file.exists(boosterpak:::pack_function_file(user_path, "ni")))
+
+  unlink(file.path(root, "boosters", "packs", "portable_fns.toml"))
+  unlink(file.path(root, "boosters", "packs", "portable_fns"), recursive = TRUE)
+  project_path <- demote_pack("portable_fns", root = root, verbose = FALSE)
+  expect_true(file.exists(boosterpak:::pack_function_file(project_path, "ni")))
 })

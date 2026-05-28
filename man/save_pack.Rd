@@ -7,6 +7,7 @@ save_pack(
   scope = c("project", "user"),
   from = NULL,
   root = ".",
+  functions = "installed",
   overwrite = FALSE,
   verbose = NULL
 )
@@ -19,6 +20,9 @@ save_pack(
 \item{from}{Optional existing pack name to fork. When \code{NULL}, captures the current project's resolved package set.}
 
 \item{root}{Project root.}
+
+\item{functions}{Functions to carry with the pack: \code{"installed"}, \code{"all"},
+\code{"none"}, or a character vector of function names.}
 
 \item{overwrite}{Whether to replace an existing pack file.}
 

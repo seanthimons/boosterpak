@@ -100,6 +100,76 @@ test_that("sync leaves existing materialized function files untouched", {
   expect_equal(readLines(path, warn = FALSE), edited)
 })
 
+test_that("add_pack copies bundled functions and refuses local overwrite by default", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_function("ni", root = root, verbose = FALSE)
+  save_pack("portable_fns", root = root, verbose = FALSE)
+  remove_function("ni", root = root, verbose = FALSE)
+
+  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
+  expect_true(file.exists(file.path(root, "boosters", "fn_ni.R")))
+  expect_true(file.exists(file.path(root, "boosters", "packs", "portable_fns", "functions", "fn_ni.R")))
+
+  remove_pack("portable_fns", root = root, sync = FALSE, verbose = FALSE)
+  writeLines("# local", file.path(root, "boosters", "fn_ni.R"))
+  expect_error(add_pack("portable_fns", root = root, sync = FALSE, verbose = FALSE), "overwrite_functions = TRUE")
+  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
+  expect_equal(
+    readLines(file.path(root, "boosters", "fn_ni.R"), warn = FALSE),
+    readLines(file.path(root, "boosters", "packs", "portable_fns", "functions", "fn_ni.R"), warn = FALSE)
+  )
+})
+
+test_that("sync copies missing pack-bundled functions without overwriting edits", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_function("ni", root = root, verbose = FALSE)
+  save_pack("portable_fns", root = root, verbose = FALSE)
+  remove_function("ni", root = root, verbose = FALSE)
+  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
+  path <- file.path(root, "boosters", "fn_ni.R")
+  unlink(path)
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages) character(),
+    install_via = function(specs, root = ".") TRUE,
+    call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+  expect_true(file.exists(path))
+
+  edited <- c(readLines(path, warn = FALSE), "# local edit")
+  writeLines(edited, path)
+  sync(root = root, verbose = FALSE)
+  expect_equal(readLines(path, warn = FALSE), edited)
+})
+
+test_that("remove_pack optionally removes only unchanged unshared bundled functions", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_function("ni", root = root, verbose = FALSE)
+  save_pack("portable_fns", root = root, verbose = FALSE)
+  remove_function("ni", root = root, verbose = FALSE)
+  add_pack("portable_fns", root = root, sync = FALSE, verbose = FALSE)
+  path <- file.path(root, "boosters", "fn_ni.R")
+
+  remove_pack("portable_fns", root = root, sync = FALSE, verbose = FALSE)
+  expect_true(file.exists(path))
+
+  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
+  writeLines(c(readLines(path, warn = FALSE), "# local edit"), path)
+  remove_pack("portable_fns", root = root, sync = FALSE, remove_functions = TRUE, verbose = FALSE)
+  expect_true(file.exists(path))
+
+  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
+  remove_pack("portable_fns", root = root, sync = FALSE, remove_functions = TRUE, verbose = FALSE)
+  expect_false(file.exists(path))
+})
+
 test_that("function validation uses did-you-mean for unknown functions", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)

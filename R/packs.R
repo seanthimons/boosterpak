@@ -54,6 +54,7 @@ discover_pack_scope <- function(scope, dir) {
       description = data$description %||% "",
       scope = scope,
       sources = summarize_sources(data$sources %||% list()),
+      functions = paste(toml_string_array(data$functions %||% character(), sprintf("%s functions", path)), collapse = ", "),
       path = normalizePath(path, winslash = "/", mustWork = FALSE),
       stringsAsFactors = FALSE
     )
@@ -64,6 +65,7 @@ discover_pack_scope <- function(scope, dir) {
     description = character(),
     scope = character(),
     sources = character(),
+    functions = character(),
     path = character()
   )
 }
@@ -152,6 +154,12 @@ validate_pack_schema <- function(expected_name, path, data) {
   }
   data$packages <- toml_string_array(data$packages, sprintf("%s packages", path))
   data$extends <- toml_string_array(data$extends %||% character(), sprintf("%s extends", path))
+  data$functions <- toml_string_array(data$functions %||% character(), sprintf("%s functions", path))
+  invisible(lapply(data$functions, function(name) {
+    if (!file.exists(pack_function_file(path, name))) {
+      cli::cli_abort("{.file {path}} declares function {.val {name}} but {.file {pack_function_file(path, name)}} is missing.", call = NULL)
+    }
+  }))
   invisible(TRUE)
 }
 
@@ -180,6 +188,18 @@ resolve_pack_names <- function(name, root = ".", stack = character()) {
   unique(c(parent_names, name))
 }
 
+resolve_pack_functions <- function(name, root = ".", stack = character()) {
+  if (name %in% stack) {
+    cycle <- paste(c(stack, name), collapse = " -> ")
+    cli::cli_abort("Pack cycle detected: {cycle}.", call = NULL)
+  }
+
+  pack <- load_pack(name, root)
+  parents <- toml_string_array(pack$extends %||% character(), sprintf("%s extends", pack$.__path__))
+  parent_functions <- unlist(lapply(parents, resolve_pack_functions, root = root, stack = c(stack, name)), use.names = FALSE)
+  unique(c(parent_functions, pack$functions %||% character()))
+}
+
 resolve_config_pack_names <- function(config, root = ".") {
   declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
   unique(unlist(lapply(declared, resolve_pack_names, root = root), use.names = FALSE))
@@ -189,15 +209,19 @@ materialize_pack <- function(name, root = ".") {
   pack <- load_pack(name, root)
   dir.create(project_packs_dir(root), recursive = TRUE, showWarnings = FALSE)
   target <- file.path(project_packs_dir(root), sprintf("%s.toml", name))
-  if (identical(normalizePath(pack$.__path__, winslash = "/", mustWork = FALSE), normalizePath(target, winslash = "/", mustWork = FALSE))) {
-    return(invisible(target))
+  same_path <- identical(normalizePath(pack$.__path__, winslash = "/", mustWork = FALSE), normalizePath(target, winslash = "/", mustWork = FALSE))
+  if (!same_path && !file.exists(target)) {
+    copied <- file.copy(pack$.__path__, target, overwrite = FALSE)
+    if (!isTRUE(copied)) {
+      cli::cli_abort("Failed to write pack {.val {name}} to {.file {target}}.", call = NULL)
+    }
   }
-  if (file.exists(target)) {
-    return(invisible(target))
-  }
-  copied <- file.copy(pack$.__path__, target, overwrite = FALSE)
-  if (!isTRUE(copied)) {
-    cli::cli_abort("Failed to write pack {.val {name}} to {.file {target}}.", call = NULL)
+  if (dir.exists(pack_sidecar_dir(pack$.__path__)) && !dir.exists(pack_sidecar_dir(target))) {
+    dir.create(dirname(pack_sidecar_dir(target)), recursive = TRUE, showWarnings = FALSE)
+    copied_dir <- file.copy(pack_sidecar_dir(pack$.__path__), dirname(pack_sidecar_dir(target)), recursive = TRUE, overwrite = FALSE)
+    if (!isTRUE(copied_dir)) {
+      cli::cli_abort("Failed to write pack function sidecar for {.val {name}}.", call = NULL)
+    }
   }
   invisible(target)
 }
@@ -319,7 +343,7 @@ pack_description <- function(name, from = NULL) {
   }
 }
 
-write_pack_file <- function(path, name, description, packages, sources = character(), overwrite = FALSE) {
+write_pack_file <- function(path, name, description, packages, sources = character(), functions = character(), overwrite = FALSE) {
   if (file.exists(path) && !isTRUE(overwrite)) {
     cli::cli_abort("{.file {path}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
   }
@@ -327,7 +351,8 @@ write_pack_file <- function(path, name, description, packages, sources = charact
   lines <- c(
     sprintf('name = "%s"', escape_toml_string(name)),
     sprintf('description = "%s"', escape_toml_string(description)),
-    sprintf("packages = [%s]", paste(sprintf('"%s"', vapply(packages, escape_toml_string, character(1))), collapse = ", "))
+    sprintf("packages = [%s]", paste(sprintf('"%s"', vapply(packages, escape_toml_string, character(1))), collapse = ", ")),
+    sprintf("functions = [%s]", paste(sprintf('"%s"', vapply(functions, escape_toml_string, character(1))), collapse = ", "))
   )
   if (length(sources) > 0) {
     lines <- c(
@@ -361,12 +386,58 @@ resolve_save_pack_contents <- function(from = NULL, root = ".") {
     install_specs <- resolve_config_install_specs(config, root)
     sources <- install_specs[install_specs != packages]
     names(sources) <- packages[install_specs != packages]
+    functions <- installed_functions(config)
   } else {
     load_pack(from, root)
     packages <- resolve_pack(from, root)
     sources <- pack_sources_for_packages(packages, resolve_pack_sources(from, root))
+    functions <- resolve_pack_functions(from, root)
   }
-  list(packages = unique(packages), sources = sources)
+  list(packages = unique(packages), sources = sources, functions = functions)
+}
+
+local_function_names <- function(root = ".") {
+  files <- list.files(functions_dir(root), pattern = "^fn_[A-Za-z0-9._-]+\\.R$", full.names = FALSE)
+  sub("^fn_(.*)\\.R$", "\\1", files)
+}
+
+resolve_save_pack_functions <- function(functions, contents, root = ".") {
+  if (is.character(functions) && length(functions) == 1 && functions %in% c("installed", "all", "none")) {
+    names <- switch(
+      functions,
+      installed = contents$functions,
+      all = local_function_names(root),
+      none = character()
+    )
+  } else if (is.character(functions)) {
+    names <- functions
+  } else {
+    cli::cli_abort("{.arg functions} must be {.val installed}, {.val all}, {.val none}, or a character vector.", call = NULL)
+  }
+  unique(names)
+}
+
+write_pack_function_sidecar <- function(path, names, root = ".", overwrite = FALSE) {
+  sidecar <- pack_sidecar_dir(path)
+  if (dir.exists(sidecar) && isTRUE(overwrite)) {
+    unlink(sidecar, recursive = TRUE)
+  }
+  if (length(names) == 0) {
+    return(invisible(sidecar))
+  }
+  dir.create(sidecar, recursive = TRUE, showWarnings = FALSE)
+  invisible(lapply(names, function(name) {
+    source <- function_file(name, root)
+    target <- pack_function_file(path, name)
+    if (!file.exists(source)) {
+      cli::cli_abort("Requested function {.val {name}} is missing at {.file {source}}.", call = NULL)
+    }
+    copied <- file.copy(source, target, overwrite = TRUE)
+    if (!isTRUE(copied)) {
+      cli::cli_abort("Failed to copy function {.val {name}} to {.file {target}}.", call = NULL)
+    }
+  }))
+  invisible(sidecar)
 }
 
 #' Save a resolved package set as a pack
@@ -376,19 +447,23 @@ resolve_save_pack_contents <- function(from = NULL, root = ".") {
 #' @param from Optional existing pack name to fork. When `NULL`, captures the
 #'   current project's resolved package set.
 #' @param root Project root.
+#' @param functions Functions to carry with the pack: `"installed"`, `"all"`,
+#'   `"none"`, or a character vector of function names.
 #' @param overwrite Whether to replace an existing pack file.
 #' @param verbose Whether to print routine summaries.
 #' @return Path to the saved pack, invisibly.
 #' @export
-save_pack <- function(name, scope = c("project", "user"), from = NULL, root = ".", overwrite = FALSE, verbose = NULL) {
+save_pack <- function(name, scope = c("project", "user"), from = NULL, root = ".", functions = "installed", overwrite = FALSE, verbose = NULL) {
   check_verbose(verbose)
   validate_new_pack_name(name)
   scope <- match.arg(scope)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
 
   contents <- resolve_save_pack_contents(from, root)
+  pack_functions <- resolve_save_pack_functions(functions, contents, root)
   target <- file.path(pack_scope_dir(scope, root), sprintf("%s.toml", name))
-  write_pack_file(target, name, pack_description(name, from), contents$packages, contents$sources, overwrite)
+  write_pack_file(target, name, pack_description(name, from), contents$packages, contents$sources, pack_functions, overwrite)
+  write_pack_function_sidecar(target, pack_functions, root, overwrite)
 
   if (should_emit(verbose)) {
     cli::cli_alert_success("Saved pack {.val {name}} to {.file {target}}.")
@@ -414,6 +489,21 @@ copy_pack_between_scopes <- function(name, from_scope, to_scope, root = ".", ove
   ok <- file.copy(source, target, overwrite = isTRUE(overwrite))
   if (!isTRUE(ok)) {
     cli::cli_abort("Failed to copy pack {.val {name}} to {.file {target}}.", call = NULL)
+  }
+  source_sidecar <- pack_sidecar_dir(source)
+  target_sidecar <- pack_sidecar_dir(target)
+  if (dir.exists(source_sidecar)) {
+    if (dir.exists(target_sidecar)) {
+      if (!isTRUE(overwrite)) {
+        cli::cli_abort("{.file {target_sidecar}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
+      }
+      unlink(target_sidecar, recursive = TRUE)
+    }
+    dir.create(dirname(target_sidecar), recursive = TRUE, showWarnings = FALSE)
+    copied_dir <- file.copy(source_sidecar, dirname(target_sidecar), recursive = TRUE, overwrite = TRUE)
+    if (!isTRUE(copied_dir)) {
+      cli::cli_abort("Failed to copy function sidecar for pack {.val {name}}.", call = NULL)
+    }
   }
 
   if (should_emit(verbose)) {
