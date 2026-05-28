@@ -1,0 +1,5 @@
+name = "github-example"
+description = "Example pack showing a GitHub source override without adding install weight by default."
+packages = []
+
+[sources]

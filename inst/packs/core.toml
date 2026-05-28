@@ -1,0 +1,3 @@
+name = "core"
+description = "Minimal baseline pack for boosterpak projects."
+packages = []
