@@ -7,7 +7,8 @@
 sync(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL)
 }
 \arguments{
-\item{mode}{\code{"apply"} installs packages declared by \code{boosters.toml}; \code{"restore"} restores from \code{renv.lock}.}
+\item{mode}{\code{"apply"} installs packages declared by \code{boosters.toml} and
+writes \code{boosters/attach.R}; \code{"restore"} restores from \code{renv.lock}.}
 
 \item{root}{Project root.}
 

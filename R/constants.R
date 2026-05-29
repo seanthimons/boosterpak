@@ -10,6 +10,10 @@ functions_dir <- function(root = ".") {
   boosters_dir(root)
 }
 
+attach_file <- function(root = ".") {
+  file.path(boosters_dir(root), "attach.R")
+}
+
 function_file <- function(name, root = ".") {
   file.path(functions_dir(root), sprintf("fn_%s.R", name))
 }
@@ -42,6 +46,10 @@ user_packs_dir <- function() {
 }
 
 rprofile_line <- function() {
+  'if (dir.exists("boosters")) { attach <- file.path("boosters", "attach.R"); if (file.exists(attach)) source(attach); invisible(lapply(list.files("boosters", "^fn_.*\\\\.R$", full.names = TRUE), source)) }'
+}
+
+legacy_rprofile_line <- function() {
   'if (dir.exists("boosters")) invisible(lapply(list.files("boosters", "^fn_.*\\\\.R$", full.names = TRUE), source))'
 }
 

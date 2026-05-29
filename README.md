@@ -2,7 +2,7 @@
 
 <img src="man/figures/boosterpak_hex.png" alt="boosterpak hex logo" align="right" width="140"/>
 
-`boosterpak` is an R package for declaring project package intent in a human-edited `boosters.toml` file. It resolves named "booster" packs from project, user, and built-in scopes, reuses locally available packages with `renv::hydrate()` when possible, installs anything still missing with `pak`, and uses `renv` for project-local libraries and lockfiles.
+`boosterpak` is an R package for declaring project package intent in a human-edited `boosters.toml` file. It resolves named "booster" packs from project, user, and built-in scopes, reuses locally available packages with `renv::hydrate()` when possible, installs anything still missing with `pak`, writes explicit startup `library()` calls to `boosters/attach.R`, and uses `renv` for project-local libraries and lockfiles.
 
 ## 1. Install pak
 
@@ -22,7 +22,7 @@ pak::pkg_install("seanthimons/boosterpak")
 boosterpak::init(renv = "yes", rprofile = "yes")
 ```
 
-`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the `.Rprofile` helper-source line, and can initialize project-local `renv`. With `renv = "yes"`, it bootstraps `renv`, `pak`, and `boosterpak` into the project library and snapshots those workflow packages before any restart is needed.
+`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the recommended `.Rprofile` startup hook, and can initialize project-local `renv`. With `renv = "yes"`, it bootstraps `renv`, `pak`, and `boosterpak` into the project library and snapshots those workflow packages before any restart is needed.
 
 ## 4. Sync the project
 
@@ -42,7 +42,8 @@ flowchart TD
   E --> F
   F --> G[Hydrate from local libraries]
   G --> H[Install remaining with pak]
-  H --> I[Snapshot declared packages]
+  H --> A1[Write boosters/attach.R]
+  A1 --> I[Snapshot declared packages]
   F --> J[Helper files copied into boosters]
   I --> K([Edit code and helper files])
   J --> K
@@ -55,10 +56,10 @@ flowchart TD
   classDef userAction fill:#e8f3ff,stroke:#1f6feb,color:#0b1f3a;
   classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
   class A,B,C,D,E,F,K,L,N,O userAction;
-  class G,H,I,J,M packageAction;
+  class G,H,A1,I,J,M packageAction;
 ```
 
-The usual loop is to initialize once, add packs and helper functions as project intent, run `sync()`, then capture a useful baseline with `save_pack()`. Additive installs hydrate plain-name packages from local/user libraries before downloading, then install any remaining packages with `pak`. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
+The usual loop is to initialize once, add packs and helper functions as project intent, run `sync()`, then capture a useful baseline with `save_pack()`. Additive installs hydrate plain-name packages from local/user libraries before downloading, install any remaining packages with `pak`, and write `boosters/attach.R` for startup `library()` calls. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
 
 ## Add a Pack
 
@@ -87,6 +88,8 @@ packages = ["ggplot2", "patchwork", "ggtext"]
 
 In this pack, `ggplot2` and `patchwork` install by package name, while `ggtext` uses the GitHub source spec.
 
+Attachment is separate from installation. Missing `attach` means a pack attaches its direct `packages`; packs can also use `attach = true`, `attach = false`, or `attach = ["pkg1", "pkg2"]`. The top-level `[attach]` table can add packages with `declared`, remove packages with `exclude`, or set `enabled = false` to remove the managed `boosters/attach.R` file. Workflow packages from `core` and `[extras]`, such as `pak`, `renv`, and `boosterpak`, are installed but not attached unless explicitly listed in `[attach].declared`.
+
 Pack mutation is additive. Removing a pack updates `boosters.toml` and can run sync, but it does not uninstall packages.
 
 By default, `add_pack()` and `sync(mode = "apply")` use `hydrate = TRUE`, so ordinary CRAN-style package names can be copied from renv-discoverable local libraries before `pak` downloads anything. Source-specific declarations, such as GitHub remotes in `[sources]`, skip hydration and install through their declared spec. Use `hydrate = FALSE` for stricter first-run installs that should go straight to `pak`.
@@ -106,7 +109,7 @@ boosterpak::promote_pack("project_baseline")
 boosterpak::sync(mode = "restore")
 ```
 
-`sync(mode = "apply")` treats `boosters.toml` as intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate.
+`sync(mode = "apply")` treats `boosters.toml` as intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`, then writes `boosters/attach.R` before snapshot. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate.
 
 ## Troubleshooting 0.5 Init Projects
 
@@ -131,6 +134,6 @@ boosterpak::status()
 boosterpak::list_packs()
 ```
 
-`status()` reports config validity, declared and resolved packs, package counts, missing direct packages, function drift or missing materialized files, pack catalog counts, `renv` state, lockfile presence, and the `.Rprofile` hook.
+`status()` reports config validity, declared and resolved packs, package counts, missing direct packages, attach package count and file presence, function drift or missing materialized files, pack catalog counts, `renv` state, lockfile presence, and the `.Rprofile` hook.
 
 Current development includes function materialization, pack capture/promotion, and broader project status reporting; pruning remains out of scope.

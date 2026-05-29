@@ -16,7 +16,8 @@ init(
 
 \item{renv}{Whether to initialize project-local renv: \code{"ask"}, \code{"yes"}, or \code{"no"}.}
 
-\item{rprofile}{Whether to add the helper auto-source line to \code{.Rprofile}.}
+\item{rprofile}{Whether to add the recommended \code{.Rprofile} startup hook that
+sources \code{boosters/attach.R} before helper files.}
 
 \item{verbose}{Whether to print routine summaries.}
 }

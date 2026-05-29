@@ -186,6 +186,7 @@ validate_pack_schema <- function(expected_name, path, data, scope) {
   data$extends <- toml_string_array(data$extends %||% character(), sprintf("%s extends", path))
   data$functions <- toml_string_array(data$functions %||% character(), sprintf("%s functions", path))
   data$hooks$on_add <- toml_string_array(data$hooks$on_add %||% character(), sprintf("%s [hooks].on_add", path))
+  validate_pack_attach(data$attach, sprintf("%s attach", path))
   validate_pack_layout(data$name, path, data)
   invisible(lapply(data$functions, function(name) {
     if (!file.exists(pack_function_source_file(path, name, scope))) {

@@ -21,11 +21,70 @@ test_that("init writes v0.1 config and Rprofile hook when explicit", {
 
   config <- boosterpak:::read_config(root)
   expect_equal(config$packs$declared, "core")
+  expect_true(config$attach$enabled)
+  expect_equal(config$attach$declared, list())
+  expect_equal(config$attach$exclude, list())
   expect_equal(
     vapply(config$extras$declared, boosterpak:::package_name_from_spec, character(1), USE.NAMES = FALSE),
     "boosterpak"
   )
   expect_silent(boosterpak:::validate_config(config, root))
+})
+
+test_that("pack attach schema accepts documented shapes and rejects invalid types", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  dir.create(file.path(root, "boosters", "packs"), recursive = TRUE, showWarnings = FALSE)
+
+  writeLines(c(
+    'name = "attach_true"',
+    'description = "Attach all direct packages."',
+    'packages = ["cli"]',
+    "attach = true"
+  ), file.path(root, "boosters", "packs", "attach_true.toml"))
+  expect_silent(boosterpak:::load_pack("attach_true", root))
+
+  writeLines(c(
+    'name = "attach_false"',
+    'description = "Attach no packages."',
+    'packages = ["cli"]',
+    "attach = false"
+  ), file.path(root, "boosters", "packs", "attach_false.toml"))
+  expect_silent(boosterpak:::load_pack("attach_false", root))
+
+  writeLines(c(
+    'name = "attach_vector"',
+    'description = "Attach selected packages."',
+    'packages = ["cli", "glue"]',
+    'attach = ["glue"]'
+  ), file.path(root, "boosters", "packs", "attach_vector.toml"))
+  expect_silent(boosterpak:::load_pack("attach_vector", root))
+
+  writeLines(c(
+    'name = "attach_missing"',
+    'description = "Attach defaults."',
+    'packages = ["cli"]'
+  ), file.path(root, "boosters", "packs", "attach_missing.toml"))
+  expect_silent(boosterpak:::load_pack("attach_missing", root))
+
+  writeLines(c(
+    'name = "attach_bad"',
+    'description = "Invalid attach."',
+    'packages = ["cli"]',
+    "attach = 1"
+  ), file.path(root, "boosters", "packs", "attach_bad.toml"))
+  expect_error(boosterpak:::load_pack("attach_bad", root), "attach")
+})
+
+test_that("attach config validation rejects invalid top-level types", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines[lines == "enabled = true"] <- 'enabled = "yes"'
+  writeLines(lines, path)
+
+  expect_error(boosterpak:::validate_config(boosterpak:::read_config(root), root), "enabled")
 })
 
 test_that("init repairs generated beta manifests with boosterpak self extra", {
@@ -109,6 +168,18 @@ test_that("init inserts Rprofile hook after renv activation", {
   renv_line <- grep('source\\("renv/activate\\.R"\\)', lines)
   hook_line <- match(boosterpak:::rprofile_line(), lines)
   expect_equal(hook_line, renv_line + 1L)
+})
+
+test_that("init upgrades legacy Rprofile hook without duplication", {
+  root <- withr::local_tempdir()
+  writeLines(c("before <- TRUE", boosterpak:::legacy_rprofile_line(), "after <- TRUE"), file.path(root, ".Rprofile"))
+
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  expect_false(boosterpak:::legacy_rprofile_line() %in% lines)
+  expect_equal(sum(lines == boosterpak:::rprofile_line()), 1L)
+  expect_match(boosterpak:::rprofile_line(), "attach\\.R")
 })
 
 test_that("init leaves existing Rprofile hook unchanged", {
@@ -266,6 +337,9 @@ test_that("status reports broader package, pack, and function state", {
   expect_equal(s$function_count, 1L)
   expect_equal(s$function_missing_count, 0L)
   expect_equal(s$function_drift_count, 1L)
+  expect_true(s$attach_enabled)
+  expect_true(s$attach_package_count >= 1L)
+  expect_false(s$attach_file_exists)
   expect_true(all(c("project", "user", "builtin") %in% names(s$pack_counts)))
   expect_true(all(c("name", "scope", "path") %in% names(s$pack_catalog)))
 })

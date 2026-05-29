@@ -2,7 +2,8 @@
 #'
 #' @param root Project root.
 #' @param renv Whether to initialize project-local renv: `"ask"`, `"yes"`, or `"no"`.
-#' @param rprofile Whether to add the helper auto-source line to `.Rprofile`.
+#' @param rprofile Whether to add the recommended `.Rprofile` startup hook that
+#'   sources `boosters/attach.R` before helper files.
 #' @param verbose Whether to print routine summaries.
 #' @return Project setup paths, invisibly.
 #' @export

@@ -4,8 +4,8 @@
 #' @param verbose Whether to print routine summaries.
 #' @return A list describing project status, invisibly. Includes config
 #'   validity, declared and resolved packs, package and missing-package counts,
-#'   materialized function drift/missing counts, pack catalog counts, renv state,
-#'   lockfile presence, and `.Rprofile` hook state.
+#'   attach state, materialized function drift/missing counts, pack catalog
+#'   counts, renv state, lockfile presence, and `.Rprofile` hook state.
 #' @export
 status <- function(root = ".", verbose = NULL) {
   check_verbose(verbose)
@@ -19,6 +19,8 @@ status <- function(root = ".", verbose = NULL) {
   exclude <- character()
   functions <- character()
   function_status <- function_status_frame()
+  attach_enabled <- TRUE
+  attach_packages <- character()
   parse_error <- NULL
   if (config_exists) {
     config <- tryCatch(
@@ -43,6 +45,8 @@ status <- function(root = ".", verbose = NULL) {
       exclude <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
       functions <- installed_functions(config)
       function_status <- collect_function_status(functions, root)
+      attach_enabled <- !identical((config$attach %||% list())$enabled, FALSE)
+      attach_packages <- resolve_config_attach_packages(config, root)
     }
   }
   pack_catalog <- available_packs(root)
@@ -63,6 +67,10 @@ status <- function(root = ".", verbose = NULL) {
     function_count = length(functions),
     function_missing_count = sum(!function_status$exists),
     function_drift_count = sum(function_status$exists & !function_status$matches),
+    attach_enabled = attach_enabled,
+    attach_packages = attach_packages,
+    attach_package_count = length(attach_packages),
+    attach_file_exists = file.exists(attach_file(root)),
     pack_catalog = pack_catalog,
     pack_counts = stats::setNames(
       vapply(c("project", "user", "builtin"), function(scope) sum(pack_catalog$scope == scope), integer(1)),
@@ -83,6 +91,7 @@ status <- function(root = ".", verbose = NULL) {
     cli::cli_li("declared packs: {format_status_values(out$packs)}")
     cli::cli_li("resolved packages: {out$package_count} ({out$missing_package_count} missing)")
     cli::cli_li("materialized functions: {out$function_count} ({out$function_missing_count} missing, {out$function_drift_count} drifted)")
+    cli::cli_li("startup attach: {out$attach_enabled}, {out$attach_package_count} package{?s}, file {if (out$attach_file_exists) 'present' else 'missing'}")
     cli::cli_li("pack catalog: {out$pack_counts[['project']]} project, {out$pack_counts[['user']]} user, {out$pack_counts[['builtin']]} built-in")
   }
   invisible(out)

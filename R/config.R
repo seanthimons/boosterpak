@@ -7,6 +7,11 @@ default_config <- function(root = ".") {
     packs = list(declared = "core"),
     extras = list(declared = self_install_spec()),
     exclude = list(declared = character()),
+    attach = list(
+      enabled = TRUE,
+      declared = character(),
+      exclude = character()
+    ),
     settings = list(
       air_toml = TRUE,
       parallel_daemons = "auto",
@@ -27,6 +32,7 @@ validate_config <- function(config, root = ".") {
   config$packs$declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
   config$extras$declared <- toml_string_array(config$extras$declared %||% character(), "[extras].declared")
   config$exclude$declared <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
+  validate_attach_config(config)
   validate_config_functions(config)
 
   declared <- config$packs$declared %||% character()
@@ -66,7 +72,7 @@ toml_string_array <- function(value, field) {
 }
 
 warn_unknown_keys <- function(config) {
-  known_top <- c("project", "packs", "extras", "exclude", "settings", "functions")
+  known_top <- c("project", "packs", "extras", "exclude", "attach", "settings", "functions")
   unknown <- setdiff(names(config), known_top)
   if (length(unknown) > 0) {
     cli::cli_warn("Unknown top-level key{?s}: {unknown}.")
@@ -97,6 +103,11 @@ write_default_config <- function(root = ".") {
     "",
     "[exclude]",
     "declared = []",
+    "",
+    "[attach]",
+    "enabled = true",
+    "declared = []",
+    "exclude = []",
     "",
     "[functions]",
     "installed = []",

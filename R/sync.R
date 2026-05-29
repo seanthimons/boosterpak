@@ -1,6 +1,7 @@
 #' Synchronize a boosterpak project
 #'
-#' @param mode `"apply"` installs packages declared by `boosters.toml`; `"restore"` restores from `renv.lock`.
+#' @param mode `"apply"` installs packages declared by `boosters.toml` and
+#'   writes `boosters/attach.R`; `"restore"` restores from `renv.lock`.
 #' @param root Project root.
 #' @param hydrate Whether additive apply mode should reuse packages from
 #'   renv-discoverable local libraries before downloading with pak. Restore
@@ -31,6 +32,7 @@ sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbo
   missing_specs <- install_specs[packages %in% missing]
   install_via(missing_specs, root)
   sync_functions(config, root)
+  write_attach(root, verbose = FALSE)
 
   if (isTRUE(config$settings$auto_snapshot %||% TRUE)) {
     call_renv_snapshot(root, packages)
