@@ -9,7 +9,82 @@ test_that("init writes v0.1 config and Rprofile hook when explicit", {
 
   config <- boosterpak:::read_config(root)
   expect_equal(config$packs$declared, "core")
+  expect_equal(
+    vapply(config$extras$declared, boosterpak:::package_name_from_spec, character(1), USE.NAMES = FALSE),
+    "boosterpak"
+  )
   expect_silent(boosterpak:::validate_config(config, root))
+})
+
+test_that("init repairs generated beta manifests with boosterpak self extra", {
+  root <- withr::local_tempdir()
+  writeLines(c(
+    "# keep this comment",
+    "[project]",
+    'name = "beta"',
+    "",
+    "[packs]",
+    'declared = ["core"]',
+    "",
+    "[extras]",
+    "declared = [] # keep inline",
+    "",
+    "[future]",
+    "value = true"
+  ), file.path(root, "boosters.toml"))
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  lines <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
+  expect_true("# keep this comment" %in% lines)
+  expect_true("[future]" %in% lines)
+  expect_match(lines[grep("^declared = ", lines)[2]], "boosterpak")
+  config <- boosterpak:::read_config(root)
+  expect_equal(
+    vapply(config$extras$declared, boosterpak:::package_name_from_spec, character(1), USE.NAMES = FALSE),
+    "boosterpak"
+  )
+})
+
+test_that("init leaves custom extras arrays unchanged", {
+  root <- withr::local_tempdir()
+  writeLines(c(
+    "[project]",
+    'name = "custom"',
+    "",
+    "[packs]",
+    'declared = ["core"]',
+    "",
+    "[extras]",
+    "declared = [",
+    '  "cli"',
+    "]"
+  ), file.path(root, "boosters.toml"))
+  before <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
+
+  expect_error(init(root = root, renv = "no", rprofile = "no", verbose = FALSE), NA)
+
+  expect_equal(readLines(file.path(root, "boosters.toml"), warn = FALSE), before)
+})
+
+test_that("self install spec follows install metadata", {
+  expect_equal(
+    boosterpak:::self_install_spec(list(Package = "boosterpak", Built = "R 4.5.1")),
+    "boosterpak"
+  )
+  expect_equal(
+    boosterpak:::self_install_spec(list(
+      Package = "boosterpak",
+      RemoteType = "github",
+      RemoteUsername = "owner",
+      RemoteRepo = "repo"
+    )),
+    "owner/repo"
+  )
+  expect_equal(
+    boosterpak:::self_install_spec(list(Package = "boosterpak")),
+    "seanthimons/boosterpak"
+  )
 })
 
 test_that("init inserts Rprofile hook after renv activation", {
@@ -90,7 +165,7 @@ test_that("status reports broader package, pack, and function state", {
   writeLines(c(readLines(path, warn = FALSE), "# local edit"), path)
 
   local_mocked_bindings(
-    missing_packages = function(packages) packages[packages %in% "cli"],
+    missing_packages = function(packages, root = ".") packages[packages %in% "cli"],
     .package = "boosterpak"
   )
 

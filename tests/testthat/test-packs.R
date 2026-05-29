@@ -26,13 +26,13 @@ test_that("built-in catalog matches v0.1 PRD contents", {
   expect_equal(boosterpak:::resolve_pack_functions("analysis-scaffold"), "scaffold_analysis")
 })
 
-test_that("analysis scaffold pack materializes its helper function sidecar", {
+test_that("analysis scaffold pack materializes its nested helper function", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
 
   add_pack("analysis-scaffold", root = root, sync = FALSE, verbose = FALSE)
 
-  expect_true(file.exists(file.path(root, "boosters", "packs", "analysis-scaffold.toml")))
+  expect_true(file.exists(file.path(root, "boosters", "packs", "analysis-scaffold", "analysis-scaffold.toml")))
   expect_true(file.exists(file.path(
     root,
     "boosters",
@@ -41,6 +41,64 @@ test_that("analysis scaffold pack materializes its helper function sidecar", {
     "functions",
     "fn_scaffold_analysis.R"
   )))
+})
+
+test_that("pack discovery supports flat package packs and nested function packs", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "boosters", "packs", "nested", "functions"), recursive = TRUE)
+  writeLines(c(
+    'name = "flat"',
+    'description = "Flat pack"',
+    'packages = ["cli"]'
+  ), file.path(root, "boosters", "packs", "flat.toml"))
+  writeLines(c(
+    'name = "nested"',
+    'description = "Nested pack"',
+    'packages = ["cli"]',
+    'functions = ["helper"]'
+  ), file.path(root, "boosters", "packs", "nested", "nested.toml"))
+  writeLines("helper <- function() TRUE", file.path(root, "boosters", "packs", "nested", "functions", "fn_helper.R"))
+
+  packs <- list_packs(root = root, scope = "project", verbose = FALSE)
+
+  expect_setequal(packs$name, c("flat", "nested"))
+  expect_equal(boosterpak:::resolve_pack_functions("nested", root = root), "helper")
+})
+
+test_that("flat packs cannot declare functions", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "boosters", "packs"), recursive = TRUE)
+  writeLines(c(
+    'name = "bad"',
+    'description = "Bad flat function pack"',
+    'packages = ["cli"]',
+    'functions = ["helper"]'
+  ), file.path(root, "boosters", "packs", "bad.toml"))
+
+  expect_error(
+    list_packs(root = root, scope = "project", verbose = FALSE),
+    "function-bearing packs must use nested layout"
+  )
+})
+
+test_that("duplicate flat and nested packs fail clearly", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "boosters", "packs", "dupe"), recursive = TRUE)
+  writeLines(c(
+    'name = "dupe"',
+    'description = "Flat duplicate"',
+    'packages = ["cli"]'
+  ), file.path(root, "boosters", "packs", "dupe.toml"))
+  writeLines(c(
+    'name = "dupe"',
+    'description = "Nested duplicate"',
+    'packages = ["digest"]'
+  ), file.path(root, "boosters", "packs", "dupe", "dupe.toml"))
+
+  expect_error(
+    list_packs(root = root, scope = "project", verbose = FALSE),
+    "Duplicate pack manifest"
+  )
 })
 
 test_that("init materializes declared built-in packs into the project", {
@@ -119,14 +177,14 @@ test_that("GitHub extras are install specs but resolve to package-like names", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
   path <- file.path(root, "boosters.toml")
-  lines <- readLines(path, warn = FALSE)
-  lines[lines == "declared = []"][1] <- 'declared = ["rstudio/pointblank"]'
-  writeLines(lines, path)
+  boosterpak:::update_declared_array(path, "extras", "declared", c("seanthimons/boosterpak", "rstudio/pointblank"))
 
   config <- boosterpak:::read_config(root)
 
   expect_true("pointblank" %in% boosterpak:::resolve_config_packages(config, root))
   expect_true("rstudio/pointblank" %in% boosterpak:::resolve_config_install_specs(config, root))
+  expect_true("boosterpak" %in% boosterpak:::resolve_config_packages(config, root))
+  expect_true("seanthimons/boosterpak" %in% boosterpak:::resolve_config_install_specs(config, root))
 })
 
 test_that("unknown pack errors include suggestion and grouped availability", {
@@ -179,10 +237,8 @@ test_that("save_pack captures resolved project packages as a flat project pack",
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
   add_pack("example", root = root, sync = FALSE, verbose = FALSE)
   path <- boosters_file(root)
-  lines <- readLines(path, warn = FALSE)
-  lines[lines == "declared = []"][1] <- 'declared = ["withr", "rstudio/pointblank"]'
-  lines[lines == "declared = []"][1] <- 'declared = ["digest"]'
-  writeLines(lines, path, useBytes = TRUE)
+  boosterpak:::update_declared_array(path, "extras", "declared", c("seanthimons/boosterpak", "withr", "rstudio/pointblank"))
+  boosterpak:::update_declared_array(path, "exclude", "declared", "digest")
 
   saved <- save_pack("project_baseline", root = root, verbose = FALSE)
   data <- boosterpak:::read_toml_file(saved)
@@ -190,29 +246,34 @@ test_that("save_pack captures resolved project packages as a flat project pack",
   expect_equal(saved, normalizePath(file.path(root, "boosters", "packs", "project_baseline.toml"), winslash = "/", mustWork = FALSE))
   expect_equal(data$name, "project_baseline")
   expect_null(data$extends)
-  expect_setequal(data$packages, c("fs", "here", "janitor", "rio", "tidyverse", "cli", "withr", "pointblank"))
+  expect_setequal(data$packages, c("fs", "here", "janitor", "rio", "tidyverse", "cli", "boosterpak", "withr", "pointblank"))
+  expect_equal(data$sources[["boosterpak"]], "seanthimons/boosterpak")
   expect_equal(data$sources[["pointblank"]], "rstudio/pointblank")
   expect_equal(boosterpak:::toml_string_array(data$functions, "functions"), character())
 })
 
-test_that("save_pack captures installed, all, none, and explicit function sidecars", {
+test_that("save_pack captures installed, all, none, and explicit nested functions", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
   ni <- add_function("ni", root = root, verbose = FALSE)
   writeLines("custom_helper <- function() TRUE", file.path(root, "boosters", "fn_custom_helper.R"))
 
   installed <- save_pack("installed_fns", root = root, verbose = FALSE)
+  expect_equal(installed, normalizePath(file.path(root, "boosters", "packs", "installed_fns", "installed_fns.toml"), winslash = "/", mustWork = FALSE))
   expect_equal(boosterpak:::read_toml_file(installed)$functions, "ni")
   expect_equal(readLines(boosterpak:::pack_function_file(installed, "ni"), warn = FALSE), readLines(ni, warn = FALSE))
 
   all <- save_pack("all_fns", root = root, functions = "all", verbose = FALSE)
+  expect_equal(all, normalizePath(file.path(root, "boosters", "packs", "all_fns", "all_fns.toml"), winslash = "/", mustWork = FALSE))
   expect_setequal(boosterpak:::read_toml_file(all)$functions, c("ni", "custom_helper"))
 
   none <- save_pack("no_fns", root = root, functions = "none", verbose = FALSE)
+  expect_equal(none, normalizePath(file.path(root, "boosters", "packs", "no_fns.toml"), winslash = "/", mustWork = FALSE))
   expect_equal(boosterpak:::toml_string_array(boosterpak:::read_toml_file(none)$functions, "functions"), character())
   expect_false(dir.exists(boosterpak:::pack_sidecar_dir(none)))
 
   explicit <- save_pack("explicit_fns", root = root, functions = "custom_helper", verbose = FALSE)
+  expect_equal(explicit, normalizePath(file.path(root, "boosters", "packs", "explicit_fns", "explicit_fns.toml"), winslash = "/", mustWork = FALSE))
   expect_equal(boosterpak:::read_toml_file(explicit)$functions, "custom_helper")
   expect_error(save_pack("missing_fns", root = root, functions = "missing", verbose = FALSE), "missing")
 })
@@ -265,7 +326,7 @@ test_that("promote_pack and demote_pack copy between project and user scopes", {
   expect_equal(readLines(project_path, warn = FALSE), readLines(user_path, warn = FALSE))
 })
 
-test_that("promote_pack and demote_pack copy function sidecars", {
+test_that("promote_pack and demote_pack copy nested function packs", {
   withr::local_envvar(R_USER_CONFIG_DIR = withr::local_tempdir())
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
@@ -273,10 +334,11 @@ test_that("promote_pack and demote_pack copy function sidecars", {
   save_pack("portable_fns", root = root, verbose = FALSE)
 
   user_path <- promote_pack("portable_fns", root = root, verbose = FALSE)
+  expect_equal(user_path, normalizePath(file.path(boosterpak:::user_packs_dir(), "portable_fns", "portable_fns.toml"), winslash = "/", mustWork = FALSE))
   expect_true(file.exists(boosterpak:::pack_function_file(user_path, "ni")))
 
-  unlink(file.path(root, "boosters", "packs", "portable_fns.toml"))
   unlink(file.path(root, "boosters", "packs", "portable_fns"), recursive = TRUE)
   project_path <- demote_pack("portable_fns", root = root, verbose = FALSE)
+  expect_equal(project_path, normalizePath(file.path(root, "boosters", "packs", "portable_fns", "portable_fns.toml"), winslash = "/", mustWork = FALSE))
   expect_true(file.exists(boosterpak:::pack_function_file(project_path, "ni")))
 })

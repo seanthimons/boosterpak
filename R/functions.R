@@ -72,7 +72,8 @@ materialize_function <- function(name, root = ".", overwrite = FALSE) {
 }
 
 materialize_pack_function <- function(pack_path, name, root = ".", overwrite = FALSE) {
-  source <- pack_function_file(pack_path, name)
+  pack <- load_pack(tools::file_path_sans_ext(basename(pack_path)), root)
+  source <- pack_function_source_file(pack_path, name, pack$.__scope__)
   target <- function_file(name, root)
   if (!file.exists(source)) {
     cli::cli_abort("Pack function source {.file {source}} is missing.", call = NULL)
@@ -89,6 +90,10 @@ materialize_pack_function <- function(pack_path, name, root = ".", overwrite = F
     cli::cli_abort("Failed to write {.file {target}}.", call = NULL)
   }
   invisible(target)
+}
+
+pack_function_source_file <- function(pack_path, name, scope) {
+  pack_function_file(pack_path, name)
 }
 
 materialize_pack_functions <- function(names, root = ".", overwrite = FALSE) {

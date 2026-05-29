@@ -57,6 +57,10 @@ install_via <- function(packages, root = ".") {
   invisible(packages)
 }
 
-missing_packages <- function(packages) {
-  packages[!vapply(packages, requireNamespace, logical(1), quietly = TRUE)]
+missing_packages <- function(packages, root = ".") {
+  lib <- renv::paths$library(project = root)
+  installed <- vapply(packages, function(package) {
+    file.exists(file.path(lib, package, "DESCRIPTION"))
+  }, logical(1), USE.NAMES = FALSE)
+  packages[!installed]
 }

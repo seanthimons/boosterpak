@@ -5,7 +5,7 @@ default_config <- function(root = ".") {
       boosters_version = package_version_string()
     ),
     packs = list(declared = "core"),
-    extras = list(declared = character()),
+    extras = list(declared = self_install_spec()),
     exclude = list(declared = character()),
     settings = list(
       air_toml = TRUE,
@@ -93,7 +93,7 @@ write_default_config <- function(root = ".") {
     'declared = ["core"]',
     "",
     "[extras]",
-    "declared = []",
+    sprintf('declared = ["%s"]', escape_toml_string(self_install_spec())),
     "",
     "[exclude]",
     "declared = []",
@@ -113,4 +113,21 @@ write_default_config <- function(root = ".") {
 
 escape_toml_string <- function(x) {
   gsub('"', '\\"', x, fixed = TRUE)
+}
+
+self_install_spec <- function(desc = utils::packageDescription("boosterpak")) {
+  remote_type <- desc[["RemoteType"]]
+  remote_user <- desc[["RemoteUsername"]] %||% desc[["GithubUsername"]]
+  remote_repo <- desc[["RemoteRepo"]] %||% desc[["GithubRepo"]]
+
+  if (!is.null(remote_type) && identical(tolower(remote_type), "github") &&
+    !is.null(remote_user) && !is.null(remote_repo)) {
+    return(sprintf("%s/%s", remote_user, remote_repo))
+  }
+
+  if (!is.null(desc[["Built"]])) {
+    return("boosterpak")
+  }
+
+  "seanthimons/boosterpak"
 }

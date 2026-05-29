@@ -19,6 +19,8 @@ init <- function(root = ".", renv = c("ask", "yes", "no"), rprofile = c("ask", "
   if (!file.exists(config_path)) {
     write_default_config(root)
     wrote_config <- TRUE
+  } else {
+    repair_self_extra(config_path)
   }
 
   if (isTRUE(read_config(root)$settings$air_toml) && !file.exists(file.path(root, "air.toml"))) {
@@ -38,6 +40,60 @@ init <- function(root = ".", renv = c("ask", "yes", "no"), rprofile = c("ask", "
   }
 
   invisible(list(config = config_path, rprofile_changed = changed_rprofile))
+}
+
+repair_self_extra <- function(path) {
+  lines <- readLines(path, warn = FALSE)
+  extras_start <- grep("^\\s*\\[extras\\]\\s*(#.*)?$", lines)
+  if (length(extras_start) == 0) {
+    return(invisible(FALSE))
+  }
+
+  start <- extras_start[[1]]
+  next_section <- grep("^\\s*\\[[^]]+\\]\\s*(#.*)?$", lines)
+  next_section <- next_section[next_section > start]
+  end <- if (length(next_section) > 0) next_section[[1]] - 1L else length(lines)
+  section <- lines[start:end]
+  declared_rel <- grep("^\\s*declared\\s*=", section)
+  if (length(declared_rel) != 1) {
+    return(invisible(FALSE))
+  }
+
+  declared_idx <- start + declared_rel[[1]] - 1L
+  declared_line <- lines[[declared_idx]]
+  array_match <- regexec("^(\\s*declared\\s*=\\s*)\\[(.*)\\](\\s*(#.*)?)$", declared_line)
+  parts <- regmatches(declared_line, array_match)[[1]]
+  if (length(parts) == 0) {
+    cli::cli_alert_info("Leaving existing {.file boosters.toml} unchanged; [extras].declared is not a generated single-line array.")
+    return(invisible(FALSE))
+  }
+
+  existing <- parse_toml_string_array_literal(parts[[3]])
+  if (is.null(existing)) {
+    cli::cli_alert_info("Leaving existing {.file boosters.toml} unchanged; [extras].declared is custom TOML.")
+    return(invisible(FALSE))
+  }
+  if ("boosterpak" %in% vapply(existing, package_name_from_spec, character(1), USE.NAMES = FALSE)) {
+    return(invisible(FALSE))
+  }
+
+  next_values <- c(existing, self_install_spec())
+  rendered <- paste(sprintf('"%s"', vapply(next_values, escape_toml_string, character(1))), collapse = ", ")
+  lines[[declared_idx]] <- sprintf("%s[%s]%s", parts[[2]], rendered, parts[[4]])
+  writeLines(lines, path, useBytes = TRUE)
+  invisible(TRUE)
+}
+
+parse_toml_string_array_literal <- function(x) {
+  x <- trimws(x)
+  if (!nzchar(x)) {
+    return(character())
+  }
+  parsed <- tryCatch(toml::parse_toml(paste0("declared = [", x, "]"))$declared, error = function(err) NULL)
+  if (is.null(parsed) || !is.character(parsed)) {
+    return(NULL)
+  }
+  parsed
 }
 
 handle_renv_init <- function(root, renv) {

@@ -108,21 +108,26 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p></p><figure class="figure"><p></p>
 <div>
 <pre class="mermaid mermaid-js">flowchart TD
-  A[Start or clone project] --&gt; B[Initialize boosterpak]
-  B --&gt; C[Add reusable intent]
-  C --&gt; D[Add packs]
-  C --&gt; E[Add helper functions]
-  D --&gt; F[Sync project]
+  A([Start or clone project]) --&gt; B(["Run init()"])
+  B --&gt; C([Declare reusable intent])
+  C --&gt; D(["Run add_pack()"])
+  C --&gt; E(["Run add_function()"])
+  D --&gt; F(["Run sync()"])
   E --&gt; F
   F --&gt; G[Packages installed in renv]
   F --&gt; H[Helper files copied into boosters]
-  G --&gt; I[Edit code and helper files]
+  G --&gt; I([Edit code and helper files])
   H --&gt; I
-  I --&gt; J[Save a reusable pack]
-  J --&gt; K[Pack TOML plus function sidecar]
-  K --&gt; L[Promote to user scope]
-  L --&gt; M[Reuse in another project]
+  I --&gt; J(["Run save_pack()"])
+  J --&gt; K[Flat package pack or nested function pack]
+  K --&gt; L(["Run promote_pack()"])
+  L --&gt; M(["Reuse with add_pack() in another project"])
   M --&gt; D
+
+  classDef userAction fill:#e8f3ff,stroke:#1f6feb,color:#0b1f3a;
+  classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
+  class A,B,C,D,E,F,I,J,L,M userAction;
+  class G,H,K packageAction;
 </pre>
 </div>
 <p></p></figure><p></p>
@@ -131,10 +136,22 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>In practice, initialize once, add pack and function intent over time, run <code>sync()</code> whenever the project should match that intent, then save and promote a pack when the setup is worth reusing.</p>
 </section>
-<section id="initialize" class="level2">
-<h2 class="anchored" data-anchor-id="initialize">Initialize</h2>
+<section id="install-pak" class="level2">
+<h2 class="anchored" data-anchor-id="install-pak">1. Install pak</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">init</span>(<span class="at">renv =</span> <span class="st">"yes"</span>, <span class="at">rprofile =</span> <span class="st">"yes"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">"pak"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="install-boosterpak" class="level2">
+<h2 class="anchored" data-anchor-id="install-boosterpak">2. Install boosterpak</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>pak<span class="sc">::</span><span class="fu">pkg_install</span>(<span class="st">"seanthimons/boosterpak"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="initialize-the-project" class="level2">
+<h2 class="anchored" data-anchor-id="initialize-the-project">3. Initialize the project</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">init</span>(<span class="at">renv =</span> <span class="st">"yes"</span>, <span class="at">rprofile =</span> <span class="st">"yes"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>This creates:</p>
 <ul>
@@ -143,49 +160,58 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li><code>air.toml</code>, when enabled by settings</li>
 <li>a <code>.Rprofile</code> helper-source line, when requested</li>
 </ul>
+<p>The generated <code>boosters.toml</code> includes <code>boosterpak</code> itself in <code>[extras].declared</code>, so the package needed to run <code>sync()</code> is also captured in project intent and the project lockfile.</p>
 <p>In non-interactive sessions, use explicit <code>renv</code> and <code>rprofile</code> arguments. The default <code>"ask"</code> mode never silently changes <code>.Rprofile</code> when user confirmation would be required.</p>
 </section>
-<section id="add-a-pack" class="level2">
-<h2 class="anchored" data-anchor-id="add-a-pack">Add a Pack</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">add_pack</span>(<span class="st">"example"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<p>The <code>example</code> pack installs <code>cli</code>. <code>add_pack()</code> preserves unrelated comments and sections in <code>boosters.toml</code> while updating <code>[packs].declared</code>. If the pack carries helper functions, <code>add_pack()</code> also copies the bundled <code>fn_*.R</code> files into <code>boosters/</code> and refuses to overwrite existing function files unless <code>overwrite_functions = TRUE</code>.</p>
-</section>
-<section id="add-a-helper-function" class="level2">
-<h2 class="anchored" data-anchor-id="add-a-helper-function">Add a Helper Function</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">add_function</span>(<span class="st">"ni"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<p>Helper functions are materialized as <code>boosters/fn_*.R</code> files and tracked in <code>[functions].installed</code>. They are ordinary project files, so you can edit them after materialization. <code>sync()</code> restores missing installed helper files, but it does not overwrite local edits.</p>
-</section>
-<section id="apply-project-intent" class="level2">
-<h2 class="anchored" data-anchor-id="apply-project-intent">Apply Project Intent</h2>
+<section id="sync-the-project" class="level2">
+<h2 class="anchored" data-anchor-id="sync-the-project">4. Sync the project</h2>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">sync</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Apply mode is additive. It installs missing declared packages, materializes missing bundled or installed helper functions, and, when <code>auto_snapshot = true</code>, snapshots with <code>renv</code>.</p>
 </section>
+<section id="add-a-pack" class="level2">
+<h2 class="anchored" data-anchor-id="add-a-pack">Add a Pack</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">add_pack</span>(<span class="st">"example"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The <code>example</code> pack installs <code>cli</code>. <code>add_pack()</code> preserves unrelated comments and sections in <code>boosters.toml</code> while updating <code>[packs].declared</code>. If the pack carries helper functions, <code>add_pack()</code> also copies the bundled <code>fn_*.R</code> files into <code>boosters/</code> and refuses to overwrite existing function files unless <code>overwrite_functions = TRUE</code>.</p>
+<p>Packs can mix ordinary CRAN package names with package-specific source specs. Declare every package in <code>packages</code>, then use <code>[sources]</code> only for packages that should install from another source:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode toml code-with-copy"><code class="sourceCode toml"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">"plotting"</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Plotting packages from CRAN and GitHub."</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"ggplot2"</span><span class="op">,</span> <span class="st">"patchwork"</span><span class="op">,</span> <span class="st">"ggtext"</span><span class="op">]</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[sources]</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Here, <code>ggplot2</code> and <code>patchwork</code> install by package name, while <code>ggtext</code> uses the GitHub source spec.</p>
+</section>
+<section id="add-a-helper-function" class="level2">
+<h2 class="anchored" data-anchor-id="add-a-helper-function">Add a Helper Function</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">add_function</span>(<span class="st">"ni"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Helper functions are materialized as <code>boosters/fn_*.R</code> files and tracked in <code>[functions].installed</code>. They are ordinary project files, so you can edit them after materialization. <code>sync()</code> restores missing installed helper files, but it does not overwrite local edits.</p>
+</section>
 <section id="capture-and-reuse" class="level2">
 <h2 class="anchored" data-anchor-id="capture-and-reuse">Capture and Reuse</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">save_pack</span>(<span class="st">"project_baseline"</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">promote_pack</span>(<span class="st">"project_baseline"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">save_pack</span>(<span class="st">"project_baseline"</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">promote_pack</span>(<span class="st">"project_baseline"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p><code>save_pack()</code> captures the resolved package set and, by default, helper functions listed in <code>[functions].installed</code>. Use <code>functions = "all"</code> to capture every <code>boosters/fn_*.R</code> file, <code>functions = "none"</code> for a package-only pack, or a character vector for specific function names. <code>promote_pack()</code> and <code>demote_pack()</code> copy both the pack TOML and any function sidecar directory.</p>
+<p><code>save_pack()</code> captures the resolved package set and, by default, helper functions listed in <code>[functions].installed</code>. Use <code>functions = "all"</code> to capture every <code>boosters/fn_*.R</code> file, <code>functions = "none"</code> for a flat package-only pack, or a character vector for specific function names. <code>promote_pack()</code> and <code>demote_pack()</code> copy flat package-only packs as single files and nested function-bearing packs as whole directories.</p>
 </section>
 <section id="restore-exact-versions" class="level2">
 <h2 class="anchored" data-anchor-id="restore-exact-versions">Restore Exact Versions</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">sync</span>(<span class="at">mode =</span> <span class="st">"restore"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">sync</span>(<span class="at">mode =</span> <span class="st">"restore"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Restore mode requires both <code>boosters.toml</code> and <code>renv.lock</code>, calls <code>renv::restore()</code>, validates the manifest, and warns if direct declared packages are absent from the lockfile.</p>
 </section>
 <section id="inspect" class="level2">
 <h2 class="anchored" data-anchor-id="inspect">Inspect</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">status</span>()</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">list_packs</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">status</span>()</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>boosterpak<span class="sc">::</span><span class="fu">list_packs</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p><code>status()</code> reports whether the manifest exists and validates, what packs and packages resolve, whether project-local <code>renv</code> appears active, whether <code>renv.lock</code> exists, and whether <code>.Rprofile</code> contains the helper hook.</p>
 </section>

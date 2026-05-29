@@ -46,11 +46,17 @@ discover_pack_scope <- function(scope, dir) {
     ))
   }
 
-  files <- list.files(dir, pattern = "\\.toml$", full.names = TRUE)
+  flat_files <- list.files(dir, pattern = "\\.toml$", full.names = TRUE)
+  nested_dirs <- list.dirs(dir, recursive = FALSE, full.names = TRUE)
+  nested_files <- file.path(nested_dirs, sprintf("%s.toml", basename(nested_dirs)))
+  nested_files <- nested_files[file.exists(nested_files)]
+  files <- c(flat_files, nested_files)
   rows <- lapply(files, function(path) {
     data <- read_toml_file(path)
+    name <- data$name %||% tools::file_path_sans_ext(basename(path))
+    validate_pack_layout(name, path, data)
     data.frame(
-      name = data$name %||% tools::file_path_sans_ext(basename(path)),
+      name = name,
       description = data$description %||% "",
       scope = scope,
       sources = summarize_sources(data$sources %||% list()),
@@ -60,7 +66,7 @@ discover_pack_scope <- function(scope, dir) {
     )
   })
 
-  do.call(rbind, rows) %||% data.frame(
+  out <- do.call(rbind, rows) %||% data.frame(
     name = character(),
     description = character(),
     scope = character(),
@@ -68,6 +74,29 @@ discover_pack_scope <- function(scope, dir) {
     functions = character(),
     path = character()
   )
+  duplicated_names <- unique(out$name[duplicated(out$name)])
+  if (length(duplicated_names) > 0) {
+    details <- paste(vapply(duplicated_names, function(name) {
+      paste(out$path[out$name == name], collapse = ", ")
+    }, character(1)), collapse = "; ")
+    cli::cli_abort(
+      "Duplicate pack manifests found in {scope} scope for {paste(duplicated_names, collapse = ', ')}: {details}. Keep either packs/<name>.toml or packs/<name>/<name>.toml.",
+      call = NULL
+    )
+  }
+  out
+}
+
+validate_pack_layout <- function(name, path, data) {
+  functions <- toml_string_array(data$functions %||% character(), sprintf("%s functions", path))
+  if (length(functions) > 0 && !pack_is_nested_manifest(path)) {
+    nested <- file.path(dirname(path), name, sprintf("%s.toml", name))
+    cli::cli_abort(
+      "{.file {path}} declares functions, but function-bearing packs must use nested layout: {.file {nested}} with files in {.file {file.path(dirname(nested), 'functions')}}.",
+      call = NULL
+    )
+  }
+  invisible(TRUE)
 }
 
 summarize_sources <- function(sources) {
@@ -94,7 +123,7 @@ load_pack <- function(name, root = ".") {
 
   path <- match$path[[1]]
   data <- read_toml_file(path)
-  validate_pack_schema(name, path, data)
+  validate_pack_schema(name, path, data, match$scope[[1]])
   data$.__path__ <- path
   data$.__scope__ <- match$scope[[1]]
   data
@@ -135,7 +164,7 @@ format_pack_group <- function(packs, scope) {
   }
 }
 
-validate_pack_schema <- function(expected_name, path, data) {
+validate_pack_schema <- function(expected_name, path, data, scope) {
   file_name <- tools::file_path_sans_ext(basename(path))
   if (!is.character(data$name) || length(data$name) != 1 || !nzchar(data$name)) {
     cli::cli_abort("{.file {path}} must declare a non-empty string {.field name}.", call = NULL)
@@ -155,8 +184,9 @@ validate_pack_schema <- function(expected_name, path, data) {
   data$packages <- toml_string_array(data$packages, sprintf("%s packages", path))
   data$extends <- toml_string_array(data$extends %||% character(), sprintf("%s extends", path))
   data$functions <- toml_string_array(data$functions %||% character(), sprintf("%s functions", path))
+  validate_pack_layout(data$name, path, data)
   invisible(lapply(data$functions, function(name) {
-    if (!file.exists(pack_function_file(path, name))) {
+    if (!file.exists(pack_function_source_file(path, name, scope))) {
       cli::cli_abort("{.file {path}} declares function {.val {name}} but {.file {pack_function_file(path, name)}} is missing.", call = NULL)
     }
   }))
@@ -208,19 +238,22 @@ resolve_config_pack_names <- function(config, root = ".") {
 materialize_pack <- function(name, root = ".") {
   pack <- load_pack(name, root)
   dir.create(project_packs_dir(root), recursive = TRUE, showWarnings = FALSE)
-  target <- file.path(project_packs_dir(root), sprintf("%s.toml", name))
+  source_nested <- pack_is_nested_manifest(pack$.__path__)
+  target <- if (source_nested) {
+    file.path(project_packs_dir(root), name, sprintf("%s.toml", name))
+  } else {
+    file.path(project_packs_dir(root), sprintf("%s.toml", name))
+  }
   same_path <- identical(normalizePath(pack$.__path__, winslash = "/", mustWork = FALSE), normalizePath(target, winslash = "/", mustWork = FALSE))
   if (!same_path && !file.exists(target)) {
-    copied <- file.copy(pack$.__path__, target, overwrite = FALSE)
+    if (source_nested) {
+      copied <- file.copy(dirname(pack$.__path__), project_packs_dir(root), recursive = TRUE, overwrite = FALSE)
+    } else {
+      dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
+      copied <- file.copy(pack$.__path__, target, overwrite = FALSE)
+    }
     if (!isTRUE(copied)) {
       cli::cli_abort("Failed to write pack {.val {name}} to {.file {target}}.", call = NULL)
-    }
-  }
-  if (dir.exists(pack_sidecar_dir(pack$.__path__)) && !dir.exists(pack_sidecar_dir(target))) {
-    dir.create(dirname(pack_sidecar_dir(target)), recursive = TRUE, showWarnings = FALSE)
-    copied_dir <- file.copy(pack_sidecar_dir(pack$.__path__), dirname(pack_sidecar_dir(target)), recursive = TRUE, overwrite = FALSE)
-    if (!isTRUE(copied_dir)) {
-      cli::cli_abort("Failed to write pack function sidecar for {.val {name}}.", call = NULL)
     }
   }
   invisible(target)
@@ -461,7 +494,12 @@ save_pack <- function(name, scope = c("project", "user"), from = NULL, root = ".
 
   contents <- resolve_save_pack_contents(from, root)
   pack_functions <- resolve_save_pack_functions(functions, contents, root)
-  target <- file.path(pack_scope_dir(scope, root), sprintf("%s.toml", name))
+  target <- if (length(pack_functions) == 0) {
+    file.path(pack_scope_dir(scope, root), sprintf("%s.toml", name))
+  } else {
+    file.path(pack_scope_dir(scope, root), name, sprintf("%s.toml", name))
+  }
+  guard_pack_target_layout(name, scope, root, target)
   write_pack_file(target, name, pack_description(name, from), contents$packages, contents$sources, pack_functions, overwrite)
   write_pack_function_sidecar(target, pack_functions, root, overwrite)
 
@@ -475,41 +513,77 @@ copy_pack_between_scopes <- function(name, from_scope, to_scope, root = ".", ove
   check_verbose(verbose)
   validate_new_pack_name(name)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
-  source <- file.path(pack_scope_dir(from_scope, root), sprintf("%s.toml", name))
-  target <- file.path(pack_scope_dir(to_scope, root), sprintf("%s.toml", name))
+  source <- pack_manifest_in_scope(name, from_scope, root)
+  target <- if (pack_is_nested_manifest(source)) {
+    file.path(pack_scope_dir(to_scope, root), name, sprintf("%s.toml", name))
+  } else {
+    file.path(pack_scope_dir(to_scope, root), sprintf("%s.toml", name))
+  }
 
   if (!file.exists(source)) {
     cli::cli_abort("Pack {.val {name}} does not exist in {from_scope} scope.", call = NULL)
   }
+  guard_pack_target_layout(name, to_scope, root, target)
   if (file.exists(target) && !isTRUE(overwrite)) {
     cli::cli_abort("{.file {target}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
   }
 
-  dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
-  ok <- file.copy(source, target, overwrite = isTRUE(overwrite))
+  if (pack_is_nested_manifest(source)) {
+    if (dir.exists(dirname(target)) && isTRUE(overwrite)) {
+      unlink(dirname(target), recursive = TRUE)
+    }
+    if (dir.exists(dirname(target)) && !isTRUE(overwrite)) {
+      cli::cli_abort("{.file {dirname(target)}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
+    }
+    dir.create(pack_scope_dir(to_scope, root), recursive = TRUE, showWarnings = FALSE)
+    ok <- file.copy(dirname(source), pack_scope_dir(to_scope, root), recursive = TRUE, overwrite = TRUE)
+  } else {
+    dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
+    ok <- file.copy(source, target, overwrite = isTRUE(overwrite))
+  }
   if (!isTRUE(ok)) {
     cli::cli_abort("Failed to copy pack {.val {name}} to {.file {target}}.", call = NULL)
-  }
-  source_sidecar <- pack_sidecar_dir(source)
-  target_sidecar <- pack_sidecar_dir(target)
-  if (dir.exists(source_sidecar)) {
-    if (dir.exists(target_sidecar)) {
-      if (!isTRUE(overwrite)) {
-        cli::cli_abort("{.file {target_sidecar}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
-      }
-      unlink(target_sidecar, recursive = TRUE)
-    }
-    dir.create(dirname(target_sidecar), recursive = TRUE, showWarnings = FALSE)
-    copied_dir <- file.copy(source_sidecar, dirname(target_sidecar), recursive = TRUE, overwrite = TRUE)
-    if (!isTRUE(copied_dir)) {
-      cli::cli_abort("Failed to copy function sidecar for pack {.val {name}}.", call = NULL)
-    }
   }
 
   if (should_emit(verbose)) {
     cli::cli_alert_success("Copied pack {.val {name}} to {to_scope} scope.")
   }
   invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
+}
+
+guard_pack_target_layout <- function(name, scope, root, target) {
+  dir <- pack_scope_dir(scope, root)
+  flat <- file.path(dir, sprintf("%s.toml", name))
+  nested <- file.path(dir, name, sprintf("%s.toml", name))
+  target <- normalizePath(target, winslash = "/", mustWork = FALSE)
+  flat <- normalizePath(flat, winslash = "/", mustWork = FALSE)
+  nested <- normalizePath(nested, winslash = "/", mustWork = FALSE)
+  alternate <- if (identical(target, flat)) nested else flat
+  if (file.exists(alternate)) {
+    cli::cli_abort(
+      "Pack {.val {name}} already exists at {.file {alternate}}. Remove it before writing {.file {target}}.",
+      call = NULL
+    )
+  }
+  invisible(TRUE)
+}
+
+pack_manifest_in_scope <- function(name, scope, root = ".") {
+  dir <- pack_scope_dir(scope, root)
+  flat <- file.path(dir, sprintf("%s.toml", name))
+  nested <- file.path(dir, name, sprintf("%s.toml", name))
+  exists <- c(flat = file.exists(flat), nested = file.exists(nested))
+  if (all(exists)) {
+    cli::cli_abort(
+      "Duplicate pack manifest found for {.val {name}} in {scope} scope. Keep either {.file {flat}} or {.file {nested}}.",
+      call = NULL
+    )
+  }
+  if (exists[["nested"]]) {
+    nested
+  } else {
+    flat
+  }
 }
 
 #' Promote a project pack to user scope

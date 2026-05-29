@@ -311,9 +311,9 @@ This is the difference between a tool that's pleasant and one that isn't. Budget
 
 | Scope | Location | Authored by | Travels with |
 |---|---|---|---|
-| Built-in | `inst/packs/*.toml` inside the `boosters` package | Package maintainer (Sean) | The `boosters` package version |
-| User | `tools::R_user_dir("boosters", "config")/packs/*.toml` | The user | The user's machine |
-| Project | `boosters/packs/*.toml` in the project root | The user (in a project) | The project (via git) |
+| Built-in | `inst/packs/*.toml` or `inst/packs/<name>/<name>.toml` inside the `boosters` package | Package maintainer (Sean) | The `boosters` package version |
+| User | `tools::R_user_dir("boosters", "config")/packs/*.toml` or `.../packs/<name>/<name>.toml` | The user | The user's machine |
+| Project | `boosters/packs/*.toml` or `boosters/packs/<name>/<name>.toml` in the project root | The user (in a project) | The project (via git) |
 
 ### 8.2 Pack TOML schema
 
@@ -350,9 +350,9 @@ extends = ["core"]
 
 When the user references pack `"example"`:
 
-1. Look in `./boosters/packs/example.toml` (project scope).
-2. If not found, look in `<user_config>/packs/example.toml` (user scope).
-3. If not found, look in `system.file("packs/example.toml", package = "boosters")` (built-in).
+1. Look in `./boosters/packs/example.toml` or `./boosters/packs/example/example.toml` (project scope).
+2. If not found, look in the same flat or nested forms under `<user_config>/packs/` (user scope).
+3. If not found, look in the same flat or nested forms under `system.file("packs", package = "boosters")` (built-in).
 4. If still not found: validation error with did-you-mean.
 
 **First match wins.** This means user and project packs can shadow built-in packs of the same name. This is intentional — it lets users customize without forking. `list_packs()` always shows the source so there's no mystery.
@@ -383,8 +383,8 @@ The cycle check is non-optional. Implement it in v0.1 even though users are unli
 
 `boosters::save_pack(name, scope = "project", from = NULL)` captures the current project's resolved package set as a new pack TOML.
 
-- `scope = "project"` (default): writes to `boosters/packs/<name>.toml`.
-- `scope = "user"`: writes to `<user_config>/packs/<name>.toml`.
+- `scope = "project"` (default): writes package-only packs to `boosters/packs/<name>.toml` and function-bearing packs to `boosters/packs/<name>/<name>.toml`.
+- `scope = "user"`: uses the same flat or nested layout under `<user_config>/packs/`.
 - `from = NULL` (default): captures all packages currently resolved from the project's `boosters.toml`.
 - `from = "core"`: captures only what the named pack contributes (useful for forking a built-in pack to customize).
 
@@ -396,7 +396,7 @@ The saved pack flattens to actual package names; it does not retain `extends` re
 
 ### 8.6 Built-in pack catalog (v0.1)
 
-The v0.1 built-in catalog is intentionally small. It should prove the pack mechanism, local template/example behavior, and non-CRAN `pak` source routing without requiring the full personal catalog to be curated before the walking skeleton ships. Each pack lives in `inst/packs/<name>.toml` in the package source.
+The v0.1 built-in catalog is intentionally small. It should prove the pack mechanism, local template/example behavior, and non-CRAN `pak` source routing without requiring the full personal catalog to be curated before the walking skeleton ships. Package-only packs live in `inst/packs/<name>.toml`; function-bearing packs live in `inst/packs/<name>/<name>.toml` with sibling `functions/`.
 
 | Pack | Purpose | Approximate contents |
 |---|---|---|
@@ -883,8 +883,8 @@ Implemented and verified:
 Implemented and verified:
 
 - Public v0.3 exports: `save_pack()`, `promote_pack()`, and `demote_pack()`.
-- `save_pack(name, scope = "project", from = NULL)` writes `boosters/packs/<name>.toml`.
-- `save_pack(scope = "user")` writes to `tools::R_user_dir("boosters", "config")/packs/<name>.toml`.
+- `save_pack(name, scope = "project", from = NULL)` writes `boosters/packs/<name>.toml` for package-only packs or `boosters/packs/<name>/<name>.toml` when functions are included.
+- `save_pack(scope = "user")` writes to the same flat or nested layout under `tools::R_user_dir("boosters", "config")/packs/`.
 - `save_pack(from = "<pack>")` forks one resolved pack into a flat snapshot without retaining `extends`.
 - Project snapshots fold `[extras].declared` and `[exclude].declared` into a self-contained package list, including non-CRAN extras as `[sources]` entries where needed.
 - Pack source overrides are preserved in saved packs for packages with non-CRAN install specs.

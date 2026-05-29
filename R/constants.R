@@ -15,11 +15,18 @@ function_file <- function(name, root = ".") {
 }
 
 pack_sidecar_dir <- function(pack_path) {
-  file.path(dirname(pack_path), tools::file_path_sans_ext(basename(pack_path)), "functions")
+  file.path(dirname(pack_path), "functions")
 }
 
 pack_function_file <- function(pack_path, name) {
   file.path(pack_sidecar_dir(pack_path), sprintf("fn_%s.R", name))
+}
+
+pack_is_nested_manifest <- function(pack_path) {
+  identical(
+    basename(dirname(pack_path)),
+    tools::file_path_sans_ext(basename(pack_path))
+  )
 }
 
 catalog_function_file <- function(name) {

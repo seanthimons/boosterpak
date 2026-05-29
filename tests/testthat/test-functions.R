@@ -69,7 +69,7 @@ test_that("sync rematerializes TOML-installed missing function files", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages) character(),
+    missing_packages = function(packages, root = ".") character(),
     install_via = function(specs, root = ".") TRUE,
     call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
     .package = "boosterpak"
@@ -89,7 +89,7 @@ test_that("sync leaves existing materialized function files untouched", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages) character(),
+    missing_packages = function(packages, root = ".") character(),
     install_via = function(specs, root = ".") TRUE,
     call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
     .package = "boosterpak"
@@ -133,7 +133,7 @@ test_that("sync copies missing pack-bundled functions without overwriting edits"
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages) character(),
+    missing_packages = function(packages, root = ".") character(),
     install_via = function(specs, root = ".") TRUE,
     call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
     .package = "boosterpak"

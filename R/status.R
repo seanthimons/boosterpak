@@ -46,7 +46,7 @@ status <- function(root = ".", verbose = NULL) {
     }
   }
   pack_catalog <- available_packs(root)
-  missing <- missing_packages(packages)
+  missing <- missing_packages(packages, root)
   out <- list(
     config_exists = config_exists,
     config_valid = valid,

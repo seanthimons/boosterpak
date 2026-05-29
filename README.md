@@ -1,81 +1,79 @@
 # boosterpak
 
-<img src="man/figures/boosterpak_hex.png" align="right" width="140" alt="boosterpak hex logo" />
+<img src="man/figures/boosterpak_hex.png" alt="boosterpak hex logo" align="right" width="140"/>
 
-`boosterpak` is an R package for declaring project package intent in a
-human-edited `boosters.toml` file. It resolves named "booster" packs from
-project, user, and built-in scopes, installs missing packages with `pak`, and
-uses `renv` for project-local libraries and lockfiles.
+`boosterpak` is an R package for declaring project package intent in a human-edited `boosters.toml` file. It resolves named "booster" packs from project, user, and built-in scopes, installs missing packages with `pak`, and uses `renv` for project-local libraries and lockfiles.
 
-## Install
+## 1. Install pak
 
-```r
+``` r
+install.packages("pak")
+```
+
+## 2. Install boosterpak
+
+``` r
 pak::pkg_install("seanthimons/boosterpak")
 ```
 
-## Start a Project
+## 3. Initialize the project
 
-```r
+``` r
 boosterpak::init(renv = "yes", rprofile = "yes")
-boosterpak::sync()
 ```
 
-`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes
-`air.toml`, manages the `.Rprofile` helper-source line, and can initialize
-project-local `renv`.
+`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the `.Rprofile` helper-source line, and can initialize project-local `renv`. The generated manifest includes `boosterpak` itself as a project extra so collaborators can restore and sync the project from its declared intent.
+
+## 4. Sync the project
+
+``` r
+boosterpak::sync()
+```
 
 ## Typical Workflow
 
 ```mermaid
 flowchart TD
-  A[Start or clone project] --> B["Initialize boosterpak
-    <em>init()</em>"]
-  B --> C[Add reusable intent]
-  C --> D["Add packs
-    <em>add_pack()</em>"]
-  C --> E["Add helper functions
-    <em>add_function()</em>"]
-  D --> F["Sync project
-    <em>sync()</em>"]
+  A([Start or clone project]) --> B(["Run init()"])
+  B --> C([Declare reusable intent])
+  C --> D(["Run add_pack()"])
+  C --> E(["Run add_function()"])
+  D --> F(["Run sync()"])
   E --> F
   F --> G[Packages installed in renv]
   F --> H[Helper files copied into boosters]
-  G --> I[Edit code and helper files]
+  G --> I([Edit code and helper files])
   H --> I
-  I --> J["Save a reusable pack
-    <em>save_pack()</em>"]
-  J --> K[Pack TOML plus function sidecar]
-  K --> L["Promote to user scope
-    <em>promote_pack()</em>"]
-  L --> M["Reuse in another project
-    <em>add_pack()</em>"]
+  I --> J(["Run save_pack()"])
+  J --> K[Flat package pack or nested function pack]
+  K --> L(["Run promote_pack()"])
+  L --> M(["Reuse with add_pack() in another project"])
   M --> D
+
+  classDef userAction fill:#e8f3ff,stroke:#1f6feb,color:#0b1f3a;
+  classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
+  class A,B,C,D,E,F,I,J,L,M userAction;
+  class G,H,K packageAction;
 ```
 
-The usual loop is to initialize once, add packs and helper functions as project
-intent, run `sync()`, then capture a useful baseline with `save_pack()`. Packs
-can be package-only, or they can carry exact copied `boosters/fn_*.R` helper
-files in a sidecar directory for reuse across projects.
+The usual loop is to initialize once, add packs and helper functions as project intent, run `sync()`, then capture a useful baseline with `save_pack()`. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
 
 ## Add a Pack
 
-```r
+``` r
 boosterpak::add_pack("example")
 ```
 
 The built-in pack catalog contains:
 
-- `core`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`.
-- `example`: extends `core` and installs `cli`.
-- `analysis-scaffold`: installs `fs` and `here` and carries a helper for a
-  compact analysis folder scaffold.
-- `github-example`: installs `ComptoxR` from `seanthimons/ComptoxR`.
+-   `core`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`.
+-   `example`: extends `core` and installs `cli`.
+-   `analysis-scaffold`: installs `fs` and `here` and carries a helper for a compact analysis folder scaffold.
+-   `github-example`: installs `ComptoxR` from `seanthimons/ComptoxR`.
 
-Packs can mix ordinary CRAN package names with source-specific install specs.
-Declare every package in `packages`, then add a `[sources]` entry only for
-packages that should come from somewhere else:
+Packs can mix ordinary CRAN package names with source-specific install specs. Declare every package in `packages`, then add a `[sources]` entry only for packages that should come from somewhere else:
 
-```toml
+``` toml
 name = "plotting"
 description = "Plotting packages from CRAN and GitHub."
 packages = ["ggplot2", "patchwork", "ggtext"]
@@ -84,47 +82,34 @@ packages = ["ggplot2", "patchwork", "ggtext"]
 "ggtext" = "wilkelab/ggtext"
 ```
 
-In this pack, `ggplot2` and `patchwork` install by package name, while `ggtext`
-uses the GitHub source spec.
+In this pack, `ggplot2` and `patchwork` install by package name, while `ggtext` uses the GitHub source spec.
 
-Pack mutation is additive. Removing a pack updates `boosters.toml` and
-can run sync, but it does not uninstall packages.
+Pack mutation is additive. Removing a pack updates `boosters.toml` and can run sync, but it does not uninstall packages.
 
 ## Capture and Reuse Packs
 
-```r
+``` r
 boosterpak::save_pack("project_baseline")
 boosterpak::promote_pack("project_baseline")
 ```
 
-`save_pack()` writes a flat TOML snapshot of the currently resolved project
-packages and, by default, the helper functions listed in `[functions].installed`.
-Use `functions = "all"` to capture every `boosters/fn_*.R` file,
-`functions = "none"` for a package-only pack, `from = "core"` to fork one
-existing pack, or `scope = "user"` to write directly to the machine-wide user
-pack directory. `promote_pack()` copies a project pack and its function sidecar
-to user scope, and `demote_pack()` copies both back into a project.
+`save_pack()` writes a TOML snapshot of the currently resolved project packages and, by default, the helper functions listed in `[functions].installed`. Use `functions = "all"` to capture every `boosters/fn_*.R` file, `functions = "none"` for a flat package-only pack, `from = "core"` to fork one existing pack, or `scope = "user"` to write directly to the machine-wide user pack directory. `promote_pack()` and `demote_pack()` copy flat package-only packs as single files and nested function-bearing packs as whole directories.
 
 ## Restore from a Lockfile
 
-```r
+``` r
 boosterpak::sync(mode = "restore")
 ```
 
-`sync(mode = "apply")` treats `boosters.toml` as intent and `renv.lock` as
-downstream output. `sync(mode = "restore")` is the explicit path for exact
-lockfile restoration.
+`sync(mode = "apply")` treats `boosters.toml` as intent and `renv.lock` as downstream output. `sync(mode = "restore")` is the explicit path for exact lockfile restoration.
 
 ## Inspect Status
 
-```r
+``` r
 boosterpak::status()
 boosterpak::list_packs()
 ```
 
-`status()` reports config validity, declared and resolved packs, package counts,
-missing direct packages, function drift or missing materialized files, pack
-catalog counts, `renv` state, lockfile presence, and the `.Rprofile` hook.
+`status()` reports config validity, declared and resolved packs, package counts, missing direct packages, function drift or missing materialized files, pack catalog counts, `renv` state, lockfile presence, and the `.Rprofile` hook.
 
-Current development includes function materialization, pack capture/promotion,
-and broader project status reporting; pruning remains out of scope.
+Current development includes function materialization, pack capture/promotion, and broader project status reporting; pruning remains out of scope.

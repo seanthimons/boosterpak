@@ -20,7 +20,7 @@ sync <- function(mode = c("apply", "restore"), root = ".", verbose = NULL) {
   materialize_config_packs(config, root)
   packages <- resolve_config_packages(config, root)
   install_specs <- resolve_config_install_specs(config, root)
-  missing <- missing_packages(packages)
+  missing <- missing_packages(packages, root)
   missing_specs <- install_specs[packages %in% missing]
   install_via(missing_specs, root)
   sync_functions(config, root)

@@ -47,7 +47,7 @@ test_that("sync snapshots declared packages explicitly", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages) character(),
+    missing_packages = function(packages, root = ".") character(),
     install_via = function(specs, root = ".") TRUE,
     call_renv_snapshot = function(root = ".", packages = NULL) {
       snapshot_packages <<- packages
@@ -57,5 +57,16 @@ test_that("sync snapshots declared packages explicitly", {
 
   sync(root = root, verbose = FALSE)
 
-  expect_setequal(snapshot_packages, c("fs", "here", "janitor", "rio", "tidyverse", "digest", "cli"))
+  expect_setequal(snapshot_packages, c("fs", "here", "janitor", "rio", "tidyverse", "digest", "boosterpak", "cli"))
+})
+
+test_that("missing package detection checks the project renv library", {
+  root <- withr::local_tempdir()
+  lib <- renv::paths$library(project = root)
+  dir.create(file.path(lib, "cli"), recursive = TRUE)
+  writeLines("Package: cli", file.path(lib, "cli", "DESCRIPTION"))
+
+  missing <- boosterpak:::missing_packages(c("boosterpak", "cli"), root = root)
+
+  expect_equal(missing, "boosterpak")
 })
