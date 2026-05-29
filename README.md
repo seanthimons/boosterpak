@@ -97,9 +97,12 @@ By default, `add_pack()` and `sync(mode = "apply")` use `hydrate = TRUE`, so ord
 ## Capture and Reuse Packs
 
 ``` r
+boosterpak::create_pack("analysis", c("dplyr", "rstudio/pointblank"), attach = "all")
 boosterpak::save_pack("project_baseline")
 boosterpak::promote_pack("project_baseline")
 ```
+
+`create_pack()` writes a new pack from declared intent without adding it to `boosters.toml`, installing packages, or running `sync()`. Plain package names are written directly to `packages`; source-specific specs are preserved under `[sources]`. Use `function_template = "yes"` to create a nested pack layout with `functions/fn_template.R` for later manual helper authoring.
 
 `save_pack()` writes a TOML snapshot of the currently resolved project packages and, by default, the helper functions listed in `[functions].installed`. Use `functions = "all"` to capture every `boosters/fn_*.R` file, `functions = "none"` for a flat package-only pack, `from = "core"` to fork one existing pack, or `scope = "user"` to write directly to the machine-wide user pack directory. `promote_pack()` and `demote_pack()` copy flat package-only packs as single files and nested function-bearing packs as whole directories.
 

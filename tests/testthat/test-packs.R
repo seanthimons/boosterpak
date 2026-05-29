@@ -454,6 +454,64 @@ test_that("save_pack writes to user scope", {
   expect_true("user_baseline" %in% list_packs(root = root, scope = "user", verbose = FALSE)$name)
 })
 
+test_that("create_pack writes declared package specs and explicit attach intent", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  path <- create_pack("analysis", c("dplyr", "rstudio/pointblank"), root = root, attach = "all", function_template = "no", verbose = FALSE)
+  data <- boosterpak:::read_toml_file(path)
+
+  expect_equal(path, normalizePath(file.path(root, "boosters", "packs", "analysis.toml"), winslash = "/", mustWork = FALSE))
+  expect_equal(data$name, "analysis")
+  expect_equal(data$description, "Custom booster pack for analysis.")
+  expect_equal(data$packages, c("dplyr", "pointblank"))
+  expect_equal(data$sources[["pointblank"]], "rstudio/pointblank")
+  expect_true(data$attach)
+  expect_null(data$functions)
+})
+
+test_that("create_pack writes none, empty, and selected attach intent", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  none <- create_pack("noattach", "cli", root = root, attach = "none", function_template = "no", verbose = FALSE)
+  empty <- create_pack("empty", root = root, function_template = "no", verbose = FALSE)
+  selected <- create_pack("selected", c("dplyr", "ggplot2"), root = root, attach = "ggplot2", function_template = "no", verbose = FALSE)
+
+  expect_false(boosterpak:::read_toml_file(none)$attach)
+  expect_false(boosterpak:::read_toml_file(empty)$attach)
+  expect_equal(boosterpak:::toml_string_array(boosterpak:::read_toml_file(empty)$packages, "packages"), character())
+  expect_equal(boosterpak:::read_toml_file(selected)$attach, "ggplot2")
+})
+
+test_that("create_pack function template uses nested layout without declared functions", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  path <- create_pack("helpers", "cli", root = root, attach = "none", function_template = "yes", verbose = FALSE)
+  data <- boosterpak:::read_toml_file(path)
+
+  expect_equal(path, normalizePath(file.path(root, "boosters", "packs", "helpers", "helpers.toml"), winslash = "/", mustWork = FALSE))
+  expect_equal(boosterpak:::toml_string_array(data$functions, "functions"), character())
+  expect_true(file.exists(file.path(root, "boosters", "packs", "helpers", "functions", "fn_template.R")))
+  expect_false("template" %in% boosterpak:::toml_string_array(data$functions, "functions"))
+})
+
+test_that("create_pack validates project config, extends, and target conflicts", {
+  root <- withr::local_tempdir()
+  expect_error(create_pack("needs_init", root = root, verbose = FALSE), "boosters.toml")
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- create_pack("child", "digest", root = root, extends = "example", attach = "none", function_template = "no", verbose = FALSE)
+  expect_equal(boosterpak:::read_toml_file(path)$extends, "example")
+  expect_error(create_pack("badchild", root = root, extends = "missing", verbose = FALSE), "Unknown pack")
+  expect_error(create_pack("child", root = root, verbose = FALSE), "already exists")
+
+  nested <- create_pack("child", root = root, attach = "none", function_template = "yes", overwrite = TRUE, verbose = FALSE)
+  expect_equal(nested, normalizePath(file.path(root, "boosters", "packs", "child", "child.toml"), winslash = "/", mustWork = FALSE))
+  expect_false(file.exists(file.path(root, "boosters", "packs", "child.toml")))
+})
+
 test_that("promote_pack and demote_pack copy between project and user scopes", {
   withr::local_envvar(R_USER_CONFIG_DIR = withr::local_tempdir())
   root <- withr::local_tempdir()

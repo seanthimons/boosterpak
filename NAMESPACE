@@ -1,6 +1,7 @@
 export(add_pack)
 export(add_function)
 export(check_functions)
+export(create_pack)
 export(demote_pack)
 export(diff_function)
 export(geo_mean)

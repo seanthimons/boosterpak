@@ -400,7 +400,7 @@ pack_description <- function(name, from = NULL) {
   }
 }
 
-write_pack_file <- function(path, name, description, packages, sources = character(), functions = character(), overwrite = FALSE) {
+write_pack_file <- function(path, name, description, packages, sources = character(), functions = character(), overwrite = FALSE, extends = character(), attach = NULL, include_functions = TRUE) {
   if (file.exists(path) && !isTRUE(overwrite)) {
     cli::cli_abort("{.file {path}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
   }
@@ -408,9 +408,17 @@ write_pack_file <- function(path, name, description, packages, sources = charact
   lines <- c(
     sprintf('name = "%s"', escape_toml_string(name)),
     sprintf('description = "%s"', escape_toml_string(description)),
-    sprintf("packages = [%s]", paste(sprintf('"%s"', vapply(packages, escape_toml_string, character(1))), collapse = ", ")),
-    sprintf("functions = [%s]", paste(sprintf('"%s"', vapply(functions, escape_toml_string, character(1))), collapse = ", "))
+    sprintf("packages = [%s]", toml_inline_string_array(packages))
   )
+  if (length(extends) > 0) {
+    lines <- c(lines, sprintf("extends = [%s]", toml_inline_string_array(extends)))
+  }
+  if (!is.null(attach)) {
+    lines <- c(lines, toml_attach_line(attach))
+  }
+  if (isTRUE(include_functions)) {
+    lines <- c(lines, sprintf("functions = [%s]", toml_inline_string_array(functions)))
+  }
   if (length(sources) > 0) {
     lines <- c(
       lines,
@@ -424,6 +432,20 @@ write_pack_file <- function(path, name, description, packages, sources = charact
   dir.create(dirname(path), recursive = TRUE, showWarnings = FALSE)
   writeLines(lines, path, useBytes = TRUE)
   invisible(path)
+}
+
+toml_inline_string_array <- function(x) {
+  paste(sprintf('"%s"', vapply(x, escape_toml_string, character(1))), collapse = ", ")
+}
+
+toml_attach_line <- function(attach) {
+  if (identical(attach, TRUE)) {
+    return("attach = true")
+  }
+  if (identical(attach, FALSE)) {
+    return("attach = false")
+  }
+  sprintf("attach = [%s]", toml_inline_string_array(attach))
 }
 
 pack_sources_for_packages <- function(packages, sources) {
@@ -523,12 +545,189 @@ save_pack <- function(name, scope = c("project", "user"), from = NULL, root = ".
   } else {
     file.path(pack_scope_dir(scope, root), name, sprintf("%s.toml", name))
   }
-  guard_pack_target_layout(name, scope, root, target)
+  guard_pack_target_layout(name, scope, root, target, overwrite = overwrite)
   write_pack_file(target, name, pack_description(name, from), contents$packages, contents$sources, pack_functions, overwrite)
   write_pack_function_sidecar(target, pack_functions, root, overwrite)
 
   if (should_emit(verbose)) {
     cli::cli_alert_success("Saved pack {.val {name}} to {.file {target}}.")
+  }
+  invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
+}
+
+create_pack_description <- function(name, description) {
+  if (!is.null(description)) {
+    return(description)
+  }
+  if (interactive()) {
+    answer <- readline(sprintf("Description for %s: ", name))
+    if (nzchar(answer)) {
+      return(answer)
+    }
+  }
+  sprintf("Custom booster pack for %s.", name)
+}
+
+resolve_create_pack_specs <- function(packages) {
+  if (!is.character(packages)) {
+    cli::cli_abort("{.arg packages} must be a character vector.", call = NULL)
+  }
+  names <- vapply(packages, package_name_from_spec, character(1), USE.NAMES = FALSE)
+  sources <- stats::setNames(packages[names != packages], names[names != packages])
+  list(packages = unique(names), sources = sources[!duplicated(names(sources), fromLast = TRUE)])
+}
+
+resolve_create_pack_extends <- function(extends, root) {
+  if (is.null(extends)) {
+    if (!interactive()) {
+      return(character())
+    }
+    packs <- available_packs(root)
+    if (nrow(packs) == 0) {
+      return(character())
+    }
+    choices <- c("None", packs$name)
+    selected <- utils::menu(choices, title = "Extend an existing pack?")
+    if (selected <= 1) character() else choices[[selected]]
+  } else {
+    extends
+  }
+}
+
+validate_create_pack_extends <- function(extends, root) {
+  if (!is.character(extends)) {
+    cli::cli_abort("{.arg extends} must be {.code NULL} or a character vector of known pack names.", call = NULL)
+  }
+  if (length(extends) == 0) {
+    return(invisible(TRUE))
+  }
+  known <- available_packs(root)$name
+  missing <- setdiff(extends, known)
+  if (length(missing) > 0) {
+    cli::cli_abort("Unknown pack{?s} in {.arg extends}: {.val {missing}}.", call = NULL)
+  }
+  invisible(TRUE)
+}
+
+resolve_create_pack_attach <- function(attach, packages) {
+  package_names <- packages
+  choices <- c("ask", "all", "some", "none")
+  if (!all(attach %in% choices)) {
+    selected <- vapply(attach, package_name_from_spec, character(1), USE.NAMES = FALSE)
+    missing <- setdiff(selected, package_names)
+    if (length(missing) > 0) {
+      cli::cli_abort("{.arg attach} includes package{?s} not declared in {.arg packages}: {.val {missing}}.", call = NULL)
+    }
+    return(unique(selected))
+  }
+  attach <- match.arg(attach, choices)
+  if (identical(attach, "ask")) {
+    if (!interactive()) {
+      attach <- if (length(package_names) > 0) "all" else "none"
+    } else if (length(package_names) == 0) {
+      attach <- "none"
+    } else {
+      selected <- utils::menu(c("All", "Some", "None"), title = "Attach packages at startup?")
+      if (selected < 1) {
+        cli::cli_abort("Pack creation cancelled.", call = NULL)
+      }
+      attach <- c("all", "some", "none")[[selected]]
+    }
+  }
+  switch(
+    attach,
+    all = length(package_names) > 0,
+    none = FALSE,
+    some = {
+      if (!interactive()) {
+        cli::cli_abort("{.code attach = \"some\"} requires interactive selection. Pass package names in {.arg attach} instead.", call = NULL)
+      }
+      selected <- utils::select.list(package_names, multiple = TRUE, title = "Select packages to attach")
+      unique(selected)
+    }
+  )
+}
+
+resolve_create_pack_function_template <- function(function_template) {
+  function_template <- match.arg(function_template, c("ask", "yes", "no"))
+  if (identical(function_template, "ask")) {
+    if (!interactive()) {
+      return(FALSE)
+    }
+    answer <- utils::menu(c("Yes", "No"), title = "Create a function sidecar template?")
+    return(identical(answer, 1L))
+  }
+  identical(function_template, "yes")
+}
+
+write_function_template <- function(path, overwrite = FALSE) {
+  target <- pack_function_file(path, "template")
+  if (file.exists(target) && !isTRUE(overwrite)) {
+    cli::cli_abort("{.file {target}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
+  }
+  dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
+  writeLines(c(
+    "#' Template helper",
+    "#'",
+    "#' @return Replace this placeholder with a useful return value.",
+    "template <- function() {",
+    "  cli::cli_abort(\"Replace template() with your pack helper.\")",
+    "}"
+  ), target, useBytes = TRUE)
+  invisible(target)
+}
+
+#' Create a new pack from declared intent
+#'
+#' `create_pack()` writes a pack manifest from package specs you provide. It
+#' does not add the pack to `boosters.toml`, install packages, sync `renv`, or
+#' copy functions into the project.
+#'
+#' @param name Pack name to write. The name is also used as the TOML `name` and
+#'   file name.
+#' @param packages Character vector of package specs. Plain package names are
+#'   written to `packages`; source-specific specs are preserved in `[sources]`.
+#' @param root Project root.
+#' @param scope Destination scope: `"project"` or `"user"`.
+#' @param description Optional pack description.
+#' @param extends Optional character vector of known pack names to extend.
+#' @param attach Attach intent: `"ask"`, `"all"`, `"some"`, `"none"`, or a
+#'   character vector of package names to attach.
+#' @param function_template Whether to create a nested function sidecar
+#'   template: `"ask"`, `"yes"`, or `"no"`.
+#' @param overwrite Whether to replace an existing pack file or template.
+#' @param verbose Whether to print routine summaries.
+#' @return Path to the created pack, invisibly.
+#' @export
+create_pack <- function(name, packages = character(), root = ".", scope = "project", description = NULL, extends = NULL, attach = c("ask", "all", "some", "none"), function_template = c("ask", "yes", "no"), overwrite = FALSE, verbose = NULL) {
+  check_verbose(verbose)
+  validate_new_pack_name(name)
+  scope <- match.arg(scope, c("project", "user"))
+  root <- normalizePath(root, winslash = "/", mustWork = TRUE)
+  if (identical(scope, "project") && !file.exists(boosters_file(root))) {
+    cli::cli_abort("{.file boosters.toml} does not exist. Run {.code boosterpak::init()} first.", call = NULL)
+  }
+
+  specs <- resolve_create_pack_specs(packages)
+  description <- create_pack_description(name, description)
+  extends <- resolve_create_pack_extends(extends, root)
+  validate_create_pack_extends(extends, root)
+  attach <- resolve_create_pack_attach(attach, specs$packages)
+  with_template <- resolve_create_pack_function_template(function_template)
+  target <- if (with_template) {
+    file.path(pack_scope_dir(scope, root), name, sprintf("%s.toml", name))
+  } else {
+    file.path(pack_scope_dir(scope, root), sprintf("%s.toml", name))
+  }
+  guard_pack_target_layout(name, scope, root, target, overwrite = overwrite)
+
+  write_pack_file(target, name, description, specs$packages, specs$sources, functions = character(), overwrite = overwrite, extends = extends, attach = attach, include_functions = with_template)
+  if (with_template) {
+    write_function_template(target, overwrite = overwrite)
+  }
+
+  if (should_emit(verbose)) {
+    cli::cli_alert_success("Created pack {.val {name}} at {.file {target}}.")
   }
   invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
 }
@@ -547,7 +746,7 @@ copy_pack_between_scopes <- function(name, from_scope, to_scope, root = ".", ove
   if (!file.exists(source)) {
     cli::cli_abort("Pack {.val {name}} does not exist in {from_scope} scope.", call = NULL)
   }
-  guard_pack_target_layout(name, to_scope, root, target)
+  guard_pack_target_layout(name, to_scope, root, target, overwrite = overwrite)
   if (file.exists(target) && !isTRUE(overwrite)) {
     cli::cli_abort("{.file {target}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
   }
@@ -575,7 +774,7 @@ copy_pack_between_scopes <- function(name, from_scope, to_scope, root = ".", ove
   invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
 }
 
-guard_pack_target_layout <- function(name, scope, root, target) {
+guard_pack_target_layout <- function(name, scope, root, target, overwrite = FALSE) {
   dir <- pack_scope_dir(scope, root)
   flat <- file.path(dir, sprintf("%s.toml", name))
   nested <- file.path(dir, name, sprintf("%s.toml", name))
@@ -584,6 +783,14 @@ guard_pack_target_layout <- function(name, scope, root, target) {
   nested <- normalizePath(nested, winslash = "/", mustWork = FALSE)
   alternate <- if (identical(target, flat)) nested else flat
   if (file.exists(alternate)) {
+    if (isTRUE(overwrite)) {
+      if (identical(alternate, nested)) {
+        unlink(dirname(alternate), recursive = TRUE)
+      } else {
+        unlink(alternate)
+      }
+      return(invisible(TRUE))
+    }
     cli::cli_abort(
       "Pack {.val {name}} already exists at {.file {alternate}}. Remove it before writing {.file {target}}.",
       call = NULL
