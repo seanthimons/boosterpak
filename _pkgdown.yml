@@ -1,0 +1,42 @@
+url: https://seanthimons.github.io/boosterpak/
+
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left: [reference, articles]
+    right: [github]
+  components:
+    github:
+      icon: fab fa-github
+      href: https://github.com/seanthimons/boosterpak
+      aria-label: GitHub
+
+reference:
+  - title: Project workflow
+    contents:
+      - init
+      - sync
+      - status
+  - title: Packs
+    contents:
+      - add_pack
+      - remove_pack
+      - list_packs
+      - save_pack
+      - promote_pack
+      - demote_pack
+  - title: Helper functions
+    contents:
+      - add_function
+      - remove_function
+      - list_functions
+      - check_functions
+      - diff_function
+  - title: Bundled helper examples
+    contents:
+      - geo_mean
+      - my_skim
+      - theme_custom
+      - "%ni%"

@@ -68,7 +68,7 @@ The built-in pack catalog contains:
 
 -   `core`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`.
 -   `example`: extends `core` and installs `cli`.
--   `analysis-scaffold`: installs `fs` and `here` and carries a helper for a compact analysis folder scaffold.
+-   `scaffold-analysis`: installs `fs` and `here` and carries a helper for a compact analysis folder scaffold.
 -   `github-example`: installs `ComptoxR` from `seanthimons/ComptoxR`.
 
 Packs can mix ordinary CRAN package names with source-specific install specs. Declare every package in `packages`, then add a `[sources]` entry only for packages that should come from somewhere else:

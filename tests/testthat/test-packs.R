@@ -1,6 +1,6 @@
 test_that("built-in packs are discoverable", {
   packs <- list_packs(scope = "builtin", verbose = FALSE)
-  expect_setequal(packs$name, c("analysis-scaffold", "core", "example", "github-example"))
+  expect_setequal(packs$name, c("scaffold-analysis", "core", "example", "github-example"))
   expect_true(all(c("name", "description", "scope", "sources", "path") %in% names(packs)))
   expect_equal(
     packs$sources[packs$name == "github-example"],
@@ -22,22 +22,22 @@ test_that("built-in catalog matches v0.1 PRD contents", {
     boosterpak:::resolve_pack_sources("github-example"),
     c(ComptoxR = "seanthimons/ComptoxR")
   )
-  expect_equal(boosterpak:::resolve_pack("analysis-scaffold"), c("fs", "here"))
-  expect_equal(boosterpak:::resolve_pack_functions("analysis-scaffold"), "scaffold_analysis")
+  expect_equal(boosterpak:::resolve_pack("scaffold-analysis"), c("fs", "here"))
+  expect_equal(boosterpak:::resolve_pack_functions("scaffold-analysis"), "scaffold_analysis")
 })
 
-test_that("analysis scaffold pack materializes its nested helper function", {
+test_that("scaffold analysis pack materializes its nested helper function", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
 
-  add_pack("analysis-scaffold", root = root, sync = FALSE, verbose = FALSE)
+  add_pack("scaffold-analysis", root = root, sync = FALSE, verbose = FALSE)
 
-  expect_true(file.exists(file.path(root, "boosters", "packs", "analysis-scaffold", "analysis-scaffold.toml")))
+  expect_true(file.exists(file.path(root, "boosters", "packs", "scaffold-analysis", "scaffold-analysis.toml")))
   expect_true(file.exists(file.path(
     root,
     "boosters",
     "packs",
-    "analysis-scaffold",
+    "scaffold-analysis",
     "functions",
     "fn_scaffold_analysis.R"
   )))

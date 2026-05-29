@@ -9,6 +9,8 @@ Description: Provides a TOML manifest for declaring R project package bundles,
     resolving built-in, user, and project packs, and applying them through pak
     and renv.
 License: MIT + file LICENSE
+URL: https://seanthimons.github.io/boosterpak/, https://github.com/seanthimons/boosterpak
+BugReports: https://github.com/seanthimons/boosterpak/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Imports:
@@ -27,5 +29,6 @@ Suggests:
     testthat (>= 3.0.0),
     withr
 VignetteBuilder: quarto
+Config/Needs/website: pkgdown
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

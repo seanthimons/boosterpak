@@ -8,3 +8,9 @@
 /.quarto/
 README_files/*
 README.html
+docs/
+inst/doc/
+vignettes/*.html
+vignettes/*_files/
+vignettes/.gitignore
+.check-user-config/

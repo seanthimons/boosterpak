@@ -5,6 +5,15 @@
 ^\.Rhistory$
 ^\.RData$
 ^\.Ruserdata$
+^\.beans$
+^\.beans[.]yml$
+^\.check-user-config$
+^\.quarto$
+^vignettes/\.quarto$
+^vignettes/\.gitignore$
 ^booster_pak_PRD[.]md$
 ^booster_pak_v0[.]5_PRD[.]md$
 ^\.gitignore$
+^docs$
+^pkgdown$
+^[.][.]Rcheck$
