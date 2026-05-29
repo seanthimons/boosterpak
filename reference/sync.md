@@ -12,8 +12,8 @@ sync(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL)
 
 - mode:
 
-  `"apply"` installs packages declared by `boosters.toml`; `"restore"`
-  restores from `renv.lock`.
+  `"apply"` installs packages declared by `boosters.toml` and writes
+  `boosters/attach.R`; `"restore"` restores from `renv.lock`.
 
 - root:
 

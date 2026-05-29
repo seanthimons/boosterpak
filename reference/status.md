@@ -21,6 +21,6 @@ status(root = ".", verbose = NULL)
 ## Value
 
 A list describing project status, invisibly. Includes config validity,
-declared and resolved packs, package and missing-package counts,
-materialized function drift/missing counts, pack catalog counts, renv
-state, lockfile presence, and `.Rprofile` hook state.
+declared and resolved packs, package and missing-package counts, attach
+state, materialized function drift/missing counts, pack catalog counts,
+renv state, lockfile presence, and `.Rprofile` hook state.

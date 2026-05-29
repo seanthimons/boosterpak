@@ -25,7 +25,8 @@ init(
 
 - rprofile:
 
-  Whether to add the helper auto-source line to `.Rprofile`.
+  Whether to add the recommended `.Rprofile` startup hook that sources
+  `boosters/attach.R` before helper files.
 
 - verbose:
 

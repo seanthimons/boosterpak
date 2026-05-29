@@ -1,6 +1,19 @@
 # Changelog
 
-## boosterpak (development version)
+## boosterpak 0.6.0.9000
+
+- `sync(mode = "apply")` now writes a managed `boosters/attach.R` file
+  with static [`library()`](https://rdrr.io/r/base/library.html) calls
+  for startup attachment intent. Packs can declare `attach = true`,
+  `attach = false`, or `attach = ["pkg"]`; missing `attach` attaches
+  direct pack packages by default.
+- New top-level `[attach]` config supports `enabled`, `declared`, and
+  `exclude`. Workflow packages from `core` and `[extras]` are installed
+  but not attached unless explicitly listed in `[attach].declared`.
+- The recommended `.Rprofile` hook now sources `boosters/attach.R`
+  before `boosters/fn_*.R` helper files, and
+  [`status()`](https://seanthimons.github.io/boosterpak/reference/status.md)
+  reports attach state.
 
 ## boosterpak 0.5.0.9001
 

@@ -6,6 +6,8 @@
   : Initialize a boosterpak project
 - [`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
   : Synchronize a boosterpak project
+- [`write_attach()`](https://seanthimons.github.io/boosterpak/reference/write_attach.md)
+  : Write startup package attachment calls
 - [`status()`](https://seanthimons.github.io/boosterpak/reference/status.md)
   : Report boosterpak project status
 

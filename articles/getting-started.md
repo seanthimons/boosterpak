@@ -5,9 +5,11 @@ declares the packs it wants in `boosters.toml`;
 [`boosterpak::sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
 resolves those packs, hydrates plain-name packages from local libraries
 when possible, and installs anything still missing into the active
-project-local `renv` library. Packs can also carry exact copied helper
-files, so a useful project setup can be reused without separating
-“packages” from customized `boosters/fn_*.R` files.
+project-local `renv` library. It also writes `boosters/attach.R` with
+explicit startup [`library()`](https://rdrr.io/r/base/library.html)
+calls for packages intended to be attached. Packs can also carry exact
+copied helper files, so a useful project setup can be reused without
+separating “packages” from customized `boosters/fn_*.R` files.
 
 ## Typical workflow
 
@@ -21,7 +23,8 @@ flowchart TD
   E --> F
   F --> G[Hydrate from local libraries]
   G --> H[Install remaining with pak]
-  H --> I[Snapshot declared packages]
+  H --> A1[Write boosters/attach.R]
+  A1 --> I[Snapshot declared packages]
   F --> J[Helper files copied into boosters]
   I --> K([Edit code and helper files])
   J --> K
@@ -34,7 +37,7 @@ flowchart TD
   classDef userAction fill:#e8f3ff,stroke:#1f6feb,color:#0b1f3a;
   classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
   class A,B,C,D,E,F,K,L,N,O userAction;
-  class G,H,I,J,M packageAction;
+  class G,H,A1,I,J,M packageAction;
 ```
 
 In practice, initialize once, add pack and function intent over time,
@@ -66,7 +69,7 @@ This creates:
 - `boosters.toml`
 - `boosters/packs/`
 - `air.toml`, when enabled by settings
-- a `.Rprofile` helper-source line, when requested
+- a `.Rprofile` startup hook, when requested
 
 The generated `boosters.toml` includes `boosterpak` itself in
 `[extras].declared`, so the package needed to run
@@ -90,8 +93,9 @@ boosterpak::sync()
 Apply mode is additive. It hydrates plain-name missing packages from
 renv-discoverable local libraries, installs anything still missing with
 `pak`, materializes missing bundled or installed helper functions, and,
-when `auto_snapshot = true`, snapshots with `renv`. Use
-`hydrate = FALSE` to skip local reuse for stricter first-run installs.
+when `auto_snapshot = true`, writes `boosters/attach.R` and snapshots
+with `renv`. Use `hydrate = FALSE` to skip local reuse for stricter
+first-run installs.
 
 ## Add a Pack
 
@@ -130,6 +134,15 @@ packages = ["ggplot2", "patchwork", "ggtext"]
 
 Here, `ggplot2` and `patchwork` can hydrate or install by package name,
 while `ggtext` skips hydration and uses the GitHub source spec.
+
+Package attachment is a startup layer, not installation intent. Missing
+`attach` means a pack attaches its direct `packages`; use
+`attach = true` for that explicit default, `attach = false` to install
+without startup attachment, or `attach = ["pkg1", "pkg2"]` to attach a
+subset. The top-level `[attach]` table supports `enabled`, `declared`,
+and `exclude`. Workflow packages from `core` and `[extras]`, including
+`pak`, `renv`, and `boosterpak`, are installed but not attached unless
+explicitly listed in `[attach].declared`.
 
 ## Add a Helper Function
 
@@ -201,4 +214,5 @@ boosterpak::list_packs()
 [`status()`](https://seanthimons.github.io/boosterpak/reference/status.md)
 reports whether the manifest exists and validates, what packs and
 packages resolve, whether project-local `renv` appears active, whether
-`renv.lock` exists, and whether `.Rprofile` contains the helper hook.
+`renv.lock` exists, whether `boosters/attach.R` exists, and whether
+`.Rprofile` contains the startup hook.

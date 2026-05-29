@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">boosterpak</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9002</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,8 +34,12 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="boosterpak-development-version">boosterpak (development version)<a class="anchor" aria-label="anchor" href="#boosterpak-development-version"></a></h2>
-</div>
+<h2 class="pkg-version" data-toc-text="0.6.0.9000" id="boosterpak-0609000">boosterpak 0.6.0.9000<a class="anchor" aria-label="anchor" href="#boosterpak-0609000"></a></h2>
+<ul><li>
+<code>sync(mode = "apply")</code> now writes a managed <code>boosters/attach.R</code> file with static <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls for startup attachment intent. Packs can declare <code>attach = true</code>, <code>attach = false</code>, or <code>attach = ["pkg"]</code>; missing <code>attach</code> attaches direct pack packages by default.</li>
+<li>New top-level <code>[attach]</code> config supports <code>enabled</code>, <code>declared</code>, and <code>exclude</code>. Workflow packages from <code>core</code> and <code>[extras]</code> are installed but not attached unless explicitly listed in <code>[attach].declared</code>.</li>
+<li>The recommended <code>.Rprofile</code> hook now sources <code>boosters/attach.R</code> before <code>boosters/fn_*.R</code> helper files, and <code><a href="../reference/status.html">status()</a></code> reports attach state.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.5.0.9001" id="boosterpak-0509001">boosterpak 0.5.0.9001<a class="anchor" aria-label="anchor" href="#boosterpak-0509001"></a></h2>
 <ul><li>

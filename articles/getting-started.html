@@ -23,7 +23,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">boosterpak</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.5.0.9002</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,7 +65,7 @@
 
 
 
-    <p><code>boosterpak</code> adds a small intent layer above <code>pak</code> and <code>renv</code>. A project declares the packs it wants in <code>boosters.toml</code>; <code><a href="../reference/sync.html">boosterpak::sync()</a></code> resolves those packs, hydrates plain-name packages from local libraries when possible, and installs anything still missing into the active project-local <code>renv</code> library. Packs can also carry exact copied helper files, so a useful project setup can be reused without separating “packages” from customized <code>boosters/fn_*.R</code> files.</p>
+    <p><code>boosterpak</code> adds a small intent layer above <code>pak</code> and <code>renv</code>. A project declares the packs it wants in <code>boosters.toml</code>; <code><a href="../reference/sync.html">boosterpak::sync()</a></code> resolves those packs, hydrates plain-name packages from local libraries when possible, and installs anything still missing into the active project-local <code>renv</code> library. It also writes <code>boosters/attach.R</code> with explicit startup <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls for packages intended to be attached. Packs can also carry exact copied helper files, so a useful project setup can be reused without separating “packages” from customized <code>boosters/fn_*.R</code> files.</p>
 <section class="level2"><h2 id="typical-workflow">Typical workflow<a class="anchor" aria-label="anchor" href="#typical-workflow"></a>
 </h2>
 <div class="cell" data-layout-align="default">
@@ -83,7 +83,8 @@
   E --&gt; F
   F --&gt; G[Hydrate from local libraries]
   G --&gt; H[Install remaining with pak]
-  H --&gt; I[Snapshot declared packages]
+  H --&gt; A1[Write boosters/attach.R]
+  A1 --&gt; I[Snapshot declared packages]
   F --&gt; J[Helper files copied into boosters]
   I --&gt; K([Edit code and helper files])
   J --&gt; K
@@ -96,7 +97,7 @@
   classDef userAction fill:#e8f3ff,stroke:#1f6feb,color:#0b1f3a;
   classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
   class A,B,C,D,E,F,K,L,N,O userAction;
-  class G,H,I,J,M packageAction;
+  class G,H,A1,I,J,M packageAction;
 </pre>
 </div>
 <p></p></figure><p></p>
@@ -128,7 +129,7 @@
 <li><code>boosters/packs/</code></li>
 <li>
 <code>air.toml</code>, when enabled by settings</li>
-<li>a <code>.Rprofile</code> helper-source line, when requested</li>
+<li>a <code>.Rprofile</code> startup hook, when requested</li>
 </ul>
 <p>The generated <code>boosters.toml</code> includes <code>boosterpak</code> itself in <code>[extras].declared</code>, so the package needed to run <code><a href="../reference/sync.html">sync()</a></code> is also captured in project intent and the project lockfile. With <code>renv = "yes"</code>, <code><a href="../reference/init.html">init()</a></code> bootstraps only <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> into the project library and creates the initial lockfile when <code>auto_snapshot = true</code>.</p>
 <p>In non-interactive sessions, use explicit <code>renv</code> and <code>rprofile</code> arguments. The default <code>"ask"</code> mode never silently changes <code>.Rprofile</code> when user confirmation would be required.</p>
@@ -138,7 +139,7 @@
 <div class="sourceCode cell-code" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/sync.html">sync</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
-<p>Apply mode is additive. It hydrates plain-name missing packages from renv-discoverable local libraries, installs anything still missing with <code>pak</code>, materializes missing bundled or installed helper functions, and, when <code>auto_snapshot = true</code>, snapshots with <code>renv</code>. Use <code>hydrate = FALSE</code> to skip local reuse for stricter first-run installs.</p>
+<p>Apply mode is additive. It hydrates plain-name missing packages from renv-discoverable local libraries, installs anything still missing with <code>pak</code>, materializes missing bundled or installed helper functions, and, when <code>auto_snapshot = true</code>, writes <code>boosters/attach.R</code> and snapshots with <code>renv</code>. Use <code>hydrate = FALSE</code> to skip local reuse for stricter first-run installs.</p>
 </section><section class="level2"><h2 id="add-a-pack">Add a Pack<a class="anchor" aria-label="anchor" href="#add-a-pack"></a>
 </h2>
 <div class="cell">
@@ -159,6 +160,7 @@
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[sources]</span></span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code></pre></div>
 <p>Here, <code>ggplot2</code> and <code>patchwork</code> can hydrate or install by package name, while <code>ggtext</code> skips hydration and uses the GitHub source spec.</p>
+<p>Package attachment is a startup layer, not installation intent. Missing <code>attach</code> means a pack attaches its direct <code>packages</code>; use <code>attach = true</code> for that explicit default, <code>attach = false</code> to install without startup attachment, or <code>attach = ["pkg1", "pkg2"]</code> to attach a subset. The top-level <code>[attach]</code> table supports <code>enabled</code>, <code>declared</code>, and <code>exclude</code>. Workflow packages from <code>core</code> and <code>[extras]</code>, including <code>pak</code>, <code>renv</code>, and <code>boosterpak</code>, are installed but not attached unless explicitly listed in <code>[attach].declared</code>.</p>
 </section><section class="level2"><h2 id="add-a-helper-function">Add a Helper Function<a class="anchor" aria-label="anchor" href="#add-a-helper-function"></a>
 </h2>
 <div class="cell">
@@ -202,7 +204,7 @@
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/status.html">status</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/list_packs.html">list_packs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
-<p><code><a href="../reference/status.html">status()</a></code> reports whether the manifest exists and validates, what packs and packages resolve, whether project-local <code>renv</code> appears active, whether <code>renv.lock</code> exists, and whether <code>.Rprofile</code> contains the helper hook.</p>
+<p><code><a href="../reference/status.html">status()</a></code> reports whether the manifest exists and validates, what packs and packages resolve, whether project-local <code>renv</code> appears active, whether <code>renv.lock</code> exists, whether <code>boosters/attach.R</code> exists, and whether <code>.Rprofile</code> contains the startup hook.</p>
 </section><script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
