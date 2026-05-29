@@ -2,6 +2,13 @@
 
 ## boosterpak 0.6.0.9000
 
+- Added
+  [`create_pack()`](https://seanthimons.github.io/boosterpak/reference/create_pack.md)
+  for guided pack authoring from declared package intent. It writes pack
+  TOML, optional source specs, explicit attach intent, and an optional
+  nested function-template sidecar without mutating `boosters.toml` or
+  running
+  [`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md).
 - `sync(mode = "apply")` now writes a managed `boosters/attach.R` file
   with static [`library()`](https://rdrr.io/r/base/library.html) calls
   for startup attachment intent. Packs can declare `attach = true`,

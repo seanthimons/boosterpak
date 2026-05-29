@@ -13,6 +13,19 @@
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Declarative Project Package Bundles">
 <meta name="description" content="Provides a TOML manifest for declaring R project package bundles, resolving built-in, user, and project packs, and applying them through pak and renv.">
 <meta property="og:description" content="Provides a TOML manifest for declaring R project package bundles, resolving built-in, user, and project packs, and applying them through pak and renv.">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script><script>
+  document.addEventListener('DOMContentLoaded', function() {
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+    document.querySelectorAll('pre > code.language-mermaid').forEach(function(code) {
+      var pre = code.parentElement;
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = code.textContent;
+      pre.parentElement.replaceChild(div, pre);
+    });
+    mermaid.run();
+  });
+</script>
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -141,8 +154,10 @@
 <h2 id="capture-and-reuse-packs">Capture and Reuse Packs<a class="anchor" aria-label="anchor" href="#capture-and-reuse-packs"></a>
 </h2>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/save_pack.html">save_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/create_pack.html">create_pack</a></span><span class="op">(</span><span class="st">"analysis"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"dplyr"</span>, <span class="st">"rstudio/pointblank"</span><span class="op">)</span>, attach <span class="op">=</span> <span class="st">"all"</span><span class="op">)</span></span>
+<span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/save_pack.html">save_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/promote_pack.html">promote_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="reference/create_pack.html">create_pack()</a></code> writes a new pack from declared intent without adding it to <code>boosters.toml</code>, installing packages, or running <code><a href="reference/sync.html">sync()</a></code>. Plain package names are written directly to <code>packages</code>; source-specific specs are preserved under <code>[sources]</code>. Use <code>function_template = "yes"</code> to create a nested pack layout with <code>functions/fn_template.R</code> for later manual helper authoring.</p>
 <p><code><a href="reference/save_pack.html">save_pack()</a></code> writes a TOML snapshot of the currently resolved project packages and, by default, the helper functions listed in <code>[functions].installed</code>. Use <code>functions = "all"</code> to capture every <code>boosters/fn_*.R</code> file, <code>functions = "none"</code> for a flat package-only pack, <code>from = "core"</code> to fork one existing pack, or <code>scope = "user"</code> to write directly to the machine-wide user pack directory. <code><a href="reference/promote_pack.html">promote_pack()</a></code> and <code><a href="reference/demote_pack.html">demote_pack()</a></code> copy flat package-only packs as single files and nested function-bearing packs as whole directories.</p>
 </div>
 <div class="section level2">

@@ -142,9 +142,19 @@ that should go straight to `pak`.
 ## Capture and Reuse Packs
 
 ``` r
+boosterpak::create_pack("analysis", c("dplyr", "rstudio/pointblank"), attach = "all")
 boosterpak::save_pack("project_baseline")
 boosterpak::promote_pack("project_baseline")
 ```
+
+[`create_pack()`](https://seanthimons.github.io/boosterpak/reference/create_pack.md)
+writes a new pack from declared intent without adding it to
+`boosters.toml`, installing packages, or running
+[`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md).
+Plain package names are written directly to `packages`; source-specific
+specs are preserved under `[sources]`. Use `function_template = "yes"`
+to create a nested pack layout with `functions/fn_template.R` for later
+manual helper authoring.
 
 [`save_pack()`](https://seanthimons.github.io/boosterpak/reference/save_pack.md)
 writes a TOML snapshot of the currently resolved project packages and,

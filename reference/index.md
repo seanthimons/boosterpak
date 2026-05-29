@@ -19,6 +19,8 @@
   : Remove a pack declaration
 - [`list_packs()`](https://seanthimons.github.io/boosterpak/reference/list_packs.md)
   : List available packs
+- [`create_pack()`](https://seanthimons.github.io/boosterpak/reference/create_pack.md)
+  : Create a new pack from declared intent
 - [`save_pack()`](https://seanthimons.github.io/boosterpak/reference/save_pack.md)
   : Save a resolved package set as a pack
 - [`promote_pack()`](https://seanthimons.github.io/boosterpak/reference/promote_pack.md)
