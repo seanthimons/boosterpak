@@ -32,6 +32,7 @@ test_that("built-in catalog matches v0.1 PRD contents", {
   )
   expect_equal(boosterpak:::resolve_pack("scaffold-analysis"), c("fs", "here"))
   expect_equal(boosterpak:::resolve_pack_functions("scaffold-analysis"), "scaffold_analysis")
+  expect_equal(boosterpak:::resolve_pack_on_add_hooks("scaffold-analysis"), "scaffold_analysis")
 })
 
 test_that("scaffold analysis pack materializes its nested helper function", {
@@ -49,6 +50,145 @@ test_that("scaffold analysis pack materializes its nested helper function", {
     "functions",
     "fn_scaffold_analysis.R"
   )))
+})
+
+test_that("add_pack sources materialized pack functions", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  withr::defer(rm(list = c("%ni%", "my_skim", "theme_custom", "geo_mean"), envir = .GlobalEnv), teardown_env())
+
+  add_pack("eda", root = root, sync = FALSE, verbose = FALSE)
+
+  expect_true(exists("%ni%", envir = .GlobalEnv, mode = "function", inherits = FALSE))
+  expect_true(exists("my_skim", envir = .GlobalEnv, mode = "function", inherits = FALSE))
+  expect_true(exists("theme_custom", envir = .GlobalEnv, mode = "function", inherits = FALSE))
+  expect_true(exists("geo_mean", envir = .GlobalEnv, mode = "function", inherits = FALSE))
+})
+
+test_that("add_pack runs on_add hooks only for synced new additions", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  dir.create(file.path(root, "boosters", "packs", "hooked", "functions"), recursive = TRUE)
+  writeLines(c(
+    'name = "hooked"',
+    'description = "Hooked pack"',
+    'packages = []',
+    'functions = ["create_marker"]',
+    "",
+    "[hooks]",
+    'on_add = ["create_marker"]'
+  ), file.path(root, "boosters", "packs", "hooked", "hooked.toml"))
+  writeLines(c(
+    "create_marker <- function() {",
+    "  dir.create('hook-output', showWarnings = FALSE)",
+    "  invisible(TRUE)",
+    "}"
+  ), file.path(root, "boosters", "packs", "hooked", "functions", "fn_create_marker.R"))
+  withr::defer(rm(list = intersect("create_marker", ls(envir = .GlobalEnv)), envir = .GlobalEnv), teardown_env())
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    sync = function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL) TRUE,
+    .package = "boosterpak"
+  )
+  withr::local_dir(root)
+
+  add_pack("hooked", root = root, sync = TRUE, verbose = FALSE)
+  expect_true(dir.exists(file.path(root, "hook-output")))
+
+  unlink(file.path(root, "hook-output"), recursive = TRUE)
+  add_pack("hooked", root = root, sync = TRUE, verbose = FALSE)
+  expect_false(dir.exists(file.path(root, "hook-output")))
+})
+
+test_that("scaffold-analysis on_add hook creates project scaffold after sync", {
+  skip_if_not_installed("fs")
+  skip_if_not_installed("here")
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  withr::defer(rm(list = intersect("scaffold_analysis", ls(envir = .GlobalEnv)), envir = .GlobalEnv), teardown_env())
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    sync = function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL) TRUE,
+    .package = "boosterpak"
+  )
+
+  add_pack("scaffold-analysis", root = root, sync = TRUE, verbose = FALSE)
+
+  expect_true(dir.exists(file.path(root, "data", "raw")))
+  expect_true(dir.exists(file.path(root, "data", "processed")))
+  expect_true(dir.exists(file.path(root, "docs")))
+  expect_true(dir.exists(file.path(root, "output", "figures")))
+  expect_true(dir.exists(file.path(root, "R")))
+  expect_true(dir.exists(file.path(root, "scratch")))
+})
+
+test_that("add_pack with sync false sources hooks but does not run them", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  add_pack("scaffold-analysis", root = root, sync = FALSE, verbose = FALSE)
+  withr::defer(rm(list = intersect("scaffold_analysis", ls(envir = .GlobalEnv)), envir = .GlobalEnv), teardown_env())
+
+  expect_true(exists("scaffold_analysis", envir = .GlobalEnv, mode = "function", inherits = FALSE))
+  expect_false(dir.exists(file.path(root, "data")))
+  expect_false(dir.exists(file.path(root, "output")))
+})
+
+test_that("pack hooks validate type and materialized function availability", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "boosters", "packs", "badtype", "functions"), recursive = TRUE)
+  writeLines(c(
+    'name = "badtype"',
+    'description = "Bad hook type"',
+    'packages = []',
+    'functions = ["helper"]',
+    "",
+    "[hooks]",
+    "on_add = true"
+  ), file.path(root, "boosters", "packs", "badtype", "badtype.toml"))
+  writeLines("helper <- function() TRUE", file.path(root, "boosters", "packs", "badtype", "functions", "fn_helper.R"))
+
+  expect_error(
+    boosterpak:::load_pack("badtype", root = root),
+    "\\[hooks\\]\\.on_add"
+  )
+
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "boosters", "packs", "missinghook", "functions"), recursive = TRUE)
+  writeLines(c(
+    'name = "missinghook"',
+    'description = "Missing hook"',
+    'packages = []',
+    'functions = ["helper"]',
+    "",
+    "[hooks]",
+    'on_add = ["missing"]'
+  ), file.path(root, "boosters", "packs", "missinghook", "missinghook.toml"))
+  writeLines("helper <- function() TRUE", file.path(root, "boosters", "packs", "missinghook", "functions", "fn_helper.R"))
+
+  expect_error(
+    boosterpak:::load_pack("missinghook", root = root),
+    "does not list it in"
+  )
+
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "boosters", "packs", "missingfile", "functions"), recursive = TRUE)
+  writeLines(c(
+    'name = "missingfile"',
+    'description = "Missing hook file"',
+    'packages = []',
+    'functions = ["missing"]',
+    "",
+    "[hooks]",
+    'on_add = ["missing"]'
+  ), file.path(root, "boosters", "packs", "missingfile", "missingfile.toml"))
+
+  expect_error(
+    boosterpak:::load_pack("missingfile", root = root),
+    "is missing"
+  )
 })
 
 test_that("pack discovery supports flat package packs and nested function packs", {

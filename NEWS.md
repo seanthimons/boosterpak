@@ -1,3 +1,5 @@
+# boosterpak (development version)
+
 # boosterpak 0.5.0.9001
 
 - `sync(mode = "apply")` and eager `add_pack()` now hydrate plain-name missing packages from renv-discoverable local libraries before falling back to `pak::pkg_install()`. Use `hydrate = FALSE` to skip local reuse; `sync(mode = "restore")` remains an exact lockfile restore path.

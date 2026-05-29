@@ -10,6 +10,7 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
   }
 
   current <- config$packs$declared %||% character()
+  is_new_add <- identical(action, "add") && !name %in% current
   next_packs <- if (identical(action, "add")) {
     unique(c(current, name))
   } else {
@@ -19,7 +20,7 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
   if (isTRUE(sync)) {
     ensure_project_renv(root)
   }
-  if (identical(action, "add") && !name %in% current && !isTRUE(overwrite_functions)) {
+  if (is_new_add && !isTRUE(overwrite_functions)) {
     check_pack_function_conflicts(name, root)
   }
 
@@ -27,12 +28,16 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
   materialize_config_packs(read_config(root), root)
   if (identical(action, "add")) {
     materialize_pack_functions(name, root = root, overwrite = overwrite_functions)
+    source_pack_functions(name, root = root)
   } else if (isTRUE(remove_functions)) {
     remove_pack_functions(name, next_packs, root = root)
   }
 
   if (isTRUE(sync)) {
     sync(mode = "apply", root = root, hydrate = hydrate, verbose = verbose)
+    if (is_new_add) {
+      run_pack_on_add_hooks(name, root = root)
+    }
   } else if (should_emit(verbose)) {
     cli::cli_alert_success("{if (action == 'add') 'Added' else 'Removed'} pack {.val {name}} in {.file boosters.toml}.")
   }

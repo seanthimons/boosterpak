@@ -7,6 +7,18 @@ test_that("init writes v0.1 config and Rprofile hook when explicit", {
   expect_true(file.exists(file.path(root, "air.toml")))
   expect_true(boosterpak:::has_rprofile_line(root))
 
+  air <- boosterpak:::read_toml_file(file.path(root, "air.toml"))
+  expect_equal(air$format$`line-width`, 120)
+  expect_equal(air$format$`indent-width`, 2)
+  expect_equal(air$format$`indent-style`, "space")
+  expect_equal(air$format$`line-ending`, "auto")
+  expect_true(air$format$`persistent-line-breaks`)
+  expect_equal(air$format$exclude, list())
+  expect_true(air$format$`default-exclude`)
+  expect_equal(air$format$skip, list())
+  expect_equal(air$format$table, list())
+  expect_true(air$format$`default-table`)
+
   config <- boosterpak:::read_config(root)
   expect_equal(config$packs$declared, "core")
   expect_equal(

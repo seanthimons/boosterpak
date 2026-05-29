@@ -110,6 +110,37 @@ materialize_pack_functions <- function(names, root = ".", overwrite = FALSE) {
   }))
 }
 
+source_function_files <- function(names, root = ".", envir = .GlobalEnv) {
+  invisible(lapply(names, function(name) {
+    path <- function_file(name, root)
+    if (!file.exists(path)) {
+      cli::cli_abort("Function {.val {name}} is declared but {.file {path}} is missing.", call = NULL)
+    }
+    sys.source(path, envir = envir)
+  }))
+}
+
+source_pack_functions <- function(names, root = ".", envir = .GlobalEnv) {
+  functions <- unique(unlist(lapply(names, resolve_pack_functions, root = root), use.names = FALSE))
+  source_function_files(functions, root = root, envir = envir)
+  invisible(functions)
+}
+
+run_pack_on_add_hooks <- function(name, root = ".", envir = .GlobalEnv) {
+  hooks <- resolve_pack_on_add_hooks(name, root = root)
+  old_wd <- getwd()
+  on.exit(setwd(old_wd), add = TRUE)
+  setwd(root)
+  invisible(lapply(hooks, function(hook) {
+    if (!exists(hook, envir = envir, mode = "function", inherits = FALSE)) {
+      cli::cli_abort("On-add hook {.fun {hook}} is declared but was not sourced into {.code .GlobalEnv}.", call = NULL)
+    }
+    hook_fn <- get(hook, envir = envir, mode = "function", inherits = FALSE)
+    hook_fn()
+  }))
+  invisible(hooks)
+}
+
 check_pack_function_conflicts <- function(names, root = ".") {
   packs <- unique(unlist(lapply(names, resolve_pack_names, root = root), use.names = FALSE))
   conflicts <- character()
@@ -138,6 +169,7 @@ sync_functions <- function(config, root = ".") {
   }))
   declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
   materialize_pack_functions(declared, root = root, overwrite = FALSE)
+  source_pack_functions(declared, root = root)
   installed
 }
 

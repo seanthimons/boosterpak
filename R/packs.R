@@ -89,10 +89,11 @@ discover_pack_scope <- function(scope, dir) {
 
 validate_pack_layout <- function(name, path, data) {
   functions <- toml_string_array(data$functions %||% character(), sprintf("%s functions", path))
-  if (length(functions) > 0 && !pack_is_nested_manifest(path)) {
+  hooks <- toml_string_array(data$hooks$on_add %||% character(), sprintf("%s [hooks].on_add", path))
+  if ((length(functions) > 0 || length(hooks) > 0) && !pack_is_nested_manifest(path)) {
     nested <- file.path(dirname(path), name, sprintf("%s.toml", name))
     cli::cli_abort(
-      "{.file {path}} declares functions, but function-bearing packs must use nested layout: {.file {nested}} with files in {.file {file.path(dirname(nested), 'functions')}}.",
+      "{.file {path}} declares functions or hooks, but function-bearing packs must use nested layout: {.file {nested}} with files in {.file {file.path(dirname(nested), 'functions')}}.",
       call = NULL
     )
   }
@@ -184,10 +185,19 @@ validate_pack_schema <- function(expected_name, path, data, scope) {
   data$packages <- toml_string_array(data$packages, sprintf("%s packages", path))
   data$extends <- toml_string_array(data$extends %||% character(), sprintf("%s extends", path))
   data$functions <- toml_string_array(data$functions %||% character(), sprintf("%s functions", path))
+  data$hooks$on_add <- toml_string_array(data$hooks$on_add %||% character(), sprintf("%s [hooks].on_add", path))
   validate_pack_layout(data$name, path, data)
   invisible(lapply(data$functions, function(name) {
     if (!file.exists(pack_function_source_file(path, name, scope))) {
       cli::cli_abort("{.file {path}} declares function {.val {name}} but {.file {pack_function_file(path, name)}} is missing.", call = NULL)
+    }
+  }))
+  invisible(lapply(data$hooks$on_add, function(name) {
+    if (!name %in% data$functions) {
+      cli::cli_abort("{.file {path}} declares on-add hook {.val {name}} but does not list it in {.field functions}.", call = NULL)
+    }
+    if (!file.exists(pack_function_source_file(path, name, scope))) {
+      cli::cli_abort("{.file {path}} declares on-add hook {.val {name}} but {.file {pack_function_file(path, name)}} is missing.", call = NULL)
     }
   }))
   invisible(TRUE)
@@ -228,6 +238,19 @@ resolve_pack_functions <- function(name, root = ".", stack = character()) {
   parents <- toml_string_array(pack$extends %||% character(), sprintf("%s extends", pack$.__path__))
   parent_functions <- unlist(lapply(parents, resolve_pack_functions, root = root, stack = c(stack, name)), use.names = FALSE)
   unique(c(parent_functions, pack$functions %||% character()))
+}
+
+resolve_pack_on_add_hooks <- function(name, root = ".", stack = character()) {
+  if (name %in% stack) {
+    cycle <- paste(c(stack, name), collapse = " -> ")
+    cli::cli_abort("Pack cycle detected: {cycle}.", call = NULL)
+  }
+
+  pack <- load_pack(name, root)
+  parents <- toml_string_array(pack$extends %||% character(), sprintf("%s extends", pack$.__path__))
+  parent_hooks <- unlist(lapply(parents, resolve_pack_on_add_hooks, root = root, stack = c(stack, name)), use.names = FALSE)
+  hooks <- toml_string_array(pack$hooks$on_add %||% character(), sprintf("%s [hooks].on_add", pack$.__path__))
+  unique(c(parent_hooks, hooks))
 }
 
 resolve_config_pack_names <- function(config, root = ".") {

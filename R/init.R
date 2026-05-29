@@ -25,8 +25,9 @@ init <- function(root = ".", renv = c("ask", "yes", "no"), rprofile = c("ask", "
 
   config <- read_config(root)
 
-  if (isTRUE(config$settings$air_toml) && !file.exists(file.path(root, "air.toml"))) {
-    writeLines(c("# air formatter configuration", ""), file.path(root, "air.toml"), useBytes = TRUE)
+  air_path <- file.path(root, "air.toml")
+  if (isTRUE(config$settings$air_toml) && !file.exists(air_path)) {
+    write_default_air_config(air_path)
   }
   materialize_config_packs(config, root)
 
@@ -49,6 +50,25 @@ init <- function(root = ".", renv = c("ask", "yes", "no"), rprofile = c("ask", "
   }
 
   invisible(list(config = config_path, rprofile_changed = changed_rprofile))
+}
+
+write_default_air_config <- function(path) {
+  lines <- c(
+    "[format]",
+    "line-width = 120",
+    "indent-width = 2",
+    'indent-style = "space"',
+    'line-ending = "auto"',
+    "persistent-line-breaks = true",
+    "exclude = []",
+    "default-exclude = true",
+    "skip = []",
+    "table = []",
+    "default-table = true",
+    ""
+  )
+  writeLines(lines, path, useBytes = TRUE)
+  invisible(path)
 }
 
 repair_self_extra <- function(path) {
