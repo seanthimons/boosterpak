@@ -1,10 +1,10 @@
 Package: boosterpak
 Title: Declarative Project Package Bundles
-Version: 0.4.0
+Version: 0.5.0
 Authors@R: 
-    person("Sean", "Thimons", email = "sean@example.com", role = c("aut", "cre"))
+    person("Sean", "Thimons", email = "sxthimons@gmail.com", role = c("aut", "cre"))
 Author: Sean Thimons [aut, cre]
-Maintainer: Sean Thimons <sean@example.com>
+Maintainer: Sean Thimons <sxthimons@gmail.com>
 Description: Provides a TOML manifest for declaring R project package bundles,
     resolving built-in, user, and project packs, and applying them through pak
     and renv.
