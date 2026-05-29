@@ -1,0 +1,204 @@
+# Getting started with boosterpak
+
+`boosterpak` adds a small intent layer above `pak` and `renv`. A project
+declares the packs it wants in `boosters.toml`;
+[`boosterpak::sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
+resolves those packs, hydrates plain-name packages from local libraries
+when possible, and installs anything still missing into the active
+project-local `renv` library. Packs can also carry exact copied helper
+files, so a useful project setup can be reused without separating
+“packages” from customized `boosters/fn_*.R` files.
+
+## Typical workflow
+
+``` mermaid
+flowchart TD
+  A([Start or clone project]) --> B(["Run init()"])
+  B --> C([Declare reusable intent])
+  C --> D(["Run add_pack()"])
+  C --> E(["Run add_function()"])
+  D --> F(["Run sync()"])
+  E --> F
+  F --> G[Hydrate from local libraries]
+  G --> H[Install remaining with pak]
+  H --> I[Snapshot declared packages]
+  F --> J[Helper files copied into boosters]
+  I --> K([Edit code and helper files])
+  J --> K
+  K --> L(["Run save_pack()"])
+  L --> M[Flat package pack or nested function pack]
+  M --> N(["Run promote_pack()"])
+  N --> O(["Reuse with add_pack() in another project"])
+  O --> D
+
+  classDef userAction fill:#e8f3ff,stroke:#1f6feb,color:#0b1f3a;
+  classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
+  class A,B,C,D,E,F,K,L,N,O userAction;
+  class G,H,I,J,M packageAction;
+```
+
+In practice, initialize once, add pack and function intent over time,
+run
+[`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
+whenever the project should match that intent, then save and promote a
+pack when the setup is worth reusing.
+
+## 1. Install pak
+
+``` r
+install.packages("pak")
+```
+
+## 2. Install boosterpak
+
+``` r
+pak::pkg_install("seanthimons/boosterpak")
+```
+
+## 3. Initialize the project
+
+``` r
+boosterpak::init(renv = "yes", rprofile = "yes")
+```
+
+This creates:
+
+- `boosters.toml`
+- `boosters/packs/`
+- `air.toml`, when enabled by settings
+- a `.Rprofile` helper-source line, when requested
+
+The generated `boosters.toml` includes `boosterpak` itself in
+`[extras].declared`, so the package needed to run
+[`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
+is also captured in project intent and the project lockfile. With
+`renv = "yes"`,
+[`init()`](https://seanthimons.github.io/boosterpak/reference/init.md)
+bootstraps only `renv`, `pak`, and `boosterpak` into the project library
+and creates the initial lockfile when `auto_snapshot = true`.
+
+In non-interactive sessions, use explicit `renv` and `rprofile`
+arguments. The default `"ask"` mode never silently changes `.Rprofile`
+when user confirmation would be required.
+
+## 4. Sync the project
+
+``` r
+boosterpak::sync()
+```
+
+Apply mode is additive. It hydrates plain-name missing packages from
+renv-discoverable local libraries, installs anything still missing with
+`pak`, materializes missing bundled or installed helper functions, and,
+when `auto_snapshot = true`, snapshots with `renv`. Use
+`hydrate = FALSE` to skip local reuse for stricter first-run installs.
+
+## Add a Pack
+
+``` r
+boosterpak::add_pack("example")
+```
+
+The `example` pack installs `cli`.
+[`add_pack()`](https://seanthimons.github.io/boosterpak/reference/add_pack.md)
+preserves unrelated comments and sections in `boosters.toml` while
+updating `[packs].declared`. For the analysis baseline of `fs`, `here`,
+`janitor`, `rio`, core tidyverse packages, `scales`, `glue`, `digest`,
+`skimr`, and bundled helper functions, add the `eda` pack explicitly:
+
+``` r
+boosterpak::add_pack("eda")
+```
+
+If the pack carries helper functions,
+[`add_pack()`](https://seanthimons.github.io/boosterpak/reference/add_pack.md)
+also copies the bundled `fn_*.R` files into `boosters/` and refuses to
+overwrite existing function files unless `overwrite_functions = TRUE`.
+
+Packs can mix ordinary CRAN package names with package-specific source
+specs. Declare every package in `packages`, then use `[sources]` only
+for packages that should install from another source:
+
+``` toml
+name = "plotting"
+description = "Plotting packages from CRAN and GitHub."
+packages = ["ggplot2", "patchwork", "ggtext"]
+
+[sources]
+"ggtext" = "wilkelab/ggtext"
+```
+
+Here, `ggplot2` and `patchwork` can hydrate or install by package name,
+while `ggtext` skips hydration and uses the GitHub source spec.
+
+## Add a Helper Function
+
+``` r
+boosterpak::add_function("ni")
+```
+
+Helper functions are materialized as `boosters/fn_*.R` files and tracked
+in `[functions].installed`. They are ordinary project files, so you can
+edit them after materialization.
+[`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
+restores missing installed helper files, but it does not overwrite local
+edits.
+
+## Capture and Reuse
+
+``` r
+boosterpak::save_pack("project_baseline")
+boosterpak::promote_pack("project_baseline")
+```
+
+[`save_pack()`](https://seanthimons.github.io/boosterpak/reference/save_pack.md)
+captures the resolved package set and, by default, helper functions
+listed in `[functions].installed`. Use `functions = "all"` to capture
+every `boosters/fn_*.R` file, `functions = "none"` for a flat
+package-only pack, or a character vector for specific function names.
+[`promote_pack()`](https://seanthimons.github.io/boosterpak/reference/promote_pack.md)
+and
+[`demote_pack()`](https://seanthimons.github.io/boosterpak/reference/demote_pack.md)
+copy flat package-only packs as single files and nested function-bearing
+packs as whole directories.
+
+## Restore Exact Versions
+
+``` r
+boosterpak::sync(mode = "restore")
+```
+
+Restore mode requires both `boosters.toml` and `renv.lock`, calls
+[`renv::restore()`](https://rstudio.github.io/renv/reference/restore.html),
+validates the manifest, and warns if direct declared packages are absent
+from the lockfile. It remains lockfile-exact and does not hydrate.
+
+## Troubleshooting boosterpak 0.5 init projects
+
+If a project was initialized with boosterpak 0.5 and, after restart,
+`boosterpak` is no longer found, run this once from the project without
+relying on `boosterpak` being loadable:
+
+``` r
+install.packages("renv")
+renv::install(c("pak", "seanthimons/boosterpak"))
+renv::snapshot(packages = c("renv", "pak", "boosterpak"), prompt = FALSE)
+```
+
+Then restart R and run:
+
+``` r
+boosterpak::sync()
+```
+
+## Inspect
+
+``` r
+boosterpak::status()
+boosterpak::list_packs()
+```
+
+[`status()`](https://seanthimons.github.io/boosterpak/reference/status.md)
+reports whether the manifest exists and validates, what packs and
+packages resolve, whether project-local `renv` appears active, whether
+`renv.lock` exists, and whether `.Rprofile` contains the helper hook.
