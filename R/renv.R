@@ -19,7 +19,7 @@ ensure_project_renv <- function(root = ".") {
   if (!is_project_renv_active(root)) {
     cli::cli_abort(c(
       "No active project-local renv library was found.",
-      "i" = "Run {.code boosterpak::init(renv = 'yes')} or {.code renv::init()}, then restart R in the project."
+      "i" = "Run {.code boosterpak::init(renv = 'yes')} to bootstrap the project renv, or run {.code renv::init()} and restart R in the project."
     ), call = NULL)
   }
   invisible(TRUE)
@@ -28,7 +28,7 @@ ensure_project_renv <- function(root = ".") {
 call_renv_init <- function(root = ".") {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
-  renv::init(bare = TRUE)
+  renv::init(project = root, bare = TRUE, load = TRUE, restart = FALSE)
 }
 
 call_renv_load <- function(root = ".") {

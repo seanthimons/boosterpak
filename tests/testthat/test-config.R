@@ -126,15 +126,88 @@ test_that("init with renv yes loads existing project renv when inactive", {
   writeLines("", file.path(root, "renv", "activate.R"))
 
   calls <- character()
+  installed <- NULL
+  snapshotted <- NULL
   local_mocked_bindings(
     call_renv_load = function(root = ".") calls <<- c(calls, "load"),
     call_renv_init = function(root = ".") calls <<- c(calls, "init"),
+    missing_packages = function(packages, root = ".") packages,
+    install_via = function(specs, root = ".") installed <<- specs,
+    call_renv_snapshot = function(root = ".", packages = NULL) snapshotted <<- packages,
     .package = "boosterpak"
   )
 
   init(root = root, renv = "yes", rprofile = "no", verbose = FALSE)
 
   expect_equal(calls, "load")
+  expect_setequal(installed, c("pak", "renv", boosterpak:::self_install_spec()))
+  expect_setequal(snapshotted, c("pak", "renv", "boosterpak"))
+})
+
+test_that("init with renv yes initializes, bootstraps only workflow packages, and snapshots", {
+  root <- withr::local_tempdir()
+  installed <- NULL
+  snapshotted <- NULL
+  calls <- character()
+
+  local_mocked_bindings(
+    is_project_renv_active = function(root = ".") FALSE,
+    has_project_renv = function(root = ".") FALSE,
+    call_renv_init = function(root = ".") calls <<- c(calls, "init"),
+    call_renv_load = function(root = ".") calls <<- c(calls, "load"),
+    missing_packages = function(packages, root = ".") packages[packages != "renv"],
+    install_via = function(specs, root = ".") installed <<- specs,
+    call_renv_snapshot = function(root = ".", packages = NULL) snapshotted <<- packages,
+    .package = "boosterpak"
+  )
+
+  init(root = root, renv = "yes", rprofile = "no", verbose = FALSE)
+
+  expect_equal(calls, "init")
+  expect_setequal(installed, c("pak", boosterpak:::self_install_spec()))
+  expect_setequal(snapshotted, c("pak", "renv", "boosterpak"))
+  expect_false(any(c("fs", "here", "janitor", "rio", "tidyverse", "digest") %in% installed))
+})
+
+test_that("init with renv yes skips bootstrap snapshot when auto_snapshot is false", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines[lines == "auto_snapshot = true"] <- "auto_snapshot = false"
+  writeLines(lines, path)
+  snapshotted <- FALSE
+
+  local_mocked_bindings(
+    is_project_renv_active = function(root = ".") FALSE,
+    has_project_renv = function(root = ".") FALSE,
+    call_renv_init = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".") character(),
+    install_via = function(specs, root = ".") TRUE,
+    call_renv_snapshot = function(root = ".", packages = NULL) snapshotted <<- TRUE,
+    .package = "boosterpak"
+  )
+
+  init(root = root, renv = "yes", rprofile = "no", verbose = FALSE)
+
+  expect_false(snapshotted)
+})
+
+test_that("init with renv no skips renv bootstrap", {
+  root <- withr::local_tempdir()
+  called <- FALSE
+
+  local_mocked_bindings(
+    is_project_renv_active = function(root = ".") TRUE,
+    call_renv_init = function(root = ".") called <<- TRUE,
+    install_via = function(specs, root = ".") called <<- TRUE,
+    call_renv_snapshot = function(root = ".", packages = NULL) called <<- TRUE,
+    .package = "boosterpak"
+  )
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  expect_false(called)
 })
 
 test_that("non-interactive ask errors when Rprofile action is needed", {

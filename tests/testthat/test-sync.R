@@ -57,7 +57,7 @@ test_that("sync snapshots declared packages explicitly", {
 
   sync(root = root, verbose = FALSE)
 
-  expect_setequal(snapshot_packages, c("fs", "here", "janitor", "rio", "tidyverse", "digest", "boosterpak", "cli"))
+  expect_setequal(snapshot_packages, c("pak", "renv", "boosterpak", "cli"))
 })
 
 test_that("missing package detection checks the project renv library", {

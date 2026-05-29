@@ -5,9 +5,12 @@ test_that("live pak and renv apply sync installs declared packages", {
   )
 
   root <- withr::local_tempdir()
+  withr::local_envvar(R_USER_CONFIG_DIR = withr::local_tempdir())
   test_libpaths <- .libPaths()
   init(root = root, renv = "yes", rprofile = "no", verbose = FALSE)
   .libPaths(unique(c(.libPaths(), test_libpaths)))
+  expect_true(file.exists(file.path(root, "renv.lock")))
+  expect_false("boosterpak" %in% boosterpak:::missing_packages("boosterpak", root = root))
   config_path <- file.path(root, "boosters.toml")
   lines <- readLines(config_path, warn = FALSE)
   lines[lines == 'declared = ["core"]'] <- 'declared = ["example"]'
@@ -30,6 +33,7 @@ test_that("live restore warns when lockfile omits direct declared packages", {
   )
 
   root <- withr::local_tempdir()
+  withr::local_envvar(R_USER_CONFIG_DIR = withr::local_tempdir())
   test_libpaths <- .libPaths()
   init(root = root, renv = "yes", rprofile = "no", verbose = FALSE)
   .libPaths(unique(c(.libPaths(), test_libpaths)))

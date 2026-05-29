@@ -1,10 +1,6 @@
 name = "core"
-description = "Minimal baseline pack for boosterpak projects."
+description = "Minimal bootstrap pack for boosterpak projects."
 packages = [
-  "fs",
-  "here",
-  "janitor",
-  "rio",
-  "tidyverse",
-  "digest",
+  "pak",
+  "renv",
 ]

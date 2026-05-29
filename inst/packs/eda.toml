@@ -1,0 +1,10 @@
+name = "eda"
+description = "Analysis-focused pack for exploratory data work."
+packages = [
+  "fs",
+  "here",
+  "janitor",
+  "rio",
+  "tidyverse",
+  "digest",
+]

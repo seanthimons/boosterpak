@@ -22,7 +22,7 @@ pak::pkg_install("seanthimons/boosterpak")
 boosterpak::init(renv = "yes", rprofile = "yes")
 ```
 
-`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the `.Rprofile` helper-source line, and can initialize project-local `renv`. The generated manifest includes `boosterpak` itself as a project extra so collaborators can restore and sync the project from its declared intent.
+`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the `.Rprofile` helper-source line, and can initialize project-local `renv`. With `renv = "yes"`, it bootstraps `renv`, `pak`, and `boosterpak` into the project library and snapshots those workflow packages before any restart is needed.
 
 ## 4. Sync the project
 
@@ -66,8 +66,9 @@ boosterpak::add_pack("example")
 
 The built-in pack catalog contains:
 
--   `core`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`.
--   `example`: extends `core` and installs `cli`.
+-   `core`: minimal bootstrap dependencies, `pak` and `renv`.
+-   `eda`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`.
+-   `example`: small documented example that installs `cli`.
 -   `scaffold-analysis`: installs `fs` and `here` and carries a helper for a compact analysis folder scaffold.
 -   `github-example`: installs `ComptoxR` from `seanthimons/ComptoxR`.
 
@@ -102,6 +103,22 @@ boosterpak::sync(mode = "restore")
 ```
 
 `sync(mode = "apply")` treats `boosters.toml` as intent and `renv.lock` as downstream output. `sync(mode = "restore")` is the explicit path for exact lockfile restoration.
+
+## Troubleshooting 0.5 Init Projects
+
+If a project was initialized with boosterpak 0.5 and a restart made `boosterpak` unavailable inside `renv`, run this once without relying on `boosterpak` being loadable:
+
+``` r
+install.packages("renv")
+renv::install(c("pak", "seanthimons/boosterpak"))
+renv::snapshot(packages = c("renv", "pak", "boosterpak"), prompt = FALSE)
+```
+
+Then restart R in the project and run:
+
+``` r
+boosterpak::sync()
+```
 
 ## Inspect Status
 

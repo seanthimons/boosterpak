@@ -23,13 +23,22 @@ init <- function(root = ".", renv = c("ask", "yes", "no"), rprofile = c("ask", "
     repair_self_extra(config_path)
   }
 
-  if (isTRUE(read_config(root)$settings$air_toml) && !file.exists(file.path(root, "air.toml"))) {
+  config <- read_config(root)
+
+  if (isTRUE(config$settings$air_toml) && !file.exists(file.path(root, "air.toml"))) {
     writeLines(c("# air formatter configuration", ""), file.path(root, "air.toml"), useBytes = TRUE)
   }
-  materialize_config_packs(read_config(root), root)
+  materialize_config_packs(config, root)
 
-  if (!is_project_renv_active(root)) {
-    handle_renv_init(root, renv)
+  if (identical(renv, "no")) {
+    renv_ready <- FALSE
+  } else if (!is_project_renv_active(root)) {
+    renv_ready <- handle_renv_init(root, renv)
+  } else {
+    renv_ready <- TRUE
+  }
+  if (isTRUE(renv_ready)) {
+    bootstrap_project_renv(root, config)
   }
 
   changed_rprofile <- ensure_rprofile_line(root, rprofile)
@@ -116,4 +125,19 @@ handle_renv_init <- function(root, renv) {
     call_renv_init(root)
   }
   invisible(TRUE)
+}
+
+bootstrap_project_renv <- function(root, config) {
+  package_names <- c("pak", "renv", "boosterpak")
+  install_specs <- c("pak", "renv", self_install_spec())
+  names(install_specs) <- package_names
+
+  missing <- missing_packages(package_names, root)
+  install_via(unname(install_specs[missing]), root)
+
+  if (isTRUE(config$settings$auto_snapshot %||% TRUE)) {
+    call_renv_snapshot(root, package_names)
+  }
+
+  invisible(package_names)
 }

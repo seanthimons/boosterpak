@@ -1,6 +1,6 @@
 test_that("built-in packs are discoverable", {
   packs <- list_packs(scope = "builtin", verbose = FALSE)
-  expect_setequal(packs$name, c("scaffold-analysis", "core", "example", "github-example"))
+  expect_setequal(packs$name, c("scaffold-analysis", "core", "eda", "example", "github-example"))
   expect_true(all(c("name", "description", "scope", "sources", "path") %in% names(packs)))
   expect_equal(
     packs$sources[packs$name == "github-example"],
@@ -15,6 +15,10 @@ test_that("packs resolve transitively", {
 test_that("built-in catalog matches v0.1 PRD contents", {
   expect_equal(
     boosterpak:::resolve_pack("core"),
+    c("pak", "renv")
+  )
+  expect_equal(
+    boosterpak:::resolve_pack("eda"),
     c("fs", "here", "janitor", "rio", "tidyverse", "digest")
   )
   expect_equal(boosterpak:::resolve_pack("github-example"), "ComptoxR")
@@ -190,7 +194,7 @@ test_that("GitHub extras are install specs but resolve to package-like names", {
 test_that("unknown pack errors include suggestion and grouped availability", {
   expect_error(
     boosterpak:::load_pack("exampel"),
-    regexp = "Did you mean.+example.+Built-in.+core.+User:.+Project:",
+    regexp = "Did you mean.+example.+Built-in.+core.+eda.+User:.+Project:",
     class = "rlang_error"
   )
 })
@@ -246,7 +250,7 @@ test_that("save_pack captures resolved project packages as a flat project pack",
   expect_equal(saved, normalizePath(file.path(root, "boosters", "packs", "project_baseline.toml"), winslash = "/", mustWork = FALSE))
   expect_equal(data$name, "project_baseline")
   expect_null(data$extends)
-  expect_setequal(data$packages, c("fs", "here", "janitor", "rio", "tidyverse", "cli", "boosterpak", "withr", "pointblank"))
+  expect_setequal(data$packages, c("pak", "renv", "cli", "boosterpak", "withr", "pointblank"))
   expect_equal(data$sources[["boosterpak"]], "seanthimons/boosterpak")
   expect_equal(data$sources[["pointblank"]], "rstudio/pointblank")
   expect_equal(boosterpak:::toml_string_array(data$functions, "functions"), character())
@@ -285,7 +289,7 @@ test_that("save_pack can fork one named pack and refuses overwrite by default", 
   saved <- save_pack("core_fork", from = "core", root = root, verbose = FALSE)
   data <- boosterpak:::read_toml_file(saved)
 
-  expect_equal(data$packages, c("fs", "here", "janitor", "rio", "tidyverse", "digest"))
+  expect_equal(data$packages, c("pak", "renv"))
   expect_error(
     save_pack("core_fork", from = "core", root = root, verbose = FALSE),
     "already exists"

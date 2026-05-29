@@ -79,7 +79,9 @@ This creates:
 
 The generated `boosters.toml` includes `boosterpak` itself in
 `[extras].declared`, so the package needed to run `sync()` is also captured in
-project intent and the project lockfile.
+project intent and the project lockfile. With `renv = "yes"`, `init()`
+bootstraps only `renv`, `pak`, and `boosterpak` into the project library and
+creates the initial lockfile when `auto_snapshot = true`.
 
 In non-interactive sessions, use explicit `renv` and `rprofile` arguments. The
 default `"ask"` mode never silently changes `.Rprofile` when user confirmation
@@ -107,6 +109,14 @@ boosterpak::add_pack("example")
 
 The `example` pack installs `cli`. `add_pack()` preserves unrelated comments and
 sections in `boosters.toml` while updating `[packs].declared`.
+For the former analysis baseline, add the `eda` pack explicitly:
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::add_pack("eda")
+```
+
 If the pack carries helper functions, `add_pack()` also copies the bundled
 `fn_*.R` files into `boosters/` and refuses to overwrite existing function files
 unless `overwrite_functions = TRUE`.
@@ -167,6 +177,28 @@ boosterpak::sync(mode = "restore")
 Restore mode requires both `boosters.toml` and `renv.lock`, calls
 `renv::restore()`, validates the manifest, and warns if direct declared packages
 are absent from the lockfile.
+
+## Troubleshooting boosterpak 0.5 init projects
+
+If a project was initialized with boosterpak 0.5 and, after restart,
+`boosterpak` is no longer found, run this once from the project without relying
+on `boosterpak` being loadable:
+
+```{r}
+#| echo: true
+#| eval: false
+install.packages("renv")
+renv::install(c("pak", "seanthimons/boosterpak"))
+renv::snapshot(packages = c("renv", "pak", "boosterpak"), prompt = FALSE)
+```
+
+Then restart R and run:
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::sync()
+```
 
 ## Inspect
 
