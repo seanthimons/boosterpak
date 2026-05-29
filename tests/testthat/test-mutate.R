@@ -48,3 +48,21 @@ test_that("multi-line pack declarations fail clearly instead of being corrupted"
   )
   expect_equal(readLines(path, warn = FALSE), before)
 })
+
+test_that("add_pack passes hydrate opt-out through to sync", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  hydrate_value <- NULL
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    sync = function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL) {
+      hydrate_value <<- hydrate
+    },
+    .package = "boosterpak"
+  )
+
+  add_pack("example", root = root, sync = TRUE, hydrate = FALSE, verbose = FALSE)
+
+  expect_false(hydrate_value)
+})

@@ -57,6 +57,26 @@ install_via <- function(packages, root = ".") {
   invisible(packages)
 }
 
+hydrate_via_renv <- function(packages, root = ".") {
+  if (length(packages) == 0) {
+    return(invisible(character()))
+  }
+  renv::hydrate(
+    project = root,
+    packages = packages,
+    library = renv::paths$library(project = root),
+    prompt = FALSE,
+    report = FALSE
+  )
+  invisible(packages)
+}
+
+plain_missing_packages <- function(packages, install_specs, missing) {
+  missing_specs <- install_specs[packages %in% missing]
+  missing_packages <- packages[packages %in% missing]
+  missing_packages[missing_specs == missing_packages]
+}
+
 missing_packages <- function(packages, root = ".") {
   lib <- renv::paths$library(project = root)
   installed <- vapply(packages, function(package) {

@@ -1,4 +1,4 @@
-mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TRUE, overwrite_functions = FALSE, remove_functions = FALSE, verbose = NULL) {
+mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TRUE, hydrate = TRUE, overwrite_functions = FALSE, remove_functions = FALSE, verbose = NULL) {
   check_verbose(verbose)
   action <- match.arg(action)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
@@ -32,7 +32,7 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
   }
 
   if (isTRUE(sync)) {
-    sync(mode = "apply", root = root, verbose = verbose)
+    sync(mode = "apply", root = root, hydrate = hydrate, verbose = verbose)
   } else if (should_emit(verbose)) {
     cli::cli_alert_success("{if (action == 'add') 'Added' else 'Removed'} pack {.val {name}} in {.file boosters.toml}.")
   }
@@ -44,13 +44,15 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
 #' @param name Pack name.
 #' @param root Project root.
 #' @param sync Whether to run additive sync after editing TOML.
+#' @param hydrate Whether additive sync should reuse packages from
+#'   renv-discoverable local libraries before downloading with pak.
 #' @param overwrite_functions Whether to overwrite existing function files
 #'   provided by the pack.
 #' @param verbose Whether to print routine summaries.
 #' @return Updated declared pack names, invisibly.
 #' @export
-add_pack <- function(name, root = ".", sync = TRUE, overwrite_functions = FALSE, verbose = NULL) {
-  mutate_pack(name, "add", root, sync, overwrite_functions = overwrite_functions, verbose = verbose)
+add_pack <- function(name, root = ".", sync = TRUE, hydrate = TRUE, overwrite_functions = FALSE, verbose = NULL) {
+  mutate_pack(name, "add", root, sync, hydrate = hydrate, overwrite_functions = overwrite_functions, verbose = verbose)
 }
 
 #' Remove a pack declaration

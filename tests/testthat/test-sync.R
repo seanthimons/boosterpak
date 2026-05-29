@@ -60,6 +60,134 @@ test_that("sync snapshots declared packages explicitly", {
   expect_setequal(snapshot_packages, c("pak", "renv", "boosterpak", "cli"))
 })
 
+test_that("sync hydrates missing plain-name packages before pak install", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  hydrated <- NULL
+  installed <- NULL
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".") c("pak", "renv", "boosterpak", "cli"),
+    hydrate_via_renv = function(packages, root = ".") {
+      hydrated <<- packages
+    },
+    install_via = function(specs, root = ".") {
+      installed <<- specs
+    },
+    call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+
+  expected_hydrated <- c("pak", "renv", "cli")
+  if (identical(boosterpak:::self_install_spec(), "boosterpak")) {
+    expected_hydrated <- c(expected_hydrated, "boosterpak")
+  }
+  expect_setequal(hydrated, expected_hydrated)
+  expect_setequal(installed, c("pak", "renv", boosterpak:::self_install_spec(), "cli"))
+})
+
+test_that("sync rechecks missing packages after hydration before calling pak", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  calls <- 0
+  installed <- NULL
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".") {
+      calls <<- calls + 1
+      if (calls == 1) c("pak", "renv", "boosterpak", "cli") else "boosterpak"
+    },
+    hydrate_via_renv = function(packages, root = ".") TRUE,
+    install_via = function(specs, root = ".") {
+      installed <<- specs
+    },
+    call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+
+  expect_equal(calls, 2)
+  expect_equal(installed, boosterpak:::self_install_spec())
+})
+
+test_that("sync hydrate false skips hydration", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  hydrated <- FALSE
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".") c("pak", "renv", "boosterpak", "cli"),
+    hydrate_via_renv = function(packages, root = ".") {
+      hydrated <<- TRUE
+    },
+    install_via = function(specs, root = ".") TRUE,
+    call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
+    .package = "boosterpak"
+  )
+
+  sync(root = root, hydrate = FALSE, verbose = FALSE)
+
+  expect_false(hydrated)
+})
+
+test_that("sync does not hydrate source-specific package specs", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("github-example", root = root, sync = FALSE, verbose = FALSE)
+  hydrated <- NULL
+  installed <- NULL
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".") "ComptoxR",
+    hydrate_via_renv = function(packages, root = ".") {
+      hydrated <<- packages
+    },
+    install_via = function(specs, root = ".") {
+      installed <<- specs
+    },
+    call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+
+  expect_equal(hydrated, character())
+  expect_equal(installed, "seanthimons/ComptoxR")
+})
+
+test_that("sync restore does not hydrate", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  jsonlite::write_json(
+    list(R = list(Version = "4.5.1"), Packages = list(pak = list(Package = "pak"), renv = list(Package = "renv"), boosterpak = list(Package = "boosterpak"))),
+    file.path(root, "renv.lock"),
+    auto_unbox = TRUE
+  )
+  hydrated <- FALSE
+
+  local_mocked_bindings(
+    call_renv_restore = function(root = ".") TRUE,
+    hydrate_via_renv = function(packages, root = ".") {
+      hydrated <<- TRUE
+    },
+    .package = "boosterpak"
+  )
+
+  sync(mode = "restore", root = root, verbose = FALSE)
+
+  expect_false(hydrated)
+})
+
 test_that("missing package detection checks the project renv library", {
   root <- withr::local_tempdir()
   lib <- renv::paths$library(project = root)

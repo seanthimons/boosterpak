@@ -19,7 +19,11 @@ test_that("built-in catalog matches v0.1 PRD contents", {
   )
   expect_equal(
     boosterpak:::resolve_pack("eda"),
-    c("fs", "here", "janitor", "rio", "tidyverse", "digest")
+    c("fs", "here", "janitor", "rio", "dplyr", "tidyr", "readr", "ggplot2", "stringr", "purrr", "lubridate", "scales", "glue", "digest", "skimr")
+  )
+  expect_equal(
+    boosterpak:::resolve_pack_functions("eda"),
+    c("ni", "my_skim", "theme_custom", "geo_mean")
   )
   expect_equal(boosterpak:::resolve_pack("github-example"), "ComptoxR")
   expect_equal(

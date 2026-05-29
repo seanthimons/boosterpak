@@ -2,10 +2,13 @@
 #'
 #' @param mode `"apply"` installs packages declared by `boosters.toml`; `"restore"` restores from `renv.lock`.
 #' @param root Project root.
+#' @param hydrate Whether additive apply mode should reuse packages from
+#'   renv-discoverable local libraries before downloading with pak. Restore
+#'   mode ignores this option and remains lockfile-exact.
 #' @param verbose Whether to print routine summaries.
 #' @return Resolved package names, invisibly.
 #' @export
-sync <- function(mode = c("apply", "restore"), root = ".", verbose = NULL) {
+sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL) {
   check_verbose(verbose)
   mode <- match.arg(mode)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
@@ -21,6 +24,10 @@ sync <- function(mode = c("apply", "restore"), root = ".", verbose = NULL) {
   packages <- resolve_config_packages(config, root)
   install_specs <- resolve_config_install_specs(config, root)
   missing <- missing_packages(packages, root)
+  if (isTRUE(hydrate)) {
+    hydrate_via_renv(plain_missing_packages(packages, install_specs, missing), root)
+    missing <- missing_packages(packages, root)
+  }
   missing_specs <- install_specs[packages %in% missing]
   install_via(missing_specs, root)
   sync_functions(config, root)

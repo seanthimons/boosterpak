@@ -4,12 +4,16 @@
 \alias{sync}
 \title{Synchronize a boosterpak project}
 \usage{
-sync(mode = c("apply", "restore"), root = ".", verbose = NULL)
+sync(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL)
 }
 \arguments{
 \item{mode}{\code{"apply"} installs packages declared by \code{boosters.toml}; \code{"restore"} restores from \code{renv.lock}.}
 
 \item{root}{Project root.}
+
+\item{hydrate}{Whether additive apply mode should reuse packages from
+renv-discoverable local libraries before downloading with pak. Restore
+mode ignores this option and remains lockfile-exact.}
 
 \item{verbose}{Whether to print routine summaries.}
 }

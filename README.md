@@ -2,7 +2,7 @@
 
 <img src="man/figures/boosterpak_hex.png" alt="boosterpak hex logo" align="right" width="140"/>
 
-`boosterpak` is an R package for declaring project package intent in a human-edited `boosters.toml` file. It resolves named "booster" packs from project, user, and built-in scopes, installs missing packages with `pak`, and uses `renv` for project-local libraries and lockfiles.
+`boosterpak` is an R package for declaring project package intent in a human-edited `boosters.toml` file. It resolves named "booster" packs from project, user, and built-in scopes, reuses locally available packages with `renv::hydrate()` when possible, installs anything still missing with `pak`, and uses `renv` for project-local libraries and lockfiles.
 
 ## 1. Install pak
 
@@ -40,23 +40,25 @@ flowchart TD
   C --> E(["Run add_function()"])
   D --> F(["Run sync()"])
   E --> F
-  F --> G[Packages installed in renv]
-  F --> H[Helper files copied into boosters]
-  G --> I([Edit code and helper files])
-  H --> I
-  I --> J(["Run save_pack()"])
-  J --> K[Flat package pack or nested function pack]
-  K --> L(["Run promote_pack()"])
-  L --> M(["Reuse with add_pack() in another project"])
-  M --> D
+  F --> G[Hydrate from local libraries]
+  G --> H[Install remaining with pak]
+  H --> I[Snapshot declared packages]
+  F --> J[Helper files copied into boosters]
+  I --> K([Edit code and helper files])
+  J --> K
+  K --> L(["Run save_pack()"])
+  L --> M[Flat package pack or nested function pack]
+  M --> N(["Run promote_pack()"])
+  N --> O(["Reuse with add_pack() in another project"])
+  O --> D
 
   classDef userAction fill:#e8f3ff,stroke:#1f6feb,color:#0b1f3a;
   classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
-  class A,B,C,D,E,F,I,J,L,M userAction;
-  class G,H,K packageAction;
+  class A,B,C,D,E,F,K,L,N,O userAction;
+  class G,H,I,J,M packageAction;
 ```
 
-The usual loop is to initialize once, add packs and helper functions as project intent, run `sync()`, then capture a useful baseline with `save_pack()`. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
+The usual loop is to initialize once, add packs and helper functions as project intent, run `sync()`, then capture a useful baseline with `save_pack()`. Additive installs hydrate plain-name packages from local/user libraries before downloading, then install any remaining packages with `pak`. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
 
 ## Add a Pack
 
@@ -67,7 +69,7 @@ boosterpak::add_pack("example")
 The built-in pack catalog contains:
 
 -   `core`: minimal bootstrap dependencies, `pak` and `renv`.
--   `eda`: `fs`, `here`, `janitor`, `rio`, `tidyverse`, and `digest`.
+-   `eda`: analysis helpers including `fs`, `here`, `janitor`, `rio`, core tidyverse packages, `scales`, `glue`, `digest`, `skimr`, and bundled helper functions.
 -   `example`: small documented example that installs `cli`.
 -   `scaffold-analysis`: installs `fs` and `here` and carries a helper for a compact analysis folder scaffold.
 -   `github-example`: installs `ComptoxR` from `seanthimons/ComptoxR`.
@@ -87,6 +89,8 @@ In this pack, `ggplot2` and `patchwork` install by package name, while `ggtext` 
 
 Pack mutation is additive. Removing a pack updates `boosters.toml` and can run sync, but it does not uninstall packages.
 
+By default, `add_pack()` and `sync(mode = "apply")` use `hydrate = TRUE`, so ordinary CRAN-style package names can be copied from renv-discoverable local libraries before `pak` downloads anything. Source-specific declarations, such as GitHub remotes in `[sources]`, skip hydration and install through their declared spec. Use `hydrate = FALSE` for stricter first-run installs that should go straight to `pak`.
+
 ## Capture and Reuse Packs
 
 ``` r
@@ -102,7 +106,7 @@ boosterpak::promote_pack("project_baseline")
 boosterpak::sync(mode = "restore")
 ```
 
-`sync(mode = "apply")` treats `boosters.toml` as intent and `renv.lock` as downstream output. `sync(mode = "restore")` is the explicit path for exact lockfile restoration.
+`sync(mode = "apply")` treats `boosters.toml` as intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate.
 
 ## Troubleshooting 0.5 Init Projects
 

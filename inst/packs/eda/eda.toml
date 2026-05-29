@@ -15,4 +15,6 @@ packages = [
   "scales",
   "glue",
   "digest",
+  "skimr",
 ]
+functions = ["ni", "my_skim", "theme_custom", "geo_mean"]

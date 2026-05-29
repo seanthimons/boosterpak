@@ -11,8 +11,9 @@ vignette: >
 ---
 
 `boosterpak` adds a small intent layer above `pak` and `renv`. A project declares
-the packs it wants in `boosters.toml`; `boosterpak::sync()` resolves those packs
-and installs missing packages into the active project-local `renv` library.
+the packs it wants in `boosters.toml`; `boosterpak::sync()` resolves those packs,
+hydrates plain-name packages from local libraries when possible, and installs
+anything still missing into the active project-local `renv` library.
 Packs can also carry exact copied helper files, so a useful project setup can be
 reused without separating "packages" from customized `boosters/fn_*.R` files.
 
@@ -26,20 +27,22 @@ flowchart TD
   C --> E(["Run add_function()"])
   D --> F(["Run sync()"])
   E --> F
-  F --> G[Packages installed in renv]
-  F --> H[Helper files copied into boosters]
-  G --> I([Edit code and helper files])
-  H --> I
-  I --> J(["Run save_pack()"])
-  J --> K[Flat package pack or nested function pack]
-  K --> L(["Run promote_pack()"])
-  L --> M(["Reuse with add_pack() in another project"])
-  M --> D
+  F --> G[Hydrate from local libraries]
+  G --> H[Install remaining with pak]
+  H --> I[Snapshot declared packages]
+  F --> J[Helper files copied into boosters]
+  I --> K([Edit code and helper files])
+  J --> K
+  K --> L(["Run save_pack()"])
+  L --> M[Flat package pack or nested function pack]
+  M --> N(["Run promote_pack()"])
+  N --> O(["Reuse with add_pack() in another project"])
+  O --> D
 
   classDef userAction fill:#e8f3ff,stroke:#1f6feb,color:#0b1f3a;
   classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
-  class A,B,C,D,E,F,I,J,L,M userAction;
-  class G,H,K packageAction;
+  class A,B,C,D,E,F,K,L,N,O userAction;
+  class G,H,I,J,M packageAction;
 ```
 
 In practice, initialize once, add pack and function intent over time, run
@@ -95,9 +98,11 @@ would be required.
 boosterpak::sync()
 ```
 
-Apply mode is additive. It installs missing declared packages, materializes
-missing bundled or installed helper functions, and, when `auto_snapshot = true`,
-snapshots with `renv`.
+Apply mode is additive. It hydrates plain-name missing packages from
+renv-discoverable local libraries, installs anything still missing with `pak`,
+materializes missing bundled or installed helper functions, and, when
+`auto_snapshot = true`, snapshots with `renv`. Use `hydrate = FALSE` to skip
+local reuse for stricter first-run installs.
 
 ## Add a Pack
 
@@ -109,7 +114,9 @@ boosterpak::add_pack("example")
 
 The `example` pack installs `cli`. `add_pack()` preserves unrelated comments and
 sections in `boosters.toml` while updating `[packs].declared`.
-For the former analysis baseline, add the `eda` pack explicitly:
+For the analysis baseline of `fs`, `here`, `janitor`, `rio`, core tidyverse
+packages, `scales`, `glue`, `digest`, `skimr`, and bundled helper functions,
+add the `eda` pack explicitly:
 
 ```{r}
 #| echo: true
@@ -134,8 +141,8 @@ packages = ["ggplot2", "patchwork", "ggtext"]
 "ggtext" = "wilkelab/ggtext"
 ```
 
-Here, `ggplot2` and `patchwork` install by package name, while `ggtext` uses the
-GitHub source spec.
+Here, `ggplot2` and `patchwork` can hydrate or install by package name, while
+`ggtext` skips hydration and uses the GitHub source spec.
 
 ## Add a Helper Function
 
@@ -176,7 +183,7 @@ boosterpak::sync(mode = "restore")
 
 Restore mode requires both `boosters.toml` and `renv.lock`, calls
 `renv::restore()`, validates the manifest, and warns if direct declared packages
-are absent from the lockfile.
+are absent from the lockfile. It remains lockfile-exact and does not hydrate.
 
 ## Troubleshooting boosterpak 0.5 init projects
 

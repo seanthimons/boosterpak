@@ -133,6 +133,8 @@ bootstrap_project_renv <- function(root, config) {
   names(install_specs) <- package_names
 
   missing <- missing_packages(package_names, root)
+  hydrate_via_renv(intersect(missing, c("pak", "renv")), root)
+  missing <- missing_packages(package_names, root)
   install_via(unname(install_specs[missing]), root)
 
   if (isTRUE(config$settings$auto_snapshot %||% TRUE)) {

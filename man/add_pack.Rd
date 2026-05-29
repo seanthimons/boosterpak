@@ -8,6 +8,7 @@ add_pack(
   name,
   root = ".",
   sync = TRUE,
+  hydrate = TRUE,
   overwrite_functions = FALSE,
   verbose = NULL
 )
@@ -18,6 +19,9 @@ add_pack(
 \item{root}{Project root.}
 
 \item{sync}{Whether to run additive sync after editing TOML.}
+
+\item{hydrate}{Whether additive sync should reuse packages from
+renv-discoverable local libraries before downloading with pak.}
 
 \item{overwrite_functions}{Whether to overwrite existing function files
 provided by the pack.}
