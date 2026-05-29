@@ -28,20 +28,27 @@ project-local `renv`.
 
 ```mermaid
 flowchart TD
-  A[Start or clone project] --> B[Initialize boosterpak]
+  A[Start or clone project] --> B["Initialize boosterpak
+    <em>init()</em>"]
   B --> C[Add reusable intent]
-  C --> D[Add packs]
-  C --> E[Add helper functions]
-  D --> F[Sync project]
+  C --> D["Add packs
+    <em>add_pack()</em>"]
+  C --> E["Add helper functions
+    <em>add_function()</em>"]
+  D --> F["Sync project
+    <em>sync()</em>"]
   E --> F
   F --> G[Packages installed in renv]
   F --> H[Helper files copied into boosters]
   G --> I[Edit code and helper files]
   H --> I
-  I --> J[Save a reusable pack]
+  I --> J["Save a reusable pack
+    <em>save_pack()</em>"]
   J --> K[Pack TOML plus function sidecar]
-  K --> L[Promote to user scope]
-  L --> M[Reuse in another project]
+  K --> L["Promote to user scope
+    <em>promote_pack()</em>"]
+  L --> M["Reuse in another project
+    <em>add_pack()</em>"]
   M --> D
 ```
 
