@@ -2,7 +2,11 @@
 
 <img src="man/figures/boosterpak_hex.png" alt="boosterpak hex logo" align="right" width="140"/>
 
-`boosterpak` is an R package for declaring project package intent in a human-edited `boosters.toml` file. It resolves named "booster" packs from project, user, and built-in scopes, reuses locally available packages with `renv::hydrate()` when possible, installs anything still missing with `pak`, writes explicit startup `library()` calls to `boosters/attach.R`, and uses `renv` for project-local libraries and lockfiles.
+`boosterpak` installs reusable R project packs: typed bundles of package dependencies, optional source specs, startup attachment intent, and helper-function sidecars that make a project usable without turning it into a package. It is less than a package, but more than a fistful of copied files.
+
+`boosters.toml` is the project-local control file for those packs. It is not a general dependency-manifest standard and `boosterpak` does not depend on one. `pak` remains the installer, `renv` remains the lockfile and project-library layer, and `boosterpak` sits above them as a small capability-bundle layer for reusable setup conventions.
+
+Use `boosterpak` when the reusable thing is not just "these packages", but "these packages plus the helper functions, attachment choices, and setup conventions that make this kind of project ready to work in."
 
 ## 1. Install pak
 
@@ -35,7 +39,7 @@ boosterpak::sync()
 ```mermaid
 flowchart TD
   A([Start or clone project]) --> B(["Run init()"])
-  B --> C([Declare reusable intent])
+  B --> C([Declare reusable capability])
   C --> D(["Run add_pack()"])
   C --> E(["Run add_function()"])
   D --> F(["Run sync()"])
@@ -59,7 +63,9 @@ flowchart TD
   class G,H,A1,I,J,M packageAction;
 ```
 
-The usual loop is to initialize once, add packs and helper functions as project intent, run `sync()`, then capture a useful baseline with `save_pack()`. Additive installs hydrate plain-name packages from local/user libraries before downloading, install any remaining packages with `pak`, and write `boosters/attach.R` for startup `library()` calls. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
+The usual loop is to initialize once, add packs and helper functions as project capability intent, run `sync()`, then capture a useful baseline with `save_pack()`. Additive installs hydrate plain-name packages from local/user libraries before downloading, install any remaining packages with `pak`, and write `boosters/attach.R` for startup `library()` calls. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
+
+A pack is deliberately typed and reviewable. Today that means packages, optional `[sources]`, optional `attach`, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.
 
 ## Add a Pack
 
@@ -106,13 +112,23 @@ boosterpak::promote_pack("project_baseline")
 
 `save_pack()` writes a TOML snapshot of the currently resolved project packages and, by default, the helper functions listed in `[functions].installed`. Use `functions = "all"` to capture every `boosters/fn_*.R` file, `functions = "none"` for a flat package-only pack, `from = "core"` to fork one existing pack, or `scope = "user"` to write directly to the machine-wide user pack directory. `promote_pack()` and `demote_pack()` copy flat package-only packs as single files and nested function-bearing packs as whole directories.
 
+## Related Tools and Boundaries
+
+`boosterpak` is intentionally narrow:
+
+- `pak` resolves and installs package specs.
+- `renv` owns project libraries, lockfiles, and exact version restoration.
+- `boosterpak` owns reusable project capability packs: dependencies plus the small helper files, attachment choices, and setup conventions that are too project-shaped for a package and too reusable for copy-paste.
+
+That boundary is the point. `boosterpak` uses TOML for its own pack and project config, but it is not trying to be a general project requirements format.
+
 ## Restore from a Lockfile
 
 ``` r
 boosterpak::sync(mode = "restore")
 ```
 
-`sync(mode = "apply")` treats `boosters.toml` as intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`, then writes `boosters/attach.R` before snapshot. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate.
+`sync(mode = "apply")` treats `boosters.toml` as reusable setup intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`, then writes `boosters/attach.R` before snapshot. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate.
 
 ## Troubleshooting 0.5 Init Projects
 

@@ -1,6 +1,7 @@
 # boosterpak 0.6.0.9000
 
-- Added `create_pack()` for guided pack authoring from declared package intent. It writes pack TOML, optional source specs, explicit attach intent, and an optional nested function-template sidecar without mutating `boosters.toml` or running `sync()`.
+- Documentation now frames `boosterpak` as reusable project capability packs: dependencies plus helper files, attachment choices, and setup conventions. The package uses TOML for its own config, but is not a general dependency-manifest standard.
+- Added `create_pack()` for guided pack authoring from a declared package set. It writes pack TOML, optional source specs, explicit attach intent, and an optional nested function-template sidecar without mutating `boosters.toml` or running `sync()`.
 - `sync(mode = "apply")` now writes a managed `boosters/attach.R` file with static `library()` calls for startup attachment intent. Packs can declare `attach = true`, `attach = false`, or `attach = ["pkg"]`; missing `attach` attaches direct pack packages by default.
 - New top-level `[attach]` config supports `enabled`, `declared`, and `exclude`. Workflow packages from `core` and `[extras]` are installed but not attached unless explicitly listed in `[attach].declared`.
 - The recommended `.Rprofile` hook now sources `boosters/attach.R` before `boosters/fn_*.R` helper files, and `status()` reports attach state.

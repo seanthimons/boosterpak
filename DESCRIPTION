@@ -1,13 +1,15 @@
 Package: boosterpak
-Title: Declarative Project Package Bundles
+Title: Reusable Project Capability Packs
 Version: 0.6.0.9000
 Authors@R: 
     person("Sean", "Thimons", email = "sxthimons@gmail.com", role = c("aut", "cre"))
 Author: Sean Thimons [aut, cre]
 Maintainer: Sean Thimons <sxthimons@gmail.com>
-Description: Provides a TOML manifest for declaring R project package bundles,
-    resolving built-in, user, and project packs, and applying them through pak
-    and renv.
+Description: Provides reusable project packs for bootstrapping R workflows. A
+    pack is a typed bundle of package dependencies, optional source
+    specifications, startup attachment intent, helper-function sidecars, and
+    project-local setup conventions. Applies packs with 'pak' and 'renv' while
+    leaving exact version restoration to 'renv' lockfiles.
 License: MIT + file LICENSE
 URL: https://seanthimons.github.io/boosterpak/, https://github.com/seanthimons/boosterpak
 BugReports: https://github.com/seanthimons/boosterpak/issues

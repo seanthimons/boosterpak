@@ -31,5 +31,5 @@ create_pack(
 Path to the created pack, invisibly.
 }
 \description{
-\code{create_pack()} writes a pack manifest from package specs you provide. It does not add the pack to \code{boosters.toml}, install packages, sync \code{renv}, or copy functions into the project.
+\code{create_pack()} writes a typed pack spec from package specs you provide. It does not add the pack to \code{boosters.toml}, install packages, sync \code{renv}, or copy functions into the project.
 }
