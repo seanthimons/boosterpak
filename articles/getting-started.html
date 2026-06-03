@@ -78,7 +78,9 @@
 
 
 
-    <p><code>boosterpak</code> adds a small intent layer above <code>pak</code> and <code>renv</code>. A project declares the packs it wants in <code>boosters.toml</code>; <code><a href="../reference/sync.html">boosterpak::sync()</a></code> resolves those packs, hydrates plain-name packages from local libraries when possible, and installs anything still missing into the active project-local <code>renv</code> library. It also writes <code>boosters/attach.R</code> with explicit startup <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls for packages intended to be attached. Packs can also carry exact copied helper files, so a useful project setup can be reused without separating “packages” from customized <code>boosters/fn_*.R</code> files.</p>
+    <p><code>boosterpak</code> installs reusable R project packs: typed bundles of package dependencies, optional source specs, startup attachment intent, and helper-function sidecars that make a project usable without turning it into a package. It is less than a package, but more than a fistful of copied files.</p>
+<p><code>boosters.toml</code> is the project-local control file for those packs. It is not a general dependency-manifest standard and <code>boosterpak</code> does not depend on one. <code>pak</code> remains the installer, <code>renv</code> remains the lockfile and project-library layer, and <code>boosterpak</code> sits above them as a small capability-bundle layer for reusable setup conventions.</p>
+<p>A project declares the packs it wants in <code>boosters.toml</code>; <code><a href="../reference/sync.html">boosterpak::sync()</a></code> resolves those packs, hydrates plain-name packages from local libraries when possible, and installs anything still missing into the active project-local <code>renv</code> library. It also writes <code>boosters/attach.R</code> with explicit startup <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls for packages intended to be attached. Packs can also carry exact copied helper files, so a useful project setup can be reused without separating “packages” from customized <code>boosters/fn_*.R</code> files.</p>
 <section class="level2"><h2 id="typical-workflow">Typical workflow<a class="anchor" aria-label="anchor" href="#typical-workflow"></a>
 </h2>
 <div class="cell" data-layout-align="default">
@@ -89,7 +91,7 @@
 <div>
 <pre class="mermaid mermaid-js">flowchart TD
   A([Start or clone project]) --&gt; B(["Run init()"])
-  B --&gt; C([Declare reusable intent])
+  B --&gt; C([Declare reusable capability])
   C --&gt; D(["Run add_pack()"])
   C --&gt; E(["Run add_function()"])
   D --&gt; F(["Run sync()"])
@@ -117,7 +119,8 @@
 </div>
 </div>
 </div>
-<p>In practice, initialize once, add pack and function intent over time, run <code><a href="../reference/sync.html">sync()</a></code> whenever the project should match that intent, then save and promote a pack when the setup is worth reusing.</p>
+<p>In practice, initialize once, add pack and function capability intent over time, run <code><a href="../reference/sync.html">sync()</a></code> whenever the project should match that intent, then save and promote a pack when the setup is worth reusing.</p>
+<p>A pack is deliberately typed and reviewable. Today that means packages, optional <code>[sources]</code>, optional <code>attach</code>, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.</p>
 </section><section class="level2"><h2 id="install-pak">1. Install pak<a class="anchor" aria-label="anchor" href="#install-pak"></a>
 </h2>
 <div class="cell">
@@ -189,13 +192,25 @@
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/promote_pack.html">promote_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p><code><a href="../reference/save_pack.html">save_pack()</a></code> captures the resolved package set and, by default, helper functions listed in <code>[functions].installed</code>. Use <code>functions = "all"</code> to capture every <code>boosters/fn_*.R</code> file, <code>functions = "none"</code> for a flat package-only pack, or a character vector for specific function names. <code><a href="../reference/promote_pack.html">promote_pack()</a></code> and <code><a href="../reference/demote_pack.html">demote_pack()</a></code> copy flat package-only packs as single files and nested function-bearing packs as whole directories.</p>
+</section><section class="level2"><h2 id="related-tools-and-boundaries">Related Tools and Boundaries<a class="anchor" aria-label="anchor" href="#related-tools-and-boundaries"></a>
+</h2>
+<p><code>boosterpak</code> is intentionally narrow:</p>
+<ul>
+<li>
+<code>pak</code> resolves and installs package specs.</li>
+<li>
+<code>renv</code> owns project libraries, lockfiles, and exact version restoration.</li>
+<li>
+<code>boosterpak</code> owns reusable project capability packs: dependencies plus the small helper files, attachment choices, and setup conventions that are too project-shaped for a package and too reusable for copy-paste.</li>
+</ul>
+<p>That boundary is the point. <code>boosterpak</code> uses TOML for its own pack and project config, but it is not trying to be a general project requirements format.</p>
 </section><section class="level2"><h2 id="restore-exact-versions">Restore Exact Versions<a class="anchor" aria-label="anchor" href="#restore-exact-versions"></a>
 </h2>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/sync.html">sync</a></span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"restore"</span><span class="op">)</span></span></code></pre></div>
 </div>
-<p>Restore mode requires both <code>boosters.toml</code> and <code>renv.lock</code>, calls <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code>, validates the manifest, and warns if direct declared packages are absent from the lockfile. It remains lockfile-exact and does not hydrate.</p>
+<p>Restore mode requires both <code>boosters.toml</code> and <code>renv.lock</code>, calls <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code>, validates the project config, and warns if direct declared packages are absent from the lockfile. It remains lockfile-exact and does not hydrate.</p>
 </section><section class="level2"><h2 id="troubleshooting-boosterpak-0-5-init-projects">Troubleshooting boosterpak 0.5 init projects<a class="anchor" aria-label="anchor" href="#troubleshooting-boosterpak-0-5-init-projects"></a>
 </h2>
 <p>If a project was initialized with boosterpak 0.5 and, after restart, <code>boosterpak</code> is no longer found, run this once from the project without relying on <code>boosterpak</code> being loadable:</p>
@@ -217,7 +232,7 @@
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/status.html">status</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/list_packs.html">list_packs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
-<p><code><a href="../reference/status.html">status()</a></code> reports whether the manifest exists and validates, what packs and packages resolve, whether project-local <code>renv</code> appears active, whether <code>renv.lock</code> exists, whether <code>boosters/attach.R</code> exists, and whether <code>.Rprofile</code> contains the startup hook.</p>
+<p><code><a href="../reference/status.html">status()</a></code> reports whether the project config exists and validates, what packs and packages resolve, whether project-local <code>renv</code> appears active, whether <code>renv.lock</code> exists, whether <code>boosters/attach.R</code> exists, and whether <code>.Rprofile</code> contains the startup hook.</p>
 </section><script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);

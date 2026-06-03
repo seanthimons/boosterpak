@@ -1,7 +1,18 @@
 # Getting started with boosterpak
 
-`boosterpak` adds a small intent layer above `pak` and `renv`. A project
-declares the packs it wants in `boosters.toml`;
+`boosterpak` installs reusable R project packs: typed bundles of package
+dependencies, optional source specs, startup attachment intent, and
+helper-function sidecars that make a project usable without turning it
+into a package. It is less than a package, but more than a fistful of
+copied files.
+
+`boosters.toml` is the project-local control file for those packs. It is
+not a general dependency-manifest standard and `boosterpak` does not
+depend on one. `pak` remains the installer, `renv` remains the lockfile
+and project-library layer, and `boosterpak` sits above them as a small
+capability-bundle layer for reusable setup conventions.
+
+A project declares the packs it wants in `boosters.toml`;
 [`boosterpak::sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
 resolves those packs, hydrates plain-name packages from local libraries
 when possible, and installs anything still missing into the active
@@ -16,7 +27,7 @@ separating “packages” from customized `boosters/fn_*.R` files.
 ``` mermaid
 flowchart TD
   A([Start or clone project]) --> B(["Run init()"])
-  B --> C([Declare reusable intent])
+  B --> C([Declare reusable capability])
   C --> D(["Run add_pack()"])
   C --> E(["Run add_function()"])
   D --> F(["Run sync()"])
@@ -40,11 +51,17 @@ flowchart TD
   class G,H,A1,I,J,M packageAction;
 ```
 
-In practice, initialize once, add pack and function intent over time,
-run
+In practice, initialize once, add pack and function capability intent
+over time, run
 [`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
 whenever the project should match that intent, then save and promote a
 pack when the setup is worth reusing.
+
+A pack is deliberately typed and reviewable. Today that means packages,
+optional `[sources]`, optional `attach`, optional copied helper
+functions, and optional extension from other packs. It is not an
+arbitrary file sprinkler; project-specific mess stays in the project,
+and only reusable setup invariants belong in a pack.
 
 ## 1. Install pak
 
@@ -175,6 +192,21 @@ and
 copy flat package-only packs as single files and nested function-bearing
 packs as whole directories.
 
+## Related Tools and Boundaries
+
+`boosterpak` is intentionally narrow:
+
+- `pak` resolves and installs package specs.
+- `renv` owns project libraries, lockfiles, and exact version
+  restoration.
+- `boosterpak` owns reusable project capability packs: dependencies plus
+  the small helper files, attachment choices, and setup conventions that
+  are too project-shaped for a package and too reusable for copy-paste.
+
+That boundary is the point. `boosterpak` uses TOML for its own pack and
+project config, but it is not trying to be a general project
+requirements format.
+
 ## Restore Exact Versions
 
 ``` r
@@ -183,8 +215,9 @@ boosterpak::sync(mode = "restore")
 
 Restore mode requires both `boosters.toml` and `renv.lock`, calls
 [`renv::restore()`](https://rstudio.github.io/renv/reference/restore.html),
-validates the manifest, and warns if direct declared packages are absent
-from the lockfile. It remains lockfile-exact and does not hydrate.
+validates the project config, and warns if direct declared packages are
+absent from the lockfile. It remains lockfile-exact and does not
+hydrate.
 
 ## Troubleshooting boosterpak 0.5 init projects
 
@@ -212,7 +245,7 @@ boosterpak::list_packs()
 ```
 
 [`status()`](https://seanthimons.github.io/boosterpak/reference/status.md)
-reports whether the manifest exists and validates, what packs and
+reports whether the project config exists and validates, what packs and
 packages resolve, whether project-local `renv` appears active, whether
 `renv.lock` exists, whether `boosters/attach.R` exists, and whether
 `.Rprofile` contains the startup hook.

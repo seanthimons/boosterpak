@@ -2,9 +2,13 @@
 
 ## boosterpak 0.6.0.9000
 
+- Documentation now frames `boosterpak` as reusable project capability
+  packs: dependencies plus helper files, attachment choices, and setup
+  conventions. The package uses TOML for its own config, but is not a
+  general dependency-manifest standard.
 - Added
   [`create_pack()`](https://seanthimons.github.io/boosterpak/reference/create_pack.md)
-  for guided pack authoring from declared package intent. It writes pack
+  for guided pack authoring from a declared package set. It writes pack
   TOML, optional source specs, explicit attach intent, and an optional
   nested function-template sidecar without mutating `boosters.toml` or
   running

@@ -1,6 +1,6 @@
 # Create a new pack from declared intent
 
-`create_pack()` writes a pack manifest from package specs you provide.
+`create_pack()` writes a typed pack spec from package specs you provide.
 It does not add the pack to `boosters.toml`, install packages, sync
 `renv`, or copy functions into the project.
 
