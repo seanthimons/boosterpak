@@ -1,6 +1,6 @@
 read_toml_file <- function(path) {
   data <- tryCatch(
-    toml::read_toml(path),
+    RcppTOML::parseTOML(path),
     error = function(err) {
       cli::cli_abort(c(
         "{.file {path}} is not valid TOML.",
@@ -12,14 +12,10 @@ read_toml_file <- function(path) {
 }
 
 normalize_toml_arrays <- function(x) {
+  if (is.null(x)) {
+    return(list())
+  }
   if (is.list(x) && !is.data.frame(x)) {
-    if (length(x) == 0) {
-      return(x)
-    }
-    if (all(vapply(x, is.character, logical(1))) && all(vapply(x, length, integer(1)) <= 1)) {
-      preserve_names <- !is.null(names(x)) && all(nzchar(names(x)))
-      return(unlist(x, use.names = preserve_names))
-    }
     return(lapply(x, normalize_toml_arrays))
   }
   x

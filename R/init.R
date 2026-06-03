@@ -119,7 +119,7 @@ parse_toml_string_array_literal <- function(x) {
   if (!nzchar(x)) {
     return(character())
   }
-  parsed <- tryCatch(toml::parse_toml(paste0("declared = [", x, "]"))$declared, error = function(err) NULL)
+  parsed <- tryCatch(RcppTOML::parseTOML(paste0("declared = [", x, "]"), fromFile = FALSE)$declared, error = function(err) NULL)
   if (is.null(parsed) || !is.character(parsed)) {
     return(NULL)
   }
