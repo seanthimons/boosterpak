@@ -31,7 +31,7 @@ reused without separating "packages" from customized `boosters/fn_*.R` files.
 
 ## Typical workflow
 
-```{mermaid}
+```mermaid
 flowchart TD
   A([Start or clone project]) --> B(["Run init()"])
   B --> C([Declare reusable capability])
