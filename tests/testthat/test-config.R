@@ -25,7 +25,12 @@ test_that("init writes v0.1 config and Rprofile hook when explicit", {
   expect_equal(config$attach$declared, list())
   expect_equal(config$attach$exclude, list())
   expect_equal(
-    vapply(config$extras$declared, boosterpak:::package_name_from_spec, character(1), USE.NAMES = FALSE),
+    vapply(
+      config$extras$declared,
+      boosterpak:::package_name_from_spec,
+      character(1),
+      USE.NAMES = FALSE
+    ),
     "boosterpak"
   )
   expect_silent(boosterpak:::validate_config(config, root))
@@ -34,45 +39,64 @@ test_that("init writes v0.1 config and Rprofile hook when explicit", {
 test_that("pack attach schema accepts documented shapes and rejects invalid types", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
-  dir.create(file.path(root, "boosters", "packs"), recursive = TRUE, showWarnings = FALSE)
+  dir.create(
+    file.path(root, "boosters", "packs"),
+    recursive = TRUE,
+    showWarnings = FALSE
+  )
 
-  writeLines(c(
-    'name = "attach_true"',
-    'description = "Attach all direct packages."',
-    'packages = ["cli"]',
-    "attach = true"
-  ), file.path(root, "boosters", "packs", "attach_true.toml"))
+  writeLines(
+    c(
+      'name = "attach_true"',
+      'description = "Attach all direct packages."',
+      'packages = ["cli"]',
+      "attach = true"
+    ),
+    file.path(root, "boosters", "packs", "attach_true.toml")
+  )
   expect_silent(boosterpak:::load_pack("attach_true", root))
 
-  writeLines(c(
-    'name = "attach_false"',
-    'description = "Attach no packages."',
-    'packages = ["cli"]',
-    "attach = false"
-  ), file.path(root, "boosters", "packs", "attach_false.toml"))
+  writeLines(
+    c(
+      'name = "attach_false"',
+      'description = "Attach no packages."',
+      'packages = ["cli"]',
+      "attach = false"
+    ),
+    file.path(root, "boosters", "packs", "attach_false.toml")
+  )
   expect_silent(boosterpak:::load_pack("attach_false", root))
 
-  writeLines(c(
-    'name = "attach_vector"',
-    'description = "Attach selected packages."',
-    'packages = ["cli", "glue"]',
-    'attach = ["glue"]'
-  ), file.path(root, "boosters", "packs", "attach_vector.toml"))
+  writeLines(
+    c(
+      'name = "attach_vector"',
+      'description = "Attach selected packages."',
+      'packages = ["cli", "glue"]',
+      'attach = ["glue"]'
+    ),
+    file.path(root, "boosters", "packs", "attach_vector.toml")
+  )
   expect_silent(boosterpak:::load_pack("attach_vector", root))
 
-  writeLines(c(
-    'name = "attach_missing"',
-    'description = "Attach defaults."',
-    'packages = ["cli"]'
-  ), file.path(root, "boosters", "packs", "attach_missing.toml"))
+  writeLines(
+    c(
+      'name = "attach_missing"',
+      'description = "Attach defaults."',
+      'packages = ["cli"]'
+    ),
+    file.path(root, "boosters", "packs", "attach_missing.toml")
+  )
   expect_silent(boosterpak:::load_pack("attach_missing", root))
 
-  writeLines(c(
-    'name = "attach_bad"',
-    'description = "Invalid attach."',
-    'packages = ["cli"]',
-    "attach = 1"
-  ), file.path(root, "boosters", "packs", "attach_bad.toml"))
+  writeLines(
+    c(
+      'name = "attach_bad"',
+      'description = "Invalid attach."',
+      'packages = ["cli"]',
+      "attach = 1"
+    ),
+    file.path(root, "boosters", "packs", "attach_bad.toml")
+  )
   expect_error(boosterpak:::load_pack("attach_bad", root), "attach")
 })
 
@@ -84,25 +108,31 @@ test_that("attach config validation rejects invalid top-level types", {
   lines[lines == "enabled = true"] <- 'enabled = "yes"'
   writeLines(lines, path)
 
-  expect_error(boosterpak:::validate_config(boosterpak:::read_config(root), root), "enabled")
+  expect_error(
+    boosterpak:::validate_config(boosterpak:::read_config(root), root),
+    "enabled"
+  )
 })
 
 test_that("init repairs generated beta manifests with boosterpak self extra", {
   root <- withr::local_tempdir()
-  writeLines(c(
-    "# keep this comment",
-    "[project]",
-    'name = "beta"',
-    "",
-    "[packs]",
-    'declared = ["core"]',
-    "",
-    "[extras]",
-    "declared = [] # keep inline",
-    "",
-    "[future]",
-    "value = true"
-  ), file.path(root, "boosters.toml"))
+  writeLines(
+    c(
+      "# keep this comment",
+      "[project]",
+      'name = "beta"',
+      "",
+      "[packs]",
+      'declared = ["core"]',
+      "",
+      "[extras]",
+      "declared = [] # keep inline",
+      "",
+      "[future]",
+      "value = true"
+    ),
+    file.path(root, "boosters.toml")
+  )
 
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
 
@@ -112,36 +142,53 @@ test_that("init repairs generated beta manifests with boosterpak self extra", {
   expect_match(lines[grep("^declared = ", lines)[2]], "boosterpak")
   config <- boosterpak:::read_config(root)
   expect_equal(
-    vapply(config$extras$declared, boosterpak:::package_name_from_spec, character(1), USE.NAMES = FALSE),
+    vapply(
+      config$extras$declared,
+      boosterpak:::package_name_from_spec,
+      character(1),
+      USE.NAMES = FALSE
+    ),
     "boosterpak"
   )
 })
 
 test_that("init leaves custom extras arrays unchanged", {
   root <- withr::local_tempdir()
-  writeLines(c(
-    "[project]",
-    'name = "custom"',
-    "",
-    "[packs]",
-    'declared = ["core"]',
-    "",
-    "[extras]",
-    "declared = [",
-    '  "cli"',
-    "]"
-  ), file.path(root, "boosters.toml"))
+  writeLines(
+    c(
+      "[project]",
+      'name = "custom"',
+      "",
+      "[packs]",
+      'declared = ["core"]',
+      "",
+      "[extras]",
+      "declared = [",
+      '  "cli"',
+      "]"
+    ),
+    file.path(root, "boosters.toml")
+  )
   before <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
 
-  expect_error(init(root = root, renv = "no", rprofile = "no", verbose = FALSE), NA)
+  expect_error(
+    init(root = root, renv = "no", rprofile = "no", verbose = FALSE),
+    NA
+  )
 
-  expect_equal(readLines(file.path(root, "boosters.toml"), warn = FALSE), before)
+  expect_equal(
+    readLines(file.path(root, "boosters.toml"), warn = FALSE),
+    before
+  )
 })
 
 test_that("self install spec follows install metadata", {
   expect_equal(
-    boosterpak:::self_install_spec(list(Package = "boosterpak", Built = "R 4.5.1")),
-    "boosterpak"
+    boosterpak:::self_install_spec(list(
+      Package = "boosterpak",
+      Built = "R 4.5.1"
+    )),
+    "seanthimons/boosterpak"
   )
   expect_equal(
     boosterpak:::self_install_spec(list(
@@ -160,7 +207,10 @@ test_that("self install spec follows install metadata", {
 
 test_that("init inserts Rprofile hook after renv activation", {
   root <- withr::local_tempdir()
-  writeLines(c("before <- TRUE", "source(\"renv/activate.R\")", "after <- TRUE"), file.path(root, ".Rprofile"))
+  writeLines(
+    c("before <- TRUE", "source(\"renv/activate.R\")", "after <- TRUE"),
+    file.path(root, ".Rprofile")
+  )
 
   init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
 
@@ -172,7 +222,10 @@ test_that("init inserts Rprofile hook after renv activation", {
 
 test_that("init upgrades legacy Rprofile hook without duplication", {
   root <- withr::local_tempdir()
-  writeLines(c("before <- TRUE", boosterpak:::legacy_rprofile_line(), "after <- TRUE"), file.path(root, ".Rprofile"))
+  writeLines(
+    c("before <- TRUE", boosterpak:::legacy_rprofile_line(), "after <- TRUE"),
+    file.path(root, ".Rprofile")
+  )
 
   init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
 
@@ -184,7 +237,10 @@ test_that("init upgrades legacy Rprofile hook without duplication", {
 
 test_that("init leaves existing Rprofile hook unchanged", {
   root <- withr::local_tempdir()
-  writeLines(c("before <- TRUE", boosterpak:::rprofile_line(), "after <- TRUE"), file.path(root, ".Rprofile"))
+  writeLines(
+    c("before <- TRUE", boosterpak:::rprofile_line(), "after <- TRUE"),
+    file.path(root, ".Rprofile")
+  )
   before <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
 
   init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
@@ -197,9 +253,15 @@ test_that("init does not overwrite existing boosters.toml", {
   writeLines(c("[project]", 'name = "kept"'), file.path(root, "boosters.toml"))
   before <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
 
-  expect_error(init(root = root, renv = "no", rprofile = "no", verbose = FALSE), NA)
+  expect_error(
+    init(root = root, renv = "no", rprofile = "no", verbose = FALSE),
+    NA
+  )
 
-  expect_equal(readLines(file.path(root, "boosters.toml"), warn = FALSE), before)
+  expect_equal(
+    readLines(file.path(root, "boosters.toml"), warn = FALSE),
+    before
+  )
 })
 
 test_that("init with renv yes loads existing project renv when inactive", {
@@ -216,7 +278,9 @@ test_that("init with renv yes loads existing project renv when inactive", {
     call_renv_init = function(root = ".") calls <<- c(calls, "init"),
     missing_packages = function(packages, root = ".") packages,
     install_via = function(specs, root = ".") installed <<- specs,
-    call_renv_snapshot = function(root = ".", packages = NULL) snapshotted <<- packages,
+    call_renv_snapshot = function(root = ".", packages = NULL) {
+      snapshotted <<- packages
+    },
     .package = "boosterpak"
   )
 
@@ -238,9 +302,13 @@ test_that("init with renv yes initializes, bootstraps only workflow packages, an
     has_project_renv = function(root = ".") FALSE,
     call_renv_init = function(root = ".") calls <<- c(calls, "init"),
     call_renv_load = function(root = ".") calls <<- c(calls, "load"),
-    missing_packages = function(packages, root = ".") packages[packages != "renv"],
+    missing_packages = function(packages, root = ".") {
+      packages[packages != "renv"]
+    },
     install_via = function(specs, root = ".") installed <<- specs,
-    call_renv_snapshot = function(root = ".", packages = NULL) snapshotted <<- packages,
+    call_renv_snapshot = function(root = ".", packages = NULL) {
+      snapshotted <<- packages
+    },
     .package = "boosterpak"
   )
 
@@ -249,7 +317,9 @@ test_that("init with renv yes initializes, bootstraps only workflow packages, an
   expect_equal(calls, "init")
   expect_setequal(installed, c("pak", boosterpak:::self_install_spec()))
   expect_setequal(snapshotted, c("pak", "renv", "boosterpak"))
-  expect_false(any(c("fs", "here", "janitor", "rio", "tidyverse", "digest") %in% installed))
+  expect_false(any(
+    c("fs", "here", "janitor", "rio", "tidyverse", "digest") %in% installed
+  ))
 })
 
 test_that("init with renv yes skips bootstrap snapshot when auto_snapshot is false", {
@@ -267,7 +337,9 @@ test_that("init with renv yes skips bootstrap snapshot when auto_snapshot is fal
     call_renv_init = function(root = ".") TRUE,
     missing_packages = function(packages, root = ".") character(),
     install_via = function(specs, root = ".") TRUE,
-    call_renv_snapshot = function(root = ".", packages = NULL) snapshotted <<- TRUE,
+    call_renv_snapshot = function(root = ".", packages = NULL) {
+      snapshotted <<- TRUE
+    },
     .package = "boosterpak"
   )
 
@@ -321,7 +393,9 @@ test_that("status reports broader package, pack, and function state", {
   writeLines(c(readLines(path, warn = FALSE), "# local edit"), path)
 
   local_mocked_bindings(
-    missing_packages = function(packages, root = ".") packages[packages %in% "cli"],
+    missing_packages = function(packages, root = ".") {
+      packages[packages %in% "cli"]
+    },
     .package = "boosterpak"
   )
 
@@ -365,7 +439,10 @@ test_that("v0.1 settings validation accepts documented shapes", {
   lines <- c(lines, "", "[settings.camcorder]", "enabled = false")
   writeLines(lines, path)
 
-  expect_silent(boosterpak:::validate_config(boosterpak:::read_config(root), root))
+  expect_silent(boosterpak:::validate_config(
+    boosterpak:::read_config(root),
+    root
+  ))
 })
 
 test_that("v0.1 settings validation rejects invalid setting types", {
@@ -395,7 +472,10 @@ test_that("unknown TOML keys warn instead of erroring", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
   path <- file.path(root, "boosters.toml")
-  writeLines(c(readLines(path, warn = FALSE), "", "[future]", "value = true"), path)
+  writeLines(
+    c(readLines(path, warn = FALSE), "", "[future]", "value = true"),
+    path
+  )
 
   expect_warning(
     boosterpak:::validate_config(boosterpak:::read_config(root), root),
