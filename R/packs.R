@@ -532,6 +532,12 @@ list_packs <- function(scope = NULL, root = ".", verbose = NULL) {
       cli::cli_alert_info("No packs found.")
     } else {
       cli::cli_h1("Available booster packs")
+      locations <- pack_paths(root)
+      for (pack_scope in intersect(names(locations), unique(packs$scope))) {
+        cli::cli_alert_info(
+          "{pack_scope} packs: {.path {locations[[pack_scope]]}}"
+        )
+      }
       apply(packs, 1, function(row) {
         source_text <- if (nzchar(row[["sources"]])) {
           paste0(" sources: ", row[["sources"]])
