@@ -277,6 +277,7 @@ test_that("init with renv yes loads existing project renv when inactive", {
     call_renv_load = function(root = ".") calls <<- c(calls, "load"),
     call_renv_init = function(root = ".") calls <<- c(calls, "init"),
     missing_packages = function(packages, root = ".") packages,
+    install_pak_via_renv = function(root = ".") TRUE,
     install_via = function(specs, root = ".") installed <<- specs,
     call_renv_snapshot = function(root = ".", packages = NULL) {
       snapshotted <<- packages
@@ -305,6 +306,7 @@ test_that("init with renv yes initializes, bootstraps only workflow packages, an
     missing_packages = function(packages, root = ".") {
       packages[packages != "renv"]
     },
+    install_pak_via_renv = function(root = ".") TRUE,
     install_via = function(specs, root = ".") installed <<- specs,
     call_renv_snapshot = function(root = ".", packages = NULL) {
       snapshotted <<- packages
@@ -320,6 +322,37 @@ test_that("init with renv yes initializes, bootstraps only workflow packages, an
   expect_false(any(
     c("fs", "here", "janitor", "rio", "tidyverse", "digest") %in% installed
   ))
+})
+
+test_that("bootstrap installs pak via renv when hydrate leaves it missing", {
+  root <- withr::local_tempdir()
+  pak_bootstrapped <- FALSE
+  install_order <- character()
+
+  local_mocked_bindings(
+    is_project_renv_active = function(root = ".") FALSE,
+    has_project_renv = function(root = ".") FALSE,
+    call_renv_init = function(root = ".") TRUE,
+    hydrate_via_renv = function(packages, root = ".") character(),
+    missing_packages = function(packages, root = ".") {
+      if (pak_bootstrapped) packages[packages != "pak"] else packages
+    },
+    install_pak_via_renv = function(root = ".") {
+      pak_bootstrapped <<- TRUE
+      install_order <<- c(install_order, "pak-via-renv")
+    },
+    install_via = function(specs, root = ".") {
+      install_order <<- c(install_order, paste("via-pak", specs))
+    },
+    call_renv_snapshot = function(root = ".", packages = NULL) NULL,
+    .package = "boosterpak"
+  )
+
+  init(root = root, renv = "yes", rprofile = "no", verbose = FALSE)
+
+  expect_true(pak_bootstrapped)
+  expect_equal(install_order[[1]], "pak-via-renv")
+  expect_false("via-pak pak" %in% install_order)
 })
 
 test_that("init with renv yes skips bootstrap snapshot when auto_snapshot is false", {

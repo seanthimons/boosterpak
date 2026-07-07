@@ -7,7 +7,12 @@
 #' @param verbose Whether to print routine summaries.
 #' @return Project setup paths, invisibly.
 #' @export
-init <- function(root = ".", renv = c("ask", "yes", "no"), rprofile = c("ask", "yes", "no"), verbose = NULL) {
+init <- function(
+  root = ".",
+  renv = c("ask", "yes", "no"),
+  rprofile = c("ask", "yes", "no"),
+  verbose = NULL
+) {
   check_verbose(verbose)
   renv <- match.arg(renv)
   rprofile <- match.arg(rprofile)
@@ -46,8 +51,12 @@ init <- function(root = ".", renv = c("ask", "yes", "no"), rprofile = c("ask", "
   changed_rprofile <- ensure_rprofile_line(root, rprofile)
 
   if (should_emit(verbose)) {
-    if (wrote_config) cli::cli_alert_success("Wrote {.file boosters.toml}.")
-    if (isTRUE(changed_rprofile)) cli::cli_alert_success("Updated {.file .Rprofile}.")
+    if (wrote_config) {
+      cli::cli_alert_success("Wrote {.file boosters.toml}.")
+    }
+    if (isTRUE(changed_rprofile)) {
+      cli::cli_alert_success("Updated {.file .Rprofile}.")
+    }
   }
 
   invisible(list(config = config_path, rprofile_changed = changed_rprofile))
@@ -91,24 +100,37 @@ repair_self_extra <- function(path) {
 
   declared_idx <- start + declared_rel[[1]] - 1L
   declared_line <- lines[[declared_idx]]
-  array_match <- regexec("^(\\s*declared\\s*=\\s*)\\[(.*)\\](\\s*(#.*)?)$", declared_line)
+  array_match <- regexec(
+    "^(\\s*declared\\s*=\\s*)\\[(.*)\\](\\s*(#.*)?)$",
+    declared_line
+  )
   parts <- regmatches(declared_line, array_match)[[1]]
   if (length(parts) == 0) {
-    cli::cli_alert_info("Leaving existing {.file boosters.toml} unchanged; [extras].declared is not a generated single-line array.")
+    cli::cli_alert_info(
+      "Leaving existing {.file boosters.toml} unchanged; [extras].declared is not a generated single-line array."
+    )
     return(invisible(FALSE))
   }
 
   existing <- parse_toml_string_array_literal(parts[[3]])
   if (is.null(existing)) {
-    cli::cli_alert_info("Leaving existing {.file boosters.toml} unchanged; [extras].declared is custom TOML.")
+    cli::cli_alert_info(
+      "Leaving existing {.file boosters.toml} unchanged; [extras].declared is custom TOML."
+    )
     return(invisible(FALSE))
   }
-  if ("boosterpak" %in% vapply(existing, package_name_from_spec, character(1), USE.NAMES = FALSE)) {
+  if (
+    "boosterpak" %in%
+      vapply(existing, package_name_from_spec, character(1), USE.NAMES = FALSE)
+  ) {
     return(invisible(FALSE))
   }
 
   next_values <- c(existing, self_install_spec())
-  rendered <- paste(sprintf('"%s"', vapply(next_values, escape_toml_string, character(1))), collapse = ", ")
+  rendered <- paste(
+    sprintf('"%s"', vapply(next_values, escape_toml_string, character(1))),
+    collapse = ", "
+  )
   lines[[declared_idx]] <- sprintf("%s[%s]%s", parts[[2]], rendered, parts[[4]])
   writeLines(lines, path, useBytes = TRUE)
   invisible(TRUE)
@@ -119,7 +141,13 @@ parse_toml_string_array_literal <- function(x) {
   if (!nzchar(x)) {
     return(character())
   }
-  parsed <- tryCatch(RcppTOML::parseTOML(paste0("declared = [", x, "]"), fromFile = FALSE)$declared, error = function(err) NULL)
+  parsed <- tryCatch(
+    RcppTOML::parseTOML(
+      paste0("declared = [", x, "]"),
+      fromFile = FALSE
+    )$declared,
+    error = function(err) NULL
+  )
   if (is.null(parsed) || !is.character(parsed)) {
     return(NULL)
   }
@@ -132,10 +160,15 @@ handle_renv_init <- function(root, renv) {
   }
   if (identical(renv, "ask")) {
     if (!interactive()) {
-      cli::cli_alert_info("No project-local renv found. Use {.code renv = 'yes'} to initialize one.")
+      cli::cli_alert_info(
+        "No project-local renv found. Use {.code renv = 'yes'} to initialize one."
+      )
       return(invisible(FALSE))
     }
-    answer <- utils::menu(c("Yes", "No"), title = "Initialize project-local renv now?")
+    answer <- utils::menu(
+      c("Yes", "No"),
+      title = "Initialize project-local renv now?"
+    )
     if (!identical(answer, 1L)) {
       return(invisible(FALSE))
     }
@@ -156,6 +189,10 @@ bootstrap_project_renv <- function(root, config) {
   missing <- missing_packages(package_names, root)
   hydrate_via_renv(intersect(missing, c("pak", "renv")), root)
   missing <- missing_packages(package_names, root)
+  if ("pak" %in% missing) {
+    install_pak_via_renv(root)
+    missing <- missing_packages(package_names, root)
+  }
   install_via(unname(install_specs[missing]), root)
 
   if (isTRUE(config$settings$auto_snapshot %||% TRUE)) {

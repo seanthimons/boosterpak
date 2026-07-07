@@ -5,8 +5,10 @@ is_project_renv_active <- function(root = ".") {
     return(FALSE)
   }
   lib <- renv::paths$library(project = root)
-  any(normalizePath(.libPaths(), winslash = "/", mustWork = FALSE) ==
-    normalizePath(lib, winslash = "/", mustWork = FALSE))
+  any(
+    normalizePath(.libPaths(), winslash = "/", mustWork = FALSE) ==
+      normalizePath(lib, winslash = "/", mustWork = FALSE)
+  )
 }
 
 has_project_renv <- function(root = ".") {
@@ -17,10 +19,13 @@ has_project_renv <- function(root = ".") {
 
 ensure_project_renv <- function(root = ".") {
   if (!is_project_renv_active(root)) {
-    cli::cli_abort(c(
-      "No active project-local renv library was found.",
-      "i" = "Run {.code boosterpak::init(renv = 'yes')} to bootstrap the project renv, or run {.code renv::init()} and restart R in the project."
-    ), call = NULL)
+    cli::cli_abort(
+      c(
+        "No active project-local renv library was found.",
+        "i" = "Run {.code boosterpak::init(renv = 'yes')} to bootstrap the project renv, or run {.code renv::init()} and restart R in the project."
+      ),
+      call = NULL
+    )
   }
   invisible(TRUE)
 }
@@ -57,6 +62,13 @@ install_via <- function(packages, root = ".") {
   invisible(packages)
 }
 
+install_pak_via_renv <- function(root = ".") {
+  old <- setwd(root)
+  on.exit(setwd(old), add = TRUE)
+  renv::install("pak", prompt = FALSE)
+  invisible("pak")
+}
+
 hydrate_via_renv <- function(packages, root = ".") {
   if (length(packages) == 0) {
     return(invisible(character()))
@@ -79,8 +91,13 @@ plain_missing_packages <- function(packages, install_specs, missing) {
 
 missing_packages <- function(packages, root = ".") {
   lib <- renv::paths$library(project = root)
-  installed <- vapply(packages, function(package) {
-    file.exists(file.path(lib, package, "DESCRIPTION"))
-  }, logical(1), USE.NAMES = FALSE)
+  installed <- vapply(
+    packages,
+    function(package) {
+      file.exists(file.path(lib, package, "DESCRIPTION"))
+    },
+    logical(1),
+    USE.NAMES = FALSE
+  )
   packages[!installed]
 }
