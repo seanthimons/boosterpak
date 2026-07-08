@@ -128,7 +128,7 @@ That boundary is the point. `boosterpak` uses TOML for its own pack and project 
 boosterpak::sync(mode = "restore")
 ```
 
-`sync(mode = "apply")` treats `boosters.toml` as reusable setup intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`, then writes `boosters/attach.R` before snapshot. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate.
+`sync(mode = "apply")` treats `boosters.toml` as reusable setup intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`, then writes `boosters/attach.R` before snapshot. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate. For restoring a freshly cloned project on a new machine, see the "Restoring a project on a new machine" vignette: run `renv::restore()` first (it installs `boosterpak` itself from the lockfile), restart R, then `boosterpak::sync(mode = "restore")`.
 
 ## Troubleshooting 0.5 Init Projects
 

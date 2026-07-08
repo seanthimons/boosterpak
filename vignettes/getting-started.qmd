@@ -225,6 +225,10 @@ Restore mode requires both `boosters.toml` and `renv.lock`, calls
 packages are absent from the lockfile. It remains lockfile-exact and does not
 hydrate.
 
+For the full clone-to-working walkthrough on a new machine, including the
+bootstrap order when `boosterpak` is not installed yet, see
+`vignette("restoring-a-project")`.
+
 ## Troubleshooting boosterpak 0.5 init projects
 
 If a project was initialized with boosterpak 0.5 and, after restart,

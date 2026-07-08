@@ -1,0 +1,136 @@
+---
+title: "Restoring a project on a new machine"
+format: html
+execute:
+  warning: false
+  message: false
+vignette: >
+  %\VignetteIndexEntry{Restoring a project on a new machine}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+This vignette covers the clone path: a boosterpak project that already works on
+one machine, freshly cloned from a git remote onto another. The goal is to get
+from `git clone` to a working session without re-running project setup.
+
+The short version:
+
+```{r}
+#| echo: true
+#| eval: false
+# In R, from the cloned project directory:
+renv::restore()
+
+# Restart R, then:
+boosterpak::sync(mode = "restore")
+boosterpak::status()
+```
+
+Do not re-run `init()`. The project is already initialized; `sync()` is the
+restore verb.
+
+## What travels with the repo
+
+A boosterpak project commits its intent and its lockfile, not its installed
+environment. A clone brings:
+
+- `boosters.toml`, the project control file.
+- `boosters/packs/`, the project-local pack sidecars.
+- `boosters/fn_*.R`, materialized helper functions, including any local edits.
+- `boosters/attach.R`, the managed startup attachment file.
+- `renv.lock`, the exact package versions.
+- `.Rprofile` with the renv activation line and the boosterpak startup hook.
+- `renv/activate.R`, the renv bootstrap script.
+
+A clone does not bring:
+
+- The renv project library. Packages must be reinstalled.
+- The machine-wide user pack directory. Packs promoted with `promote_pack()`
+  live outside the repo, but the project does not need them to restore:
+  `add_pack()` already materialized every declared pack into
+  `boosters/packs/`.
+
+## 1. Install R and open the project
+
+Install R on the new machine, ideally the version recorded in the `"R"` field
+of `renv.lock`. Then start R in the cloned project directory. The committed
+`.Rprofile` sources `renv/activate.R`, which bootstraps renv into an empty
+project library automatically.
+
+The first startup may print errors from the boosterpak hook: `.Rprofile`
+sources `boosters/attach.R`, whose `library()` calls refer to packages that are
+not installed yet. These are harmless and disappear after restore.
+
+## 2. Restore the library from the lockfile
+
+`boosterpak` itself is not installed on this machine yet, so nothing
+boosterpak-shaped can run first. Restore through renv, which installs
+everything in the lockfile, including `boosterpak`. `init()` snapshots
+`renv`, `pak`, and `boosterpak` into the lockfile precisely so that a clone can
+bootstrap this way.
+
+```{r}
+#| echo: true
+#| eval: false
+renv::restore()
+```
+
+## 3. Reconcile the boosterpak layer
+
+Restart R so the freshly restored packages and the startup hook load cleanly,
+then run restore mode:
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::sync(mode = "restore")
+```
+
+Restore mode requires both `boosters.toml` and `renv.lock`, calls
+`renv::restore()`, validates the project config, and warns if direct declared
+packages are absent from the lockfile. It is lockfile-exact: it does not
+hydrate from local libraries, does not install anything beyond the lockfile,
+and does not rewrite `boosters/attach.R` or helper files. Helper functions and
+`attach.R` travel through git, so restore mode has nothing to materialize;
+local edits to `boosters/fn_*.R` are preserved because they are ordinary
+committed files.
+
+## 4. Verify
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::status()
+boosterpak::check_functions()
+```
+
+`status()` reports config validity, resolved packs and packages, missing direct
+packages, attach state, function drift, renv state, lockfile presence, and the
+`.Rprofile` hook. `check_functions()` compares materialized helper files
+against their pack sources.
+
+## What does not re-run in a clone
+
+- `init()` side effects. The project already has `boosters.toml`, the
+  `.Rprofile` hook, and renv infrastructure; there is nothing to initialize.
+- Pack `on_add` hooks. Hooks fire when a pack is newly declared by
+  `add_pack()`. In a clone, every pack is already declared in `boosters.toml`,
+  so `sync()` restores the environment without re-running project-scaffolding
+  side effects such as folder creation.
+
+## Troubleshooting: boosterpak absent from the lockfile
+
+Projects initialized with boosterpak 0.5 may not have `boosterpak` in
+`renv.lock`, so `renv::restore()` leaves it uninstalled. Bootstrap it once
+without relying on `boosterpak` being loadable:
+
+```{r}
+#| echo: true
+#| eval: false
+install.packages("renv")
+renv::install(c("pak", "seanthimons/boosterpak"))
+renv::snapshot(packages = c("renv", "pak", "boosterpak"), prompt = FALSE)
+```
+
+Then restart R and run `boosterpak::sync()`.
