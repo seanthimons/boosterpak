@@ -1,6 +1,8 @@
 scaffold_analysis <- function(dirs = c(
   "data/raw",
   "data/processed",
+	"data/final",
+	"dev",
   "docs",
   "output/figures",
   "R",
