@@ -12,7 +12,6 @@
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><script src="getting-started_files/libs/quarto-html/popper.min.js"></script><script src="getting-started_files/libs/quarto-html/tippy.umd.min.js"></script><link href="getting-started_files/libs/quarto-html/tippy.css" rel="stylesheet">
 <link href="getting-started_files/libs/quarto-html/light-border.css" rel="stylesheet">
-<script src="getting-started_files/libs/quarto-diagram/mermaid.min.js"></script><script src="getting-started_files/libs/quarto-diagram/mermaid-init.js"></script><link href="getting-started_files/libs/quarto-diagram/mermaid.css" rel="stylesheet">
 <!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Getting started with boosterpak">
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script><script>
   document.addEventListener('DOMContentLoaded', function() {
@@ -83,13 +82,7 @@
 <p>A project declares the packs it wants in <code>boosters.toml</code>; <code><a href="../reference/sync.html">boosterpak::sync()</a></code> resolves those packs, hydrates plain-name packages from local libraries when possible, and installs anything still missing into the active project-local <code>renv</code> library. It also writes <code>boosters/attach.R</code> with explicit startup <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls for packages intended to be attached. Packs can also carry exact copied helper files, so a useful project setup can be reused without separating “packages” from customized <code>boosters/fn_*.R</code> files.</p>
 <section class="level2"><h2 id="typical-workflow">Typical workflow<a class="anchor" aria-label="anchor" href="#typical-workflow"></a>
 </h2>
-<div class="cell" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p>
-<figure class=""><p></p>
-<div>
-<pre class="mermaid mermaid-js">flowchart TD
+<pre class="mermaid"><code>flowchart TD
   A([Start or clone project]) --&gt; B(["Run init()"])
   B --&gt; C([Declare reusable capability])
   C --&gt; D(["Run add_pack()"])
@@ -112,31 +105,25 @@
   classDef userAction fill:#e8f3ff,stroke:#1f6feb,color:#0b1f3a;
   classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
   class A,B,C,D,E,F,K,L,N,O userAction;
-  class G,H,A1,I,J,M packageAction;
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
+  class G,H,A1,I,J,M packageAction;</code></pre>
 <p>In practice, initialize once, add pack and function capability intent over time, run <code><a href="../reference/sync.html">sync()</a></code> whenever the project should match that intent, then save and promote a pack when the setup is worth reusing.</p>
 <p>A pack is deliberately typed and reviewable. Today that means packages, optional <code>[sources]</code>, optional <code>attach</code>, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.</p>
 </section><section class="level2"><h2 id="install-pak">1. Install pak<a class="anchor" aria-label="anchor" href="#install-pak"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"pak"</span><span class="op">)</span></span></code></pre></div>
 </div>
 </section><section class="level2"><h2 id="install-boosterpak">2. Install boosterpak<a class="anchor" aria-label="anchor" href="#install-boosterpak"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pkg_install.html" class="external-link">pkg_install</a></span><span class="op">(</span><span class="st">"seanthimons/boosterpak"</span><span class="op">)</span></span></code></pre></div>
 </div>
 </section><section class="level2"><h2 id="initialize-the-project">3. Initialize the project<a class="anchor" aria-label="anchor" href="#initialize-the-project"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/init.html">init</a></span><span class="op">(</span>renv <span class="op">=</span> <span class="st">"yes"</span>, rprofile <span class="op">=</span> <span class="st">"yes"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>This creates:</p>
@@ -152,42 +139,42 @@
 </section><section class="level2"><h2 id="sync-the-project">4. Sync the project<a class="anchor" aria-label="anchor" href="#sync-the-project"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/sync.html">sync</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Apply mode is additive. It hydrates plain-name missing packages from renv-discoverable local libraries, installs anything still missing with <code>pak</code>, materializes missing bundled or installed helper functions, and, when <code>auto_snapshot = true</code>, writes <code>boosters/attach.R</code> and snapshots with <code>renv</code>. Use <code>hydrate = FALSE</code> to skip local reuse for stricter first-run installs.</p>
 </section><section class="level2"><h2 id="add-a-pack">Add a Pack<a class="anchor" aria-label="anchor" href="#add-a-pack"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/add_pack.html">add_pack</a></span><span class="op">(</span><span class="st">"example"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>The <code>example</code> pack installs <code>cli</code>. <code><a href="../reference/add_pack.html">add_pack()</a></code> preserves unrelated comments and sections in <code>boosters.toml</code> while updating <code>[packs].declared</code>. For the analysis baseline of <code>fs</code>, <code>here</code>, <code>janitor</code>, <code>rio</code>, core tidyverse packages, <code>scales</code>, <code>glue</code>, <code>digest</code>, <code>skimr</code>, and bundled helper functions, add the <code>eda</code> pack explicitly:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/add_pack.html">add_pack</a></span><span class="op">(</span><span class="st">"eda"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>If the pack carries helper functions, <code><a href="../reference/add_pack.html">add_pack()</a></code> also copies the bundled <code>fn_*.R</code> files into <code>boosters/</code> and refuses to overwrite existing function files unless <code>overwrite_functions = TRUE</code>.</p>
 <p>Packs can mix ordinary CRAN package names with package-specific source specs. Declare every package in <code>packages</code>, then use <code>[sources]</code> only for packages that should install from another source:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">"plotting"</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Plotting packages from CRAN and GitHub."</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"ggplot2"</span><span class="op">,</span> <span class="st">"patchwork"</span><span class="op">,</span> <span class="st">"ggtext"</span><span class="op">]</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[sources]</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">"plotting"</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Plotting packages from CRAN and GitHub."</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"ggplot2"</span><span class="op">,</span> <span class="st">"patchwork"</span><span class="op">,</span> <span class="st">"ggtext"</span><span class="op">]</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[sources]</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code></pre></div>
 <p>Here, <code>ggplot2</code> and <code>patchwork</code> can hydrate or install by package name, while <code>ggtext</code> skips hydration and uses the GitHub source spec.</p>
 <p>Package attachment is a startup layer, not installation intent. Missing <code>attach</code> means a pack attaches its direct <code>packages</code>; use <code>attach = true</code> for that explicit default, <code>attach = false</code> to install without startup attachment, or <code>attach = ["pkg1", "pkg2"]</code> to attach a subset. The top-level <code>[attach]</code> table supports <code>enabled</code>, <code>declared</code>, and <code>exclude</code>. Workflow packages from <code>core</code> and <code>[extras]</code>, including <code>pak</code>, <code>renv</code>, and <code>boosterpak</code>, are installed but not attached unless explicitly listed in <code>[attach].declared</code>.</p>
 </section><section class="level2"><h2 id="add-a-helper-function">Add a Helper Function<a class="anchor" aria-label="anchor" href="#add-a-helper-function"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/add_function.html">add_function</a></span><span class="op">(</span><span class="st">"ni"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Helper functions are materialized as <code>boosters/fn_*.R</code> files and tracked in <code>[functions].installed</code>. They are ordinary project files, so you can edit them after materialization. <code><a href="../reference/sync.html">sync()</a></code> restores missing installed helper files, but it does not overwrite local edits.</p>
 </section><section class="level2"><h2 id="capture-and-reuse">Capture and Reuse<a class="anchor" aria-label="anchor" href="#capture-and-reuse"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/save_pack.html">save_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/promote_pack.html">promote_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -207,7 +194,7 @@
 </section><section class="level2"><h2 id="restore-exact-versions">Restore Exact Versions<a class="anchor" aria-label="anchor" href="#restore-exact-versions"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/sync.html">sync</a></span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"restore"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Restore mode requires both <code>boosters.toml</code> and <code>renv.lock</code>, calls <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code>, validates the project config, and warns if direct declared packages are absent from the lockfile. It remains lockfile-exact and does not hydrate.</p>
@@ -215,20 +202,20 @@
 </h2>
 <p>If a project was initialized with boosterpak 0.5 and, after restart, <code>boosterpak</code> is no longer found, run this once from the project without relying on <code>boosterpak</code> being loadable:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"renv"</span><span class="op">)</span></span>
 <span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/install.html" class="external-link">install</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"pak"</span>, <span class="st">"seanthimons/boosterpak"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">snapshot</a></span><span class="op">(</span>packages <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"renv"</span>, <span class="st">"pak"</span>, <span class="st">"boosterpak"</span><span class="op">)</span>, prompt <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Then restart R and run:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/sync.html">sync</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 </section><section class="level2"><h2 id="inspect">Inspect<a class="anchor" aria-label="anchor" href="#inspect"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/status.html">status</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/list_packs.html">list_packs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>

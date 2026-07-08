@@ -7,6 +7,11 @@
   conventions. The package uses TOML for its own config, but is not a
   general dependency-manifest standard.
 - Added
+  [`add_github_pack()`](https://seanthimons.github.io/boosterpak/reference/add_github_pack.md)
+  to import pack manifests from a GitHub repository or git URL into
+  project-local `boosters/packs/`, declare selected packs, and
+  optionally run the existing sync flow.
+- Added
   [`create_pack()`](https://seanthimons.github.io/boosterpak/reference/create_pack.md)
   for guided pack authoring from a declared package set. It writes pack
   TOML, optional source specs, explicit attach intent, and an optional

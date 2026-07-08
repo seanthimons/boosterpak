@@ -261,6 +261,8 @@ out of scope.
 
 - [`add_pack()`](https://seanthimons.github.io/boosterpak/reference/add_pack.md)
   : Add a pack declaration
+- [`add_github_pack()`](https://seanthimons.github.io/boosterpak/reference/add_github_pack.md)
+  : Import booster packs from a GitHub repository
 - [`remove_pack()`](https://seanthimons.github.io/boosterpak/reference/remove_pack.md)
   : Remove a pack declaration
 - [`list_packs()`](https://seanthimons.github.io/boosterpak/reference/list_packs.md)

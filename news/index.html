@@ -48,6 +48,7 @@
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.6.0.9000" id="boosterpak-0609000">boosterpak 0.6.0.9000<a class="anchor" aria-label="anchor" href="#boosterpak-0609000"></a></h2>
 <ul><li>Documentation now frames <code>boosterpak</code> as reusable project capability packs: dependencies plus helper files, attachment choices, and setup conventions. The package uses TOML for its own config, but is not a general dependency-manifest standard.</li>
+<li>Added <code><a href="../reference/add_github_pack.html">add_github_pack()</a></code> to import pack manifests from a GitHub repository or git URL into project-local <code>boosters/packs/</code>, declare selected packs, and optionally run the existing sync flow.</li>
 <li>Added <code><a href="../reference/create_pack.html">create_pack()</a></code> for guided pack authoring from a declared package set. It writes pack TOML, optional source specs, explicit attach intent, and an optional nested function-template sidecar without mutating <code>boosters.toml</code> or running <code><a href="../reference/sync.html">sync()</a></code>.</li>
 <li>
 <code>sync(mode = "apply")</code> now writes a managed <code>boosters/attach.R</code> file with static <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls for startup attachment intent. Packs can declare <code>attach = true</code>, <code>attach = false</code>, or <code>attach = ["pkg"]</code>; missing <code>attach</code> attaches direct pack packages by default.</li>
