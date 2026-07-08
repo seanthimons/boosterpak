@@ -1,4 +1,5 @@
 export(add_pack)
+export(add_github_pack)
 export(add_function)
 export(check_functions)
 export(create_pack)
