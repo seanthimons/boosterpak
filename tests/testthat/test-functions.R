@@ -4,7 +4,10 @@ test_that("list_functions reports catalog and installation status", {
 
   functions <- list_functions(root = root, verbose = FALSE)
 
-  expect_setequal(functions$name, c("ni", "my_skim", "theme_custom", "geo_mean"))
+  expect_setequal(
+    functions$name,
+    c("ni", "my_skim", "theme_custom", "geo_mean", "scaffold_analysis")
+  )
   expect_false(any(functions$installed))
 })
 
@@ -15,7 +18,10 @@ test_that("add_function materializes file and updates TOML", {
   path <- add_function("ni", root = root, verbose = FALSE)
 
   expect_true(file.exists(path))
-  expect_equal(readLines(path, warn = FALSE), readLines(boosterpak:::catalog_function_file("ni"), warn = FALSE))
+  expect_equal(
+    readLines(path, warn = FALSE),
+    readLines(boosterpak:::catalog_function_file("ni", root), warn = FALSE)
+  )
   config <- boosterpak:::read_config(root)
   expect_equal(config$functions$installed, "ni")
   functions <- list_functions(root = root, verbose = FALSE)
@@ -28,10 +34,16 @@ test_that("add_function refuses to overwrite local edits unless explicit", {
   path <- add_function("ni", root = root, verbose = FALSE)
   writeLines(c(readLines(path, warn = FALSE), "# local edit"), path)
 
-  expect_error(add_function("ni", root = root, verbose = FALSE), "overwrite = TRUE")
+  expect_error(
+    add_function("ni", root = root, verbose = FALSE),
+    "overwrite = TRUE"
+  )
 
   add_function("ni", root = root, overwrite = TRUE, verbose = FALSE)
-  expect_equal(readLines(path, warn = FALSE), readLines(boosterpak:::catalog_function_file("ni"), warn = FALSE))
+  expect_equal(
+    readLines(path, warn = FALSE),
+    readLines(boosterpak:::catalog_function_file("ni", root), warn = FALSE)
+  )
 })
 
 test_that("remove_function deletes file and updates TOML", {
@@ -43,7 +55,10 @@ test_that("remove_function deletes file and updates TOML", {
 
   expect_false(file.exists(path))
   expect_equal(remaining, character())
-  expect_equal(boosterpak:::installed_functions(boosterpak:::read_config(root)), character())
+  expect_equal(
+    boosterpak:::installed_functions(boosterpak:::read_config(root)),
+    character()
+  )
 })
 
 test_that("check_functions and diff_function report drift", {
@@ -107,17 +122,49 @@ test_that("add_pack copies bundled functions and refuses local overwrite by defa
   save_pack("portable_fns", root = root, verbose = FALSE)
   remove_function("ni", root = root, verbose = FALSE)
 
-  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
+  add_pack(
+    "portable_fns",
+    root = root,
+    sync = FALSE,
+    overwrite_functions = TRUE,
+    verbose = FALSE
+  )
   expect_true(file.exists(file.path(root, "boosters", "fn_ni.R")))
-  expect_true(file.exists(file.path(root, "boosters", "packs", "portable_fns", "functions", "fn_ni.R")))
+  expect_true(file.exists(file.path(
+    root,
+    "boosters",
+    "packs",
+    "portable_fns",
+    "functions",
+    "fn_ni.R"
+  )))
 
   remove_pack("portable_fns", root = root, sync = FALSE, verbose = FALSE)
   writeLines("# local", file.path(root, "boosters", "fn_ni.R"))
-  expect_error(add_pack("portable_fns", root = root, sync = FALSE, verbose = FALSE), "overwrite_functions = TRUE")
-  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
+  expect_error(
+    add_pack("portable_fns", root = root, sync = FALSE, verbose = FALSE),
+    "overwrite_functions = TRUE"
+  )
+  add_pack(
+    "portable_fns",
+    root = root,
+    sync = FALSE,
+    overwrite_functions = TRUE,
+    verbose = FALSE
+  )
   expect_equal(
     readLines(file.path(root, "boosters", "fn_ni.R"), warn = FALSE),
-    readLines(file.path(root, "boosters", "packs", "portable_fns", "functions", "fn_ni.R"), warn = FALSE)
+    readLines(
+      file.path(
+        root,
+        "boosters",
+        "packs",
+        "portable_fns",
+        "functions",
+        "fn_ni.R"
+      ),
+      warn = FALSE
+    )
   )
 })
 
@@ -127,7 +174,13 @@ test_that("sync copies missing pack-bundled functions without overwriting edits"
   add_function("ni", root = root, verbose = FALSE)
   save_pack("portable_fns", root = root, verbose = FALSE)
   remove_function("ni", root = root, verbose = FALSE)
-  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
+  add_pack(
+    "portable_fns",
+    root = root,
+    sync = FALSE,
+    overwrite_functions = TRUE,
+    verbose = FALSE
+  )
   path <- file.path(root, "boosters", "fn_ni.R")
   unlink(path)
 
@@ -160,13 +213,37 @@ test_that("remove_pack optionally removes only unchanged unshared bundled functi
   remove_pack("portable_fns", root = root, sync = FALSE, verbose = FALSE)
   expect_true(file.exists(path))
 
-  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
+  add_pack(
+    "portable_fns",
+    root = root,
+    sync = FALSE,
+    overwrite_functions = TRUE,
+    verbose = FALSE
+  )
   writeLines(c(readLines(path, warn = FALSE), "# local edit"), path)
-  remove_pack("portable_fns", root = root, sync = FALSE, remove_functions = TRUE, verbose = FALSE)
+  remove_pack(
+    "portable_fns",
+    root = root,
+    sync = FALSE,
+    remove_functions = TRUE,
+    verbose = FALSE
+  )
   expect_true(file.exists(path))
 
-  add_pack("portable_fns", root = root, sync = FALSE, overwrite_functions = TRUE, verbose = FALSE)
-  remove_pack("portable_fns", root = root, sync = FALSE, remove_functions = TRUE, verbose = FALSE)
+  add_pack(
+    "portable_fns",
+    root = root,
+    sync = FALSE,
+    overwrite_functions = TRUE,
+    verbose = FALSE
+  )
+  remove_pack(
+    "portable_fns",
+    root = root,
+    sync = FALSE,
+    remove_functions = TRUE,
+    verbose = FALSE
+  )
   expect_false(file.exists(path))
 })
 
