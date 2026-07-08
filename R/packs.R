@@ -241,6 +241,15 @@ validate_pack_schema <- function(expected_name, path, data, scope) {
     sprintf("%s [hooks].on_add", path)
   )
   validate_pack_attach(data$attach, sprintf("%s attach", path))
+  if (
+    !is.null(data$settings) &&
+      (!is.list(data$settings) || is.data.frame(data$settings))
+  ) {
+    cli::cli_abort(
+      "{.file {path}} {.field [settings]} must be a TOML table.",
+      call = NULL
+    )
+  }
   validate_pack_layout(data$name, path, data)
   invisible(lapply(data$functions, function(name) {
     if (!file.exists(pack_function_source_file(path, name, scope))) {

@@ -53,6 +53,7 @@ reference:
       - list_functions
       - check_functions
       - diff_function
+      - pack_setting
   - title: Bundled helper examples
     contents:
       - geo_mean

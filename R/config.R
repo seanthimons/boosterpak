@@ -14,7 +14,6 @@ default_config <- function(root = ".") {
     ),
     settings = list(
       air_toml = TRUE,
-      parallel_daemons = "auto",
       auto_snapshot = TRUE
     )
   )
@@ -65,20 +64,36 @@ validate_config <- function(config, root = ".") {
     )
   }
   if (!is.null(settings$parallel_daemons)) {
-    ok_auto <- identical(settings$parallel_daemons, "auto")
-    ok_number <- is.numeric(settings$parallel_daemons) &&
-      length(settings$parallel_daemons) == 1 &&
-      settings$parallel_daemons >= 1 &&
-      settings$parallel_daemons == as.integer(settings$parallel_daemons)
-    if (!ok_auto && !ok_number) {
+    cli::cli_warn(
+      "{.field [settings].parallel_daemons} is deprecated; declare the value as a pack setting instead, e.g. {.field [settings.packs.sean-parallel].daemons}."
+    )
+  }
+  validate_pack_settings(settings)
+
+  warn_unknown_keys(config)
+  invisible(TRUE)
+}
+
+validate_pack_settings <- function(settings) {
+  packs <- settings$packs
+  if (is.null(packs)) {
+    return(invisible(TRUE))
+  }
+  if (!is.list(packs) || is.data.frame(packs)) {
+    cli::cli_abort(
+      "{.field [settings.packs]} must be a TOML table.",
+      call = NULL
+    )
+  }
+  invisible(lapply(names(packs), function(name) {
+    entry <- packs[[name]]
+    if (!is.list(entry) || is.data.frame(entry)) {
       cli::cli_abort(
-        "{.field [settings].parallel_daemons} must be {.val auto} or a positive integer.",
+        "{.field [settings.packs.{name}]} must be a TOML table.",
         call = NULL
       )
     }
-  }
-
-  warn_unknown_keys(config)
+  }))
   invisible(TRUE)
 }
 
@@ -110,7 +125,8 @@ warn_unknown_keys <- function(config) {
     "air_toml",
     "parallel_daemons",
     "auto_snapshot",
-    "camcorder"
+    "camcorder",
+    "packs"
   )
   unknown_settings <- setdiff(
     names(config$settings %||% list()),
@@ -154,12 +170,66 @@ write_default_config <- function(root = ".") {
     "",
     "[settings]",
     "air_toml = true",
-    'parallel_daemons = "auto"',
     "auto_snapshot = true",
     ""
   )
   writeLines(lines, path, useBytes = TRUE)
   invisible(path)
+}
+
+format_toml_value <- function(value) {
+  if (is.character(value) && length(value) == 1) {
+    sprintf('"%s"', escape_toml_string(value))
+  } else if (is.logical(value) && length(value) == 1) {
+    if (isTRUE(value)) "true" else "false"
+  } else if (is.numeric(value) && length(value) == 1) {
+    as.character(value)
+  } else if (is.character(value)) {
+    sprintf(
+      "[%s]",
+      paste(
+        sprintf('"%s"', vapply(value, escape_toml_string, character(1))),
+        collapse = ", "
+      )
+    )
+  } else {
+    cli::cli_abort(
+      "Pack settings values must be strings, booleans, numbers, or string arrays.",
+      call = NULL
+    )
+  }
+}
+
+ensure_pack_settings_section <- function(path, pack_name, settings) {
+  if (length(settings) == 0) {
+    return(invisible(path))
+  }
+  lines <- readLines(path, warn = FALSE)
+  header <- sprintf("[settings.packs.%s]", pack_name)
+  if (any(trimws(lines) == header)) {
+    return(invisible(path))
+  }
+  entries <- vapply(
+    names(settings),
+    function(key) sprintf("%s = %s", key, format_toml_value(settings[[key]])),
+    character(1)
+  )
+  writeLines(c(lines, "", header, entries), path, useBytes = TRUE)
+  invisible(path)
+}
+
+scaffold_pack_settings <- function(names, root = ".") {
+  packs <- unique(unlist(
+    lapply(names, resolve_pack_names, root = root),
+    use.names = FALSE
+  ))
+  invisible(lapply(packs, function(pack_name) {
+    pack <- load_pack(pack_name, root)
+    settings <- pack$settings %||% list()
+    if (length(settings) > 0) {
+      ensure_pack_settings_section(boosters_file(root), pack_name, settings)
+    }
+  }))
 }
 
 escape_toml_string <- function(x) {

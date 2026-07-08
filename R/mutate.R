@@ -1,4 +1,13 @@
-mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TRUE, hydrate = TRUE, overwrite_functions = FALSE, remove_functions = FALSE, verbose = NULL) {
+mutate_pack <- function(
+  name,
+  action = c("add", "remove"),
+  root = ".",
+  sync = TRUE,
+  hydrate = TRUE,
+  overwrite_functions = FALSE,
+  remove_functions = FALSE,
+  verbose = NULL
+) {
   check_verbose(verbose)
   action <- match.arg(action)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
@@ -27,8 +36,15 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
   update_declared_array(boosters_file(root), "packs", "declared", next_packs)
   materialize_config_packs(read_config(root), root)
   if (identical(action, "add")) {
-    materialize_pack_functions(name, root = root, overwrite = overwrite_functions)
+    materialize_pack_functions(
+      name,
+      root = root,
+      overwrite = overwrite_functions
+    )
     source_pack_functions(name, root = root)
+    if (is_new_add) {
+      scaffold_pack_settings(name, root = root)
+    }
   } else if (isTRUE(remove_functions)) {
     remove_pack_functions(name, next_packs, root = root)
   }
@@ -39,7 +55,9 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
       run_pack_on_add_hooks(name, root = root)
     }
   } else if (should_emit(verbose)) {
-    cli::cli_alert_success("{if (action == 'add') 'Added' else 'Removed'} pack {.val {name}} in {.file boosters.toml}.")
+    cli::cli_alert_success(
+      "{if (action == 'add') 'Added' else 'Removed'} pack {.val {name}} in {.file boosters.toml}."
+    )
   }
   invisible(next_packs)
 }
@@ -56,8 +74,23 @@ mutate_pack <- function(name, action = c("add", "remove"), root = ".", sync = TR
 #' @param verbose Whether to print routine summaries.
 #' @return Updated declared pack names, invisibly.
 #' @export
-add_pack <- function(name, root = ".", sync = TRUE, hydrate = TRUE, overwrite_functions = FALSE, verbose = NULL) {
-  mutate_pack(name, "add", root, sync, hydrate = hydrate, overwrite_functions = overwrite_functions, verbose = verbose)
+add_pack <- function(
+  name,
+  root = ".",
+  sync = TRUE,
+  hydrate = TRUE,
+  overwrite_functions = FALSE,
+  verbose = NULL
+) {
+  mutate_pack(
+    name,
+    "add",
+    root,
+    sync,
+    hydrate = hydrate,
+    overwrite_functions = overwrite_functions,
+    verbose = verbose
+  )
 }
 
 #' Remove a pack declaration
@@ -70,8 +103,21 @@ add_pack <- function(name, root = ".", sync = TRUE, hydrate = TRUE, overwrite_fu
 #' @param verbose Whether to print routine summaries.
 #' @return Updated declared pack names, invisibly.
 #' @export
-remove_pack <- function(name, root = ".", sync = TRUE, remove_functions = FALSE, verbose = NULL) {
-  mutate_pack(name, "remove", root, sync, remove_functions = remove_functions, verbose = verbose)
+remove_pack <- function(
+  name,
+  root = ".",
+  sync = TRUE,
+  remove_functions = FALSE,
+  verbose = NULL
+) {
+  mutate_pack(
+    name,
+    "remove",
+    root,
+    sync,
+    remove_functions = remove_functions,
+    verbose = verbose
+  )
 }
 
 update_declared_array <- function(path, section, key, values) {
@@ -79,14 +125,27 @@ update_declared_array <- function(path, section, key, values) {
   lines <- readLines(path, warn = FALSE)
   section_start <- grep(sprintf("^\\[%s\\]\\s*$", section), lines)
   if (length(section_start) != 1) {
-    cli::cli_abort("Could not find unique [{section}] section in {.file {path}}.", call = NULL)
+    cli::cli_abort(
+      "Could not find unique [{section}] section in {.file {path}}.",
+      call = NULL
+    )
   }
   next_section <- grep("^\\[.+\\]\\s*$", lines)
   next_section <- next_section[next_section > section_start]
-  section_end <- if (length(next_section) == 0) length(lines) else next_section[[1]] - 1
-  key_lines <- grep(sprintf("^\\s*%s\\s*=", key), lines[section_start:section_end])
+  section_end <- if (length(next_section) == 0) {
+    length(lines)
+  } else {
+    next_section[[1]] - 1
+  }
+  key_lines <- grep(
+    sprintf("^\\s*%s\\s*=", key),
+    lines[section_start:section_end]
+  )
   if (length(key_lines) != 1) {
-    cli::cli_abort("Could not safely update [{section}].{key} in {.file {path}}.", call = NULL)
+    cli::cli_abort(
+      "Could not safely update [{section}].{key} in {.file {path}}.",
+      call = NULL
+    )
   }
   target <- section_start + key_lines[[1]] - 1
   if (!grepl("\\[.*\\]", lines[[target]])) {
@@ -95,7 +154,14 @@ update_declared_array <- function(path, section, key, values) {
       call = NULL
     )
   }
-  lines[[target]] <- sprintf("%s = [%s]", key, paste(sprintf('"%s"', vapply(values, escape_toml_string, character(1))), collapse = ", "))
+  lines[[target]] <- sprintf(
+    "%s = [%s]",
+    key,
+    paste(
+      sprintf('"%s"', vapply(values, escape_toml_string, character(1))),
+      collapse = ", "
+    )
+  )
   writeLines(lines, path, useBytes = TRUE)
   invisible(path)
 }

@@ -66,6 +66,8 @@ Optional fields:
   a matching `functions/fn_<name>.R` sidecar file.
 - `[hooks]` with `on_add` — functions to run automatically after the pack is
   first added to a project.
+- `[settings]` — default values for pack settings the project can override;
+  see "Pack settings" below.
 
 Each `fn_<name>.R` sidecar is copied into the project's `boosters/` folder by
 `add_pack()` and sourced into the global environment at startup via the
@@ -115,6 +117,63 @@ The common surprise is the second rule: if you add a pack with
 (for example after hand-editing the file or cloning a project), the hook
 never fires. In a cloned project that is intentional — `sync()` restores the
 environment without re-running project-scaffolding side effects.
+
+## Pack settings
+
+Hooks take no arguments, so a `[settings]` table is how a pack exposes
+knobs that vary per project. The pack declares defaults:
+
+```toml
+name = "targets-curation"
+description = "Scaffold a targets-based curation pipeline."
+packages = ["targets", "tarchetypes", "cli"]
+functions = ["scaffold_targets_curation"]
+
+[settings]
+dirs = ["data/raw", "data/processed", "R"]
+
+[hooks]
+on_add = ["scaffold_targets_curation"]
+```
+
+The first time the pack is added to a project, those defaults are copied
+into a `[settings.packs.<name>]` section appended to `boosters.toml`
+(packs pulled in via `extends` get their own sections too):
+
+```toml
+[settings.packs.targets-curation]
+dirs = ["data/raw", "data/processed", "R"]
+```
+
+Edit that section freely — it is the per-project override. Sidecar
+functions read the effective value with `pack_setting()`, which resolves
+project override → pack default → the `default` argument:
+
+```r
+scaffold_targets_curation <- function(
+  dirs = boosterpak::pack_setting(
+    "targets-curation",
+    "dirs",
+    default = c("data/raw", "R")
+  )
+) {
+  fs::dir_create(fs::path(getwd(), dirs))
+}
+```
+
+The rules mirror `on_add` hooks:
+
+- **Scaffolded once, never overwritten.** The section is appended only when
+  its header is missing. Re-adding the pack, `sync()`, and every other
+  boosterpak write leave your edits alone — all writers that touch an
+  existing `boosters.toml` either rewrite a single known line or append,
+  so custom sections survive by construction.
+- **First add only, but regardless of `sync`.** Unlike hooks, scaffolding
+  also happens with `add_pack(name, sync = FALSE)`.
+- **Values are loosely typed** — strings, booleans, numbers, or string
+  arrays. The consuming function validates what it reads.
+- **`remove_pack()` keeps the section**, the same way it keeps edited
+  `fn_*.R` files. Delete it by hand if you no longer want it.
 
 ## Where packs live
 

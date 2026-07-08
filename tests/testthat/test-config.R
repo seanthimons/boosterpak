@@ -468,14 +468,36 @@ test_that("v0.1 settings validation accepts documented shapes", {
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
   path <- file.path(root, "boosters.toml")
   lines <- readLines(path, warn = FALSE)
-  lines[lines == 'parallel_daemons = "auto"'] <- "parallel_daemons = 2"
-  lines <- c(lines, "", "[settings.camcorder]", "enabled = false")
+  lines <- c(
+    lines,
+    "",
+    "[settings.camcorder]",
+    "enabled = false",
+    "",
+    "[settings.packs.core]",
+    "retries = 2"
+  )
   writeLines(lines, path)
 
   expect_silent(boosterpak:::validate_config(
     boosterpak:::read_config(root),
     root
   ))
+})
+
+test_that("legacy parallel_daemons warns as deprecated", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  settings <- match("[settings]", lines)
+  lines <- append(lines, 'parallel_daemons = "auto"', after = settings)
+  writeLines(lines, path)
+
+  expect_warning(
+    boosterpak:::validate_config(boosterpak:::read_config(root), root),
+    "parallel_daemons.*deprecated"
+  )
 })
 
 test_that("v0.1 settings validation rejects invalid setting types", {
@@ -492,12 +514,12 @@ test_that("v0.1 settings validation rejects invalid setting types", {
   )
 
   lines[lines == 'air_toml = "yes"'] <- "air_toml = true"
-  lines[lines == 'parallel_daemons = "auto"'] <- "parallel_daemons = 0"
+  lines <- c(lines, 'packs = "nope"')
   writeLines(lines, path)
 
   expect_error(
     boosterpak:::validate_config(boosterpak:::read_config(root), root),
-    "parallel_daemons"
+    "settings.packs"
   )
 })
 
