@@ -23,15 +23,27 @@ default_config <- function(root = ".") {
 read_config <- function(root = ".") {
   path <- boosters_file(root)
   if (!file.exists(path)) {
-    cli::cli_abort("{.file boosters.toml} does not exist. Run {.code boosterpak::init()} first.", call = NULL)
+    cli::cli_abort(
+      "{.file boosters.toml} does not exist. Run {.code boosterpak::init()} first.",
+      call = NULL
+    )
   }
   read_toml_file(path)
 }
 
 validate_config <- function(config, root = ".") {
-  config$packs$declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
-  config$extras$declared <- toml_string_array(config$extras$declared %||% character(), "[extras].declared")
-  config$exclude$declared <- toml_string_array(config$exclude$declared %||% character(), "[exclude].declared")
+  config$packs$declared <- toml_string_array(
+    config$packs$declared %||% character(),
+    "[packs].declared"
+  )
+  config$extras$declared <- toml_string_array(
+    config$extras$declared %||% character(),
+    "[extras].declared"
+  )
+  config$exclude$declared <- toml_string_array(
+    config$exclude$declared %||% character(),
+    "[exclude].declared"
+  )
   validate_attach_config(config)
   validate_config_functions(config)
 
@@ -41,10 +53,16 @@ validate_config <- function(config, root = ".") {
 
   settings <- config$settings %||% list()
   if (!is.null(settings$air_toml) && !is.logical(settings$air_toml)) {
-    cli::cli_abort("{.field [settings].air_toml} must be {.code true} or {.code false}.", call = NULL)
+    cli::cli_abort(
+      "{.field [settings].air_toml} must be {.code true} or {.code false}.",
+      call = NULL
+    )
   }
   if (!is.null(settings$auto_snapshot) && !is.logical(settings$auto_snapshot)) {
-    cli::cli_abort("{.field [settings].auto_snapshot} must be {.code true} or {.code false}.", call = NULL)
+    cli::cli_abort(
+      "{.field [settings].auto_snapshot} must be {.code true} or {.code false}.",
+      call = NULL
+    )
   }
   if (!is.null(settings$parallel_daemons)) {
     ok_auto <- identical(settings$parallel_daemons, "auto")
@@ -53,7 +71,10 @@ validate_config <- function(config, root = ".") {
       settings$parallel_daemons >= 1 &&
       settings$parallel_daemons == as.integer(settings$parallel_daemons)
     if (!ok_auto && !ok_number) {
-      cli::cli_abort("{.field [settings].parallel_daemons} must be {.val auto} or a positive integer.", call = NULL)
+      cli::cli_abort(
+        "{.field [settings].parallel_daemons} must be {.val auto} or a positive integer.",
+        call = NULL
+      )
     }
   }
 
@@ -72,13 +93,29 @@ toml_string_array <- function(value, field) {
 }
 
 warn_unknown_keys <- function(config) {
-  known_top <- c("project", "packs", "extras", "exclude", "attach", "settings", "functions")
+  known_top <- c(
+    "project",
+    "packs",
+    "extras",
+    "exclude",
+    "attach",
+    "settings",
+    "functions"
+  )
   unknown <- setdiff(names(config), known_top)
   if (length(unknown) > 0) {
     cli::cli_warn("Unknown top-level key{?s}: {unknown}.")
   }
-  known_settings <- c("air_toml", "parallel_daemons", "auto_snapshot", "camcorder")
-  unknown_settings <- setdiff(names(config$settings %||% list()), known_settings)
+  known_settings <- c(
+    "air_toml",
+    "parallel_daemons",
+    "auto_snapshot",
+    "camcorder"
+  )
+  unknown_settings <- setdiff(
+    names(config$settings %||% list()),
+    known_settings
+  )
   if (length(unknown_settings) > 0) {
     cli::cli_warn("Unknown [settings] key{?s}: {unknown_settings}.")
   }
@@ -92,7 +129,10 @@ write_default_config <- function(root = ".") {
     "# Edit this file directly or use boosterpak::add_pack() / remove_pack().",
     "",
     "[project]",
-    sprintf('name = "%s"', escape_toml_string(default_config(root)$project$name)),
+    sprintf(
+      'name = "%s"',
+      escape_toml_string(default_config(root)$project$name)
+    ),
     sprintf('boosters_version = "%s"', package_version_string()),
     "",
     "[packs]",
@@ -131,13 +171,13 @@ self_install_spec <- function(desc = utils::packageDescription("boosterpak")) {
   remote_user <- desc[["RemoteUsername"]] %||% desc[["GithubUsername"]]
   remote_repo <- desc[["RemoteRepo"]] %||% desc[["GithubRepo"]]
 
-  if (!is.null(remote_type) && identical(tolower(remote_type), "github") &&
-    !is.null(remote_user) && !is.null(remote_repo)) {
+  if (
+    !is.null(remote_type) &&
+      identical(tolower(remote_type), "github") &&
+      !is.null(remote_user) &&
+      !is.null(remote_repo)
+  ) {
     return(sprintf("%s/%s", remote_user, remote_repo))
-  }
-
-  if (!is.null(desc[["Built"]])) {
-    return("boosterpak")
   }
 
   "seanthimons/boosterpak"
