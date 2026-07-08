@@ -33,8 +33,9 @@ pack_is_nested_manifest <- function(pack_path) {
   )
 }
 
-catalog_function_file <- function(name) {
-  system.file("functions", sprintf("%s.R", name), package = "boosterpak")
+catalog_function_file <- function(name, root = ".") {
+  catalog <- function_catalog(root)
+  catalog$path[match(name, catalog$name)]
 }
 
 project_packs_dir <- function(root = ".") {

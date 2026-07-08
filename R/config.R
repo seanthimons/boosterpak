@@ -45,7 +45,7 @@ validate_config <- function(config, root = ".") {
     "[exclude].declared"
   )
   validate_attach_config(config)
-  validate_config_functions(config)
+  validate_config_functions(config, root)
 
   declared <- config$packs$declared %||% character()
   invisible(lapply(declared, load_pack, root = root))

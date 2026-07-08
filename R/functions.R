@@ -1,49 +1,78 @@
-function_catalog <- function() {
-  data.frame(
-    name = c("ni", "my_skim", "theme_custom", "geo_mean"),
-    object = c("%ni%", "my_skim", "theme_custom", "geo_mean"),
-    description = c(
-      "Negation of %in%.",
-      "skim_with() preset for numeric EDA with geometric mean and inline histogram.",
-      "Minimal ggplot2 theme with white panels and angled x-axis labels.",
-      "Geometric mean of positive values."
-    ),
-    path = vapply(c("ni", "my_skim", "theme_custom", "geo_mean"), catalog_function_file, character(1)),
-    stringsAsFactors = FALSE
-  )
+function_catalog <- function(root = ".") {
+  packs <- available_packs(root)
+  rows <- lapply(seq_len(nrow(packs)), function(i) {
+    functions <- strsplit(packs$functions[[i]], ", ", fixed = TRUE)[[1]]
+    functions <- functions[nzchar(functions)]
+    if (length(functions) == 0) {
+      return(NULL)
+    }
+    data.frame(
+      name = functions,
+      pack = packs$name[[i]],
+      description = packs$description[[i]],
+      path = vapply(
+        functions,
+        function(name) pack_function_file(packs$path[[i]], name),
+        character(1)
+      ),
+      stringsAsFactors = FALSE
+    )
+  })
+  out <- do.call(rbind, rows) %||%
+    data.frame(
+      name = character(),
+      pack = character(),
+      description = character(),
+      path = character(),
+      stringsAsFactors = FALSE
+    )
+  out[!duplicated(out$name), , drop = FALSE]
 }
 
-validate_function_name <- function(name) {
-  catalog <- function_catalog()
+validate_function_name <- function(name, root = ".") {
+  catalog <- function_catalog(root)
   match <- catalog[catalog$name == name, , drop = FALSE]
   if (nrow(match) == 0) {
     hint <- suggest_pack_name(name, catalog$name)
-    cli::cli_abort(c(
-      "{.val {name}} is not a known function.",
-      if (!is.null(hint)) "i" = "Did you mean {.val {hint}}?",
-      "Available functions: {paste(catalog$name, collapse = ', ')}"
-    ), call = NULL)
+    cli::cli_abort(
+      c(
+        "{.val {name}} is not a known function.",
+        if (!is.null(hint)) "i" = "Did you mean {.val {hint}}?",
+        "Available functions: {paste(catalog$name, collapse = ', ')}"
+      ),
+      call = NULL
+    )
   }
   if (!file.exists(match$path[[1]])) {
-    cli::cli_abort("Catalog file for function {.val {name}} is missing.", call = NULL)
+    cli::cli_abort(
+      "Catalog file for function {.val {name}} is missing.",
+      call = NULL
+    )
   }
   invisible(match)
 }
 
 installed_functions <- function(config) {
-  toml_string_array(config$functions$installed %||% character(), "[functions].installed")
+  toml_string_array(
+    config$functions$installed %||% character(),
+    "[functions].installed"
+  )
 }
 
-validate_config_functions <- function(config) {
+validate_config_functions <- function(config, root = ".") {
   installed <- installed_functions(config)
-  invisible(lapply(installed, validate_function_name))
+  invisible(lapply(installed, validate_function_name, root = root))
   invisible(TRUE)
 }
 
 ensure_functions_section <- function(path) {
   lines <- readLines(path, warn = FALSE)
   if (!any(grepl("^\\[functions\\]\\s*$", lines))) {
-    writeLines(c(lines, "", "[functions]", "installed = []"), path, useBytes = TRUE)
+    writeLines(
+      c(lines, "", "[functions]", "installed = []"),
+      path,
+      useBytes = TRUE
+    )
   }
   invisible(path)
 }
@@ -55,7 +84,7 @@ update_installed_functions <- function(root, values) {
 }
 
 materialize_function <- function(name, root = ".", overwrite = FALSE) {
-  match <- validate_function_name(name)
+  match <- validate_function_name(name, root)
   dir.create(functions_dir(root), recursive = TRUE, showWarnings = FALSE)
   target <- function_file(name, root)
   if (file.exists(target) && !isTRUE(overwrite)) {
@@ -71,12 +100,20 @@ materialize_function <- function(name, root = ".", overwrite = FALSE) {
   invisible(target)
 }
 
-materialize_pack_function <- function(pack_path, name, root = ".", overwrite = FALSE) {
+materialize_pack_function <- function(
+  pack_path,
+  name,
+  root = ".",
+  overwrite = FALSE
+) {
   pack <- load_pack(tools::file_path_sans_ext(basename(pack_path)), root)
   source <- pack_function_source_file(pack_path, name, pack$.__scope__)
   target <- function_file(name, root)
   if (!file.exists(source)) {
-    cli::cli_abort("Pack function source {.file {source}} is missing.", call = NULL)
+    cli::cli_abort(
+      "Pack function source {.file {source}} is missing.",
+      call = NULL
+    )
   }
   dir.create(functions_dir(root), recursive = TRUE, showWarnings = FALSE)
   if (file.exists(target) && !isTRUE(overwrite)) {
@@ -97,10 +134,16 @@ pack_function_source_file <- function(pack_path, name, scope) {
 }
 
 materialize_pack_functions <- function(names, root = ".", overwrite = FALSE) {
-  packs <- unique(unlist(lapply(names, resolve_pack_names, root = root), use.names = FALSE))
+  packs <- unique(unlist(
+    lapply(names, resolve_pack_names, root = root),
+    use.names = FALSE
+  ))
   invisible(lapply(packs, function(pack_name) {
     pack <- load_pack(pack_name, root)
-    functions <- toml_string_array(pack$functions %||% character(), sprintf("%s functions", pack$.__path__))
+    functions <- toml_string_array(
+      pack$functions %||% character(),
+      sprintf("%s functions", pack$.__path__)
+    )
     invisible(lapply(functions, function(name) {
       target <- function_file(name, root)
       if (!file.exists(target) || isTRUE(overwrite)) {
@@ -114,14 +157,20 @@ source_function_files <- function(names, root = ".", envir = .GlobalEnv) {
   invisible(lapply(names, function(name) {
     path <- function_file(name, root)
     if (!file.exists(path)) {
-      cli::cli_abort("Function {.val {name}} is declared but {.file {path}} is missing.", call = NULL)
+      cli::cli_abort(
+        "Function {.val {name}} is declared but {.file {path}} is missing.",
+        call = NULL
+      )
     }
     sys.source(path, envir = envir)
   }))
 }
 
 source_pack_functions <- function(names, root = ".", envir = .GlobalEnv) {
-  functions <- unique(unlist(lapply(names, resolve_pack_functions, root = root), use.names = FALSE))
+  functions <- unique(unlist(
+    lapply(names, resolve_pack_functions, root = root),
+    use.names = FALSE
+  ))
   source_function_files(functions, root = root, envir = envir)
   invisible(functions)
 }
@@ -133,7 +182,10 @@ run_pack_on_add_hooks <- function(name, root = ".", envir = .GlobalEnv) {
   setwd(root)
   invisible(lapply(hooks, function(hook) {
     if (!exists(hook, envir = envir, mode = "function", inherits = FALSE)) {
-      cli::cli_abort("On-add hook {.fun {hook}} is declared but was not sourced into {.code .GlobalEnv}.", call = NULL)
+      cli::cli_abort(
+        "On-add hook {.fun {hook}} is declared but was not sourced into {.code .GlobalEnv}.",
+        call = NULL
+      )
     }
     hook_fn <- get(hook, envir = envir, mode = "function", inherits = FALSE)
     hook_fn()
@@ -142,12 +194,21 @@ run_pack_on_add_hooks <- function(name, root = ".", envir = .GlobalEnv) {
 }
 
 check_pack_function_conflicts <- function(names, root = ".") {
-  packs <- unique(unlist(lapply(names, resolve_pack_names, root = root), use.names = FALSE))
+  packs <- unique(unlist(
+    lapply(names, resolve_pack_names, root = root),
+    use.names = FALSE
+  ))
   conflicts <- character()
   invisible(lapply(packs, function(pack_name) {
     pack <- load_pack(pack_name, root)
-    functions <- toml_string_array(pack$functions %||% character(), sprintf("%s functions", pack$.__path__))
-    conflicts <<- c(conflicts, functions[file.exists(function_file(functions, root))])
+    functions <- toml_string_array(
+      pack$functions %||% character(),
+      sprintf("%s functions", pack$.__path__)
+    )
+    conflicts <<- c(
+      conflicts,
+      functions[file.exists(function_file(functions, root))]
+    )
   }))
   conflicts <- unique(conflicts)
   if (length(conflicts) > 0) {
@@ -167,29 +228,51 @@ sync_functions <- function(config, root = ".") {
       materialize_function(name, root = root, overwrite = FALSE)
     }
   }))
-  declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
+  declared <- toml_string_array(
+    config$packs$declared %||% character(),
+    "[packs].declared"
+  )
   materialize_pack_functions(declared, root = root, overwrite = FALSE)
   source_pack_functions(declared, root = root)
   installed
 }
 
 pack_provided_function_names <- function(config, root = ".") {
-  declared <- toml_string_array(config$packs$declared %||% character(), "[packs].declared")
-  unique(unlist(lapply(declared, resolve_pack_functions, root = root), use.names = FALSE))
+  declared <- toml_string_array(
+    config$packs$declared %||% character(),
+    "[packs].declared"
+  )
+  unique(unlist(
+    lapply(declared, resolve_pack_functions, root = root),
+    use.names = FALSE
+  ))
 }
 
 remove_pack_functions <- function(name, remaining_packs, root = ".") {
   pack <- load_pack(name, root)
-  removable <- toml_string_array(pack$functions %||% character(), sprintf("%s functions", pack$.__path__))
+  removable <- toml_string_array(
+    pack$functions %||% character(),
+    sprintf("%s functions", pack$.__path__)
+  )
   if (length(removable) == 0) {
     return(invisible(character()))
   }
-  still_provided <- unique(unlist(lapply(remaining_packs, resolve_pack_functions, root = root), use.names = FALSE))
+  still_provided <- unique(unlist(
+    lapply(remaining_packs, resolve_pack_functions, root = root),
+    use.names = FALSE
+  ))
   removed <- character()
   for (function_name in setdiff(removable, still_provided)) {
     target <- function_file(function_name, root)
     source <- pack_function_file(pack$.__path__, function_name)
-    if (file.exists(target) && file.exists(source) && identical(readLines(target, warn = FALSE), readLines(source, warn = FALSE))) {
+    if (
+      file.exists(target) &&
+        file.exists(source) &&
+        identical(
+          readLines(target, warn = FALSE),
+          readLines(source, warn = FALSE)
+        )
+    ) {
       unlink(target)
       removed <- c(removed, function_name)
     }
@@ -206,17 +289,21 @@ remove_pack_functions <- function(name, remaining_packs, root = ".") {
 list_functions <- function(root = ".", verbose = NULL) {
   check_verbose(verbose)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
-  catalog <- function_catalog()
+  catalog <- function_catalog(root)
   installed <- if (file.exists(boosters_file(root))) {
     installed_functions(read_config(root))
   } else {
     character()
   }
-  catalog$installed <- catalog$name %in% installed & file.exists(function_file(catalog$name, root))
+  catalog$installed <- catalog$name %in%
+    installed &
+    file.exists(function_file(catalog$name, root))
   if (should_emit(verbose)) {
     cli::cli_h1("Available booster functions")
     apply(catalog, 1, function(row) {
-      cli::cli_li("{.val {row[['name']]}} [{if (identical(row[['installed']], 'TRUE')) 'installed' else 'available'}]: {row[['description']]}")
+      cli::cli_li(
+        "{.val {row[['name']]}} [{if (identical(row[['installed']], 'TRUE')) 'installed' else 'available'}]: {row[['description']]}"
+      )
     })
   }
   invisible(catalog)
@@ -256,7 +343,7 @@ remove_function <- function(name, root = ".", verbose = NULL) {
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
   config <- read_config(root)
   validate_config(config, root)
-  validate_function_name(name)
+  validate_function_name(name, root)
   path <- function_file(name, root)
   if (file.exists(path)) {
     unlink(path)
@@ -282,27 +369,44 @@ check_functions <- function(root = ".", verbose = NULL) {
   validate_config(config, root)
   installed <- installed_functions(config)
   rows <- lapply(installed, function(name) {
-    validate_function_name(name)
+    validate_function_name(name, root)
     local <- function_file(name, root)
-    package <- catalog_function_file(name)
+    package <- catalog_function_file(name, root)
     exists <- file.exists(local)
-    matches <- exists && identical(readLines(local, warn = FALSE), readLines(package, warn = FALSE))
-    data.frame(name = name, path = local, exists = exists, matches = matches, stringsAsFactors = FALSE)
+    matches <- exists &&
+      identical(
+        readLines(local, warn = FALSE),
+        readLines(package, warn = FALSE)
+      )
+    data.frame(
+      name = name,
+      path = local,
+      exists = exists,
+      matches = matches,
+      stringsAsFactors = FALSE
+    )
   })
-  out <- do.call(rbind, rows) %||% data.frame(
-    name = character(),
-    path = character(),
-    exists = logical(),
-    matches = logical()
-  )
+  out <- do.call(rbind, rows) %||%
+    data.frame(
+      name = character(),
+      path = character(),
+      exists = logical(),
+      matches = logical()
+    )
   if (should_emit(verbose)) {
     apply(out, 1, function(row) {
       if (!identical(row[["exists"]], "TRUE")) {
-        cli::cli_alert_warning("{.file {row[['path']]}} is missing. Run {.code boosterpak::sync()} to rematerialize it.")
+        cli::cli_alert_warning(
+          "{.file {row[['path']]}} is missing. Run {.code boosterpak::sync()} to rematerialize it."
+        )
       } else if (identical(row[["matches"]], "TRUE")) {
-        cli::cli_alert_success("{.file {row[['path']]}} matches package version.")
+        cli::cli_alert_success(
+          "{.file {row[['path']]}} matches package version."
+        )
       } else {
-        cli::cli_alert_info("{.file {row[['path']]}} differs from package version.")
+        cli::cli_alert_info(
+          "{.file {row[['path']]}} differs from package version."
+        )
       }
     })
   }
@@ -319,13 +423,19 @@ check_functions <- function(root = ".", verbose = NULL) {
 diff_function <- function(name, root = ".", verbose = NULL) {
   check_verbose(verbose)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
-  validate_function_name(name)
+  validate_function_name(name, root)
   local <- function_file(name, root)
-  package <- catalog_function_file(name)
+  package <- catalog_function_file(name, root)
   if (!file.exists(local)) {
-    cli::cli_abort("{.file {local}} does not exist. Run {.code boosterpak::add_function({name})} first.", call = NULL)
+    cli::cli_abort(
+      "{.file {local}} does not exist. Run {.code boosterpak::add_function({name})} first.",
+      call = NULL
+    )
   }
-  diff <- simple_line_diff(readLines(package, warn = FALSE), readLines(local, warn = FALSE))
+  diff <- simple_line_diff(
+    readLines(package, warn = FALSE),
+    readLines(local, warn = FALSE)
+  )
   if (should_emit(verbose)) {
     cli::cat_line(diff)
   }
