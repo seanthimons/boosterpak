@@ -20,7 +20,18 @@
 #' @param verbose Whether to print routine summaries.
 #' @return Updated declared pack names, invisibly.
 #' @export
-add_github_pack <- function(repo, packs = NULL, ref = NULL, path = ".", root = ".", sync = TRUE, hydrate = TRUE, overwrite = FALSE, overwrite_functions = FALSE, verbose = NULL) {
+add_github_pack <- function(
+  repo,
+  packs = NULL,
+  ref = NULL,
+  path = ".",
+  root = ".",
+  sync = TRUE,
+  hydrate = TRUE,
+  overwrite = FALSE,
+  overwrite_functions = FALSE,
+  verbose = NULL
+) {
   check_verbose(verbose)
   repo_url <- normalize_github_pack_repo(repo)
   ref <- validate_optional_git_ref(ref)
@@ -37,7 +48,11 @@ add_github_pack <- function(repo, packs = NULL, ref = NULL, path = ".", root = "
   selected <- resolve_remote_pack_selection(packs, discovered, repo, path)
   selected_rows <- discovered[match(selected, discovered$name), , drop = FALSE]
 
-  copy_remote_packs_to_project(selected_rows, root = root, overwrite = overwrite)
+  copy_remote_packs_to_project(
+    selected_rows,
+    root = root,
+    overwrite = overwrite
+  )
   declare_project_packs(
     selected,
     root = root,
@@ -50,7 +65,10 @@ add_github_pack <- function(repo, packs = NULL, ref = NULL, path = ".", root = "
 
 normalize_github_pack_repo <- function(repo) {
   if (!is.character(repo) || length(repo) != 1 || !nzchar(repo)) {
-    cli::cli_abort("{.arg repo} must be one non-empty GitHub repository or git URL.", call = NULL)
+    cli::cli_abort(
+      "{.arg repo} must be one non-empty GitHub repository or git URL.",
+      call = NULL
+    )
   }
 
   if (dir.exists(repo) || file.exists(repo)) {
@@ -80,17 +98,26 @@ validate_optional_git_ref <- function(ref) {
     return(NULL)
   }
   if (!is.character(ref) || length(ref) != 1 || !nzchar(ref)) {
-    cli::cli_abort("{.arg ref} must be {.code NULL} or one non-empty git ref.", call = NULL)
+    cli::cli_abort(
+      "{.arg ref} must be {.code NULL} or one non-empty git ref.",
+      call = NULL
+    )
   }
   ref
 }
 
 validate_remote_pack_path <- function(path) {
   if (!is.character(path) || length(path) != 1 || !nzchar(path)) {
-    cli::cli_abort("{.arg path} must be one non-empty relative path inside {.arg repo}.", call = NULL)
+    cli::cli_abort(
+      "{.arg path} must be one non-empty relative path inside {.arg repo}.",
+      call = NULL
+    )
   }
   if (grepl("^([A-Za-z]:|/|\\\\)", path)) {
-    cli::cli_abort("{.arg path} must be relative to the cloned repository.", call = NULL)
+    cli::cli_abort(
+      "{.arg path} must be relative to the cloned repository.",
+      call = NULL
+    )
   }
   path
 }
@@ -112,7 +139,10 @@ checkout_github_pack_ref <- function(repo_dir, ref = NULL) {
 
 ensure_git_available <- function() {
   if (!nzchar(Sys.which("git"))) {
-    cli::cli_abort("{.command git} must be available on PATH to import GitHub packs.", call = NULL)
+    cli::cli_abort(
+      "{.command git} must be available on PATH to import GitHub packs.",
+      call = NULL
+    )
   }
   invisible(TRUE)
 }
@@ -121,19 +151,25 @@ run_git <- function(args, action) {
   output <- tryCatch(
     suppressWarnings(git_system2("git", args, stdout = TRUE, stderr = TRUE)),
     error = function(err) {
-      cli::cli_abort(c(
-        "Failed to {action} with {.command git}.",
-        "x" = conditionMessage(err)
-      ), call = NULL)
+      cli::cli_abort(
+        c(
+          "Failed to {action} with {.command git}.",
+          "x" = conditionMessage(err)
+        ),
+        call = NULL
+      )
     }
   )
   status <- attr(output, "status") %||% 0L
   if (!identical(as.integer(status), 0L)) {
     details <- paste(output, collapse = "\n")
-    cli::cli_abort(c(
-      "Failed to {action} with {.command git}.",
-      "x" = details
-    ), call = NULL)
+    cli::cli_abort(
+      c(
+        "Failed to {action} with {.command git}.",
+        "x" = details
+      ),
+      call = NULL
+    )
   }
   invisible(output)
 }
@@ -145,13 +181,19 @@ git_system2 <- function(command, args, stdout = TRUE, stderr = TRUE) {
 remote_pack_dir <- function(repo_dir, path) {
   candidate <- file.path(repo_dir, path)
   if (!dir.exists(candidate)) {
-    cli::cli_abort("Pack path {.file {path}} does not exist inside the cloned repository.", call = NULL)
+    cli::cli_abort(
+      "Pack path {.file {path}} does not exist inside the cloned repository.",
+      call = NULL
+    )
   }
 
   repo_dir <- normalizePath(repo_dir, winslash = "/", mustWork = TRUE)
   candidate <- normalizePath(candidate, winslash = "/", mustWork = TRUE)
   if (!path_is_within(candidate, repo_dir)) {
-    cli::cli_abort("{.arg path} must stay inside the cloned repository.", call = NULL)
+    cli::cli_abort(
+      "{.arg path} must stay inside the cloned repository.",
+      call = NULL
+    )
   }
   candidate
 }
@@ -169,7 +211,10 @@ path_is_within <- function(path, root) {
 discover_remote_packs <- function(dir) {
   packs <- discover_pack_scope("github", dir)
   if (nrow(packs) == 0) {
-    cli::cli_abort("No booster pack manifests were found in {.file {dir}}.", call = NULL)
+    cli::cli_abort(
+      "No booster pack manifests were found in {.file {dir}}.",
+      call = NULL
+    )
   }
   packs
 }
@@ -179,11 +224,14 @@ resolve_remote_pack_selection <- function(packs, discovered, repo, path) {
 
   if (is.null(packs)) {
     if (!interactive()) {
-      cli::cli_abort(c(
-        "{.arg packs} must be supplied in non-interactive sessions.",
-        "Available packs: {paste(available, collapse = ', ')}",
-        "i" = "Example: {.code boosterpak::add_github_pack({encodeString(repo, quote = '\"')}, packs = {format_r_string_vector(head(available, 2))})}"
-      ), call = NULL)
+      cli::cli_abort(
+        c(
+          "{.arg packs} must be supplied in non-interactive sessions.",
+          "Available packs: {paste(available, collapse = ', ')}",
+          "i" = "Example: {.code boosterpak::add_github_pack({encodeString(repo, quote = '\"')}, packs = {format_r_string_vector(head(available, 2))})}"
+        ),
+        call = NULL
+      )
     }
     selected <- utils::select.list(
       available,
@@ -198,7 +246,10 @@ resolve_remote_pack_selection <- function(packs, discovered, repo, path) {
   }
 
   if (!is.character(packs) || length(packs) == 0 || any(!nzchar(packs))) {
-    cli::cli_abort("{.arg packs} must be {.code NULL}, {.val all}, or a non-empty character vector.", call = NULL)
+    cli::cli_abort(
+      "{.arg packs} must be {.code NULL}, {.val all}, or a non-empty character vector.",
+      call = NULL
+    )
   }
   if (identical(packs, "all")) {
     return(available)
@@ -206,10 +257,13 @@ resolve_remote_pack_selection <- function(packs, discovered, repo, path) {
 
   missing <- setdiff(packs, available)
   if (length(missing) > 0) {
-    cli::cli_abort(c(
-      "Unknown GitHub pack{?s}: {.val {missing}}.",
-      "Available packs: {paste(available, collapse = ', ')}"
-    ), call = NULL)
+    cli::cli_abort(
+      c(
+        "Unknown GitHub pack{?s}: {.val {missing}}.",
+        "Available packs: {paste(available, collapse = ', ')}"
+      ),
+      call = NULL
+    )
   }
   unique(packs)
 }
@@ -225,7 +279,11 @@ format_r_string_vector <- function(x) {
 
 copy_remote_packs_to_project <- function(packs, root, overwrite = FALSE) {
   invisible(lapply(seq_len(nrow(packs)), function(i) {
-    copy_remote_pack_to_project(packs[i, , drop = FALSE], root = root, overwrite = overwrite)
+    copy_remote_pack_to_project(
+      packs[i, , drop = FALSE],
+      root = root,
+      overwrite = overwrite
+    )
   }))
 }
 
@@ -242,16 +300,27 @@ copy_remote_pack_to_project <- function(pack, root, overwrite = FALSE) {
     target_dir <- dirname(target)
     if (dir.exists(target_dir)) {
       if (!isTRUE(overwrite)) {
-        cli::cli_abort("{.file {target_dir}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
+        cli::cli_abort(
+          "{.file {target_dir}} already exists. Use {.code overwrite = TRUE} to replace it.",
+          call = NULL
+        )
       }
       unlink(target_dir, recursive = TRUE)
     }
     dir.create(project_packs_dir(root), recursive = TRUE, showWarnings = FALSE)
-    copied <- file.copy(dirname(source), project_packs_dir(root), recursive = TRUE, overwrite = FALSE)
+    copied <- file.copy(
+      dirname(source),
+      project_packs_dir(root),
+      recursive = TRUE,
+      overwrite = FALSE
+    )
   } else {
     if (file.exists(target)) {
       if (!isTRUE(overwrite)) {
-        cli::cli_abort("{.file {target}} already exists. Use {.code overwrite = TRUE} to replace it.", call = NULL)
+        cli::cli_abort(
+          "{.file {target}} already exists. Use {.code overwrite = TRUE} to replace it.",
+          call = NULL
+        )
       }
       unlink(target)
     }
@@ -260,7 +329,10 @@ copy_remote_pack_to_project <- function(pack, root, overwrite = FALSE) {
   }
 
   if (!isTRUE(copied)) {
-    cli::cli_abort("Failed to copy pack {.val {name}} to {.file {target}}.", call = NULL)
+    cli::cli_abort(
+      "Failed to copy pack {.val {name}} to {.file {target}}.",
+      call = NULL
+    )
   }
   invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
 }
@@ -273,7 +345,14 @@ remote_pack_target <- function(name, source, root) {
   }
 }
 
-declare_project_packs <- function(names, root = ".", sync = TRUE, hydrate = TRUE, overwrite_functions = FALSE, verbose = NULL) {
+declare_project_packs <- function(
+  names,
+  root = ".",
+  sync = TRUE,
+  hydrate = TRUE,
+  overwrite_functions = FALSE,
+  verbose = NULL
+) {
   config <- read_config(root)
   validate_config(config, root)
   invisible(lapply(names, load_pack, root = root))
@@ -291,14 +370,23 @@ declare_project_packs <- function(names, root = ".", sync = TRUE, hydrate = TRUE
 
   update_declared_array(boosters_file(root), "packs", "declared", next_packs)
   materialize_config_packs(read_config(root), root)
-  materialize_pack_functions(names, root = root, overwrite = overwrite_functions)
+  materialize_pack_functions(
+    names,
+    root = root,
+    overwrite = overwrite_functions
+  )
   source_pack_functions(names, root = root)
+  if (length(new_adds) > 0) {
+    scaffold_pack_settings(new_adds, root = root)
+  }
 
   if (isTRUE(sync)) {
     sync(mode = "apply", root = root, hydrate = hydrate, verbose = verbose)
     invisible(lapply(new_adds, run_pack_on_add_hooks, root = root))
   } else if (should_emit(verbose)) {
-    cli::cli_alert_success("Imported {length(names)} GitHub pack{?s} in {.file boosters.toml}.")
+    cli::cli_alert_success(
+      "Imported {length(names)} GitHub pack{?s} in {.file boosters.toml}."
+    )
   }
   invisible(next_packs)
 }

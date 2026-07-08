@@ -442,6 +442,40 @@ diff_function <- function(name, root = ".", verbose = NULL) {
   invisible(diff)
 }
 
+#' Read a pack setting
+#'
+#' Looks up a setting for a pack, preferring the project-level override in
+#' `[settings.packs.<pack>]` of `boosters.toml`, then the pack's own
+#' `[settings]` defaults, then `default`.
+#'
+#' @param pack Pack name.
+#' @param key Setting key.
+#' @param default Value returned when the setting is not declared anywhere.
+#' @param root Project root.
+#' @return The setting value.
+#' @export
+pack_setting <- function(pack, key, default = NULL, root = ".") {
+  value <- NULL
+  if (file.exists(boosters_file(root))) {
+    config <- tryCatch(read_config(root), error = function(err) NULL)
+    packs <- (config$settings %||% list())$packs %||% list()
+    if (is.list(packs) && !is.data.frame(packs)) {
+      entry <- packs[[pack]]
+      if (is.list(entry) && !is.data.frame(entry)) {
+        value <- entry[[key]]
+      }
+    }
+  }
+  if (is.null(value)) {
+    pack_data <- tryCatch(load_pack(pack, root), error = function(err) NULL)
+    settings <- pack_data$settings %||% list()
+    if (is.list(settings) && !is.data.frame(settings)) {
+      value <- settings[[key]]
+    }
+  }
+  value %||% default
+}
+
 simple_line_diff <- function(package_lines, local_lines) {
   n <- max(length(package_lines), length(local_lines))
   out <- c("--- package", "+++ local")
