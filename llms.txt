@@ -288,6 +288,8 @@ out of scope.
   : Check materialized helper functions for drift
 - [`diff_function()`](https://seanthimons.github.io/boosterpak/reference/diff_function.md)
   : Diff a materialized helper function against the package version
+- [`pack_setting()`](https://seanthimons.github.io/boosterpak/reference/pack_setting.md)
+  : Read a pack setting
 
 ## Bundled helper examples
 
@@ -304,5 +306,7 @@ out of scope.
 
 ### All vignettes
 
+- [Building your own
+  pack](https://seanthimons.github.io/boosterpak/articles/building-a-pack.md):
 - [Getting started with
   boosterpak](https://seanthimons.github.io/boosterpak/articles/getting-started.md):

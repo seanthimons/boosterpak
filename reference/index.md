@@ -42,6 +42,8 @@
   : Check materialized helper functions for drift
 - [`diff_function()`](https://seanthimons.github.io/boosterpak/reference/diff_function.md)
   : Diff a materialized helper function against the package version
+- [`pack_setting()`](https://seanthimons.github.io/boosterpak/reference/pack_setting.md)
+  : Read a pack setting
 
 ## Bundled helper examples
 
