@@ -39,6 +39,7 @@ reference:
   - title: Packs
     contents:
       - add_pack
+      - add_github_pack
       - remove_pack
       - list_packs
       - create_pack
