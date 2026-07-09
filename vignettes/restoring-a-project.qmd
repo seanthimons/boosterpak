@@ -60,15 +60,18 @@ project library automatically.
 
 The first startup may print errors from the boosterpak hook: `.Rprofile`
 sources `boosters/attach.R`, whose `library()` calls refer to packages that are
-not installed yet. These are harmless and disappear after restore.
+not installed yet. These errors disappear after restore and are harmless to the
+restore itself — but an error in `.Rprofile` stops the rest of the file from
+running, so any custom settings placed after the boosterpak hook will not apply
+until the packages are restored.
 
 ## 2. Restore the library from the lockfile
 
 `boosterpak` itself is not installed on this machine yet, so nothing
 boosterpak-shaped can run first. Restore through renv, which installs
 everything in the lockfile, including `boosterpak`. `init()` snapshots
-`renv`, `pak`, and `boosterpak` into the lockfile precisely so that a clone can
-bootstrap this way.
+`renv`, `pak`, and `boosterpak` into the lockfile (unless `settings.auto_snapshot`
+is disabled) precisely so that a clone can bootstrap this way.
 
 ```{r}
 #| echo: true
@@ -121,8 +124,9 @@ against their pack sources.
 
 ## Troubleshooting: boosterpak absent from the lockfile
 
-Projects initialized with boosterpak 0.5 may not have `boosterpak` in
-`renv.lock`, so `renv::restore()` leaves it uninstalled. Bootstrap it once
+Projects initialized with boosterpak 0.5, or with `settings.auto_snapshot =
+false`, may not have `boosterpak` in `renv.lock`, so `renv::restore()` leaves
+it uninstalled. Bootstrap it once
 without relying on `boosterpak` being loadable:
 
 ```{r}
@@ -130,7 +134,15 @@ without relying on `boosterpak` being loadable:
 #| eval: false
 install.packages("renv")
 renv::install(c("pak", "seanthimons/boosterpak"))
-renv::snapshot(packages = c("renv", "pak", "boosterpak"), prompt = FALSE)
+renv::snapshot(
+  packages = c("renv", "pak", "boosterpak"),
+  prompt = FALSE,
+  update = TRUE
+)
 ```
 
-Then restart R and run `boosterpak::sync()`.
+`update = TRUE` matters: without it, `renv::snapshot(packages = ...)` rewrites
+the lockfile to contain only the listed packages and their dependencies,
+dropping every other project package.
+
+Then restart R and run `boosterpak::sync(mode = "restore")`.
