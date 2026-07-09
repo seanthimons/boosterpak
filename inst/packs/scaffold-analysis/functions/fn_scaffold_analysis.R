@@ -1,12 +1,12 @@
 scaffold_analysis <- function(dirs = c(
   "data/raw",
+  "data/cache",
   "data/processed",
-	"data/final",
-	"dev",
+  "data/final",
+  "dev/scratch",
   "docs",
   "output/figures",
-  "R",
-  "scratch"
+  "R"
 ), root = getwd()) {
   if (!requireNamespace("fs", quietly = TRUE)) {
     stop("Package 'fs' is required for scaffold_analysis().", call. = FALSE)
