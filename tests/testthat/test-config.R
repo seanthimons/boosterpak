@@ -500,6 +500,45 @@ test_that("legacy parallel_daemons warns as deprecated", {
   )
 })
 
+test_that("init removes generated legacy parallel_daemons default", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  settings <- match("[settings]", lines)
+  lines <- append(lines, 'parallel_daemons = "auto"', after = settings)
+  writeLines(lines, path)
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  lines <- readLines(path, warn = FALSE)
+  expect_false(any(grepl("parallel_daemons", lines)))
+  expect_false("[settings.packs.sean-parallel]" %in% lines)
+  expect_silent(boosterpak:::validate_config(
+    boosterpak:::read_config(root),
+    root
+  ))
+})
+
+test_that("init preserves custom legacy parallel_daemons values", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  settings <- match("[settings]", lines)
+  lines <- append(lines, "parallel_daemons = 3", after = settings)
+  writeLines(lines, path)
+
+  expect_silent(init(root = root, renv = "no", rprofile = "no", verbose = FALSE))
+
+  lines <- readLines(path, warn = FALSE)
+  expect_true("parallel_daemons = 3" %in% lines)
+  expect_warning(
+    boosterpak:::validate_config(boosterpak:::read_config(root), root),
+    "parallel_daemons.*deprecated"
+  )
+})
+
 test_that("v0.1 settings validation rejects invalid setting types", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)

@@ -27,6 +27,7 @@ init <- function(
     wrote_config <- TRUE
   } else {
     repair_self_extra(config_path)
+    repair_legacy_parallel_daemons(config_path)
   }
 
   config <- read_config(root)
@@ -132,6 +133,35 @@ repair_self_extra <- function(path) {
     collapse = ", "
   )
   lines[[declared_idx]] <- sprintf("%s[%s]%s", parts[[2]], rendered, parts[[4]])
+  writeLines(lines, path, useBytes = TRUE)
+  invisible(TRUE)
+}
+
+repair_legacy_parallel_daemons <- function(path) {
+  data <- tryCatch(read_toml_file(path), error = function(err) NULL)
+  value <- (data$settings %||% list())$parallel_daemons
+  if (!identical(value, "auto")) {
+    return(invisible(FALSE))
+  }
+
+  lines <- readLines(path, warn = FALSE)
+  settings_start <- grep("^\\s*\\[settings\\]\\s*(#.*)?$", lines)
+  if (length(settings_start) != 1) {
+    return(invisible(FALSE))
+  }
+
+  start <- settings_start[[1]]
+  next_section <- grep("^\\s*\\[[^]]+\\]\\s*(#.*)?$", lines)
+  next_section <- next_section[next_section > start]
+  end <- if (length(next_section) > 0) next_section[[1]] - 1L else length(lines)
+  section <- lines[start:end]
+  legacy_rel <- grep("^\\s*parallel_daemons\\s*=", section)
+  if (length(legacy_rel) != 1) {
+    return(invisible(FALSE))
+  }
+
+  legacy_idx <- start + legacy_rel[[1]] - 1L
+  lines <- lines[-legacy_idx]
   writeLines(lines, path, useBytes = TRUE)
   invisible(TRUE)
 }
