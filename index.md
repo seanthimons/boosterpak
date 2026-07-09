@@ -207,25 +207,20 @@ and `renv.lock` as downstream output. It may hydrate from local
 libraries before installing the remaining declared packages with `pak`,
 then writes `boosters/attach.R` before snapshot.
 `sync(mode = "restore")` is the explicit path for exact lockfile
-restoration and does not hydrate.
+restoration and does not hydrate. For restoring a freshly cloned project
+on a new machine, see the “Restoring a project on a new machine”
+vignette: run
+[`renv::restore()`](https://rstudio.github.io/renv/reference/restore.html)
+first (on default settings it installs `boosterpak` itself from the
+lockfile), restart R, then `boosterpak::sync(mode = "restore")`.
 
 ## Troubleshooting 0.5 Init Projects
 
 If a project was initialized with boosterpak 0.5 and a restart made
-`boosterpak` unavailable inside `renv`, run this once without relying on
-`boosterpak` being loadable:
-
-``` r
-install.packages("renv")
-renv::install(c("pak", "seanthimons/boosterpak"))
-renv::snapshot(packages = c("renv", "pak", "boosterpak"), prompt = FALSE)
-```
-
-Then restart R in the project and run:
-
-``` r
-boosterpak::sync()
-```
+`boosterpak` unavailable inside `renv`, follow the bootstrap recipe
+under “Troubleshooting: boosterpak absent from the lockfile” in the
+“Restoring a project on a new machine” vignette
+(`vignettes/restoring-a-project.qmd`).
 
 ## Inspect Status
 
