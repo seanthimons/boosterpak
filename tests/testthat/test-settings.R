@@ -128,3 +128,69 @@ test_that("adding a pack scaffolds settings for extended packs too", {
 
   expect_true("[settings.packs.cfg]" %in% readLines(path, warn = FALSE))
 })
+
+test_that("on_add hooks can read settings through exported helper", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  dir.create(
+    file.path(root, "boosters", "packs", "cfg-hook", "functions"),
+    recursive = TRUE
+  )
+  writeLines(
+    c(
+      'name = "cfg-hook"',
+      'description = "Settings hook pack."',
+      'packages = []',
+      'functions = ["write_cfg_setting"]',
+      "",
+      "[hooks]",
+      'on_add = ["write_cfg_setting"]',
+      "",
+      "[settings]",
+      "retries = 2"
+    ),
+    file.path(root, "boosters", "packs", "cfg-hook", "cfg-hook.toml")
+  )
+  writeLines(
+    c(
+      "write_cfg_setting <- function(",
+      '  value = boosterpak::pack_setting("cfg-hook", "retries")',
+      ") {",
+      '  writeLines(as.character(value), "setting.txt")',
+      "  invisible(value)",
+      "}"
+    ),
+    file.path(
+      root,
+      "boosters",
+      "packs",
+      "cfg-hook",
+      "functions",
+      "fn_write_cfg_setting.R"
+    )
+  )
+  withr::defer(
+    rm(
+      list = intersect("write_cfg_setting", ls(envir = .GlobalEnv)),
+      envir = .GlobalEnv
+    ),
+    teardown_env()
+  )
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    sync = function(
+      mode = c("apply", "restore"),
+      root = ".",
+      hydrate = TRUE,
+      verbose = NULL
+    ) {
+      TRUE
+    },
+    .package = "boosterpak"
+  )
+  withr::local_dir(root)
+
+  add_pack("cfg-hook", root = root, sync = TRUE, verbose = FALSE)
+
+  expect_equal(readLines(file.path(root, "setting.txt"), warn = FALSE), "2")
+})
