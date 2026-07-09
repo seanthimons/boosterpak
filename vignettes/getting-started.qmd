@@ -220,32 +220,19 @@ config, but it is not trying to be a general project requirements format.
 boosterpak::sync(mode = "restore")
 ```
 
-Restore mode requires both `boosters.toml` and `renv.lock`, calls
-`renv::restore()`, validates the project config, and warns if direct declared
-packages are absent from the lockfile. It remains lockfile-exact and does not
-hydrate.
+Restore mode is lockfile-exact: it restores through `renv::restore()` and does
+not hydrate.
+
+For the full restore-mode contract and the clone-to-working walkthrough on a
+new machine, including the bootstrap order when `boosterpak` is not installed
+yet, see `vignette("restoring-a-project", package = "boosterpak")`.
 
 ## Troubleshooting boosterpak 0.5 init projects
 
 If a project was initialized with boosterpak 0.5 and, after restart,
-`boosterpak` is no longer found, run this once from the project without relying
-on `boosterpak` being loadable:
-
-```{r}
-#| echo: true
-#| eval: false
-install.packages("renv")
-renv::install(c("pak", "seanthimons/boosterpak"))
-renv::snapshot(packages = c("renv", "pak", "boosterpak"), prompt = FALSE)
-```
-
-Then restart R and run:
-
-```{r}
-#| echo: true
-#| eval: false
-boosterpak::sync()
-```
+`boosterpak` is no longer found, follow the bootstrap recipe under
+"Troubleshooting: boosterpak absent from the lockfile" in
+`vignette("restoring-a-project", package = "boosterpak")`.
 
 ## Inspect
 

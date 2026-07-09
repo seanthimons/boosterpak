@@ -1,0 +1,50 @@
+name: Build package on PR approval
+
+on:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-package-${{ github.event.pull_request.number || github.run_id }}
+
+jobs:
+  build-package:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.review.state == 'approved' &&
+       github.event.pull_request.base.ref == 'main' &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
+                github.event.review.author_association))
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+
+      - name: Build source package
+        run: |
+          mkdir -p dist
+          R CMD build . --no-manual
+          mv *.tar.gz dist/
+
+      - name: Upload source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: boosterpak-source-package
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 30
