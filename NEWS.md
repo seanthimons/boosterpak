@@ -1,3 +1,7 @@
+# boosterpak 0.6.1
+
+* Release config repair, pack settings hook coverage, build workflow, and release automation.
+
 # boosterpak 0.6.0.9000
 
 - Documentation now frames `boosterpak` as reusable project capability packs: dependencies plus helper files, attachment choices, and setup conventions. The package uses TOML for its own config, but is not a general dependency-manifest standard.
