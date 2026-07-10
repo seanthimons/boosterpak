@@ -1,3 +1,7 @@
+# boosterpak 0.6.4
+
+* Release from PR #6: Ignore local log files
+
 # boosterpak 0.6.3
 
 * Release from PR #5: Fix PR #4 review feedback
