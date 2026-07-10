@@ -135,7 +135,10 @@ test_that("init persists PPM repository setup before renv activation", {
   hook_line <- match(boosterpak:::rprofile_line(), lines)
 
   expect_equal(marker, renv_line - 3L)
-  expect_match(lines[[marker + 1L]], "options\\(repos = c")
+  expect_equal(
+    lines[[marker + 1L]],
+    'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/latest"))'
+  )
   expect_match(lines[[marker + 2L]], "renv.config.repos.override")
   expect_equal(hook_line, renv_line + 1L)
 })
@@ -254,6 +257,21 @@ test_that("repository helpers handle NA values and names", {
   expect_equal(
     boosterpak:::rprofile_repos_value(repos),
     '"https://cloud.r-project.org", "https://example.test/repo"'
+  )
+
+  repos <- c(
+    CRAN = "https://packagemanager.posit.co/cran/latest",
+    Internal = "https://example.test/repo",
+    "private-repo" = "https://private.example.test/repo"
+  )
+  expect_equal(
+    boosterpak:::rprofile_repos_value(repos),
+    paste(
+      'CRAN = "https://packagemanager.posit.co/cran/latest"',
+      'Internal = "https://example.test/repo"',
+      '"private-repo" = "https://private.example.test/repo"',
+      sep = ", "
+    )
   )
 })
 

@@ -96,6 +96,14 @@ escape_r_string <- function(x) {
   gsub('"', '\\"', x, fixed = TRUE)
 }
 
+rprofile_repo_name <- function(name) {
+  escaped <- escape_r_string(name)
+  if (identical(make.names(name), name)) {
+    return(escaped)
+  }
+  sprintf('"%s"', escaped)
+}
+
 rprofile_repository_marker <- function() {
   "# Configure boosterpak package repositories."
 }
@@ -113,8 +121,8 @@ rprofile_repos_value <- function(repos) {
   repo_names <- names(repos)
   paste(
     sprintf(
-      '"%s" = "%s"',
-      vapply(repo_names, escape_r_string, character(1)),
+      '%s = "%s"',
+      vapply(repo_names, rprofile_repo_name, character(1)),
       vapply(unname(repos), escape_r_string, character(1))
     ),
     collapse = ", "
