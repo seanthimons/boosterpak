@@ -1,17 +1,16 @@
 .rescue <- function(root = ".", dry_run = FALSE, verbose = NULL) {
-  check_verbose(verbose)
+  .rescue_check_verbose(verbose)
   if (!is.logical(dry_run) || length(dry_run) != 1 || is.na(dry_run)) {
-    cli::cli_abort("{.arg dry_run} must be {.code TRUE} or {.code FALSE}.", call = NULL)
+    .rescue_stop("dry_run must be TRUE or FALSE.")
   }
 
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
   if (!file.exists(boosters_file(root))) {
-    cli::cli_abort(
+    .rescue_stop(
       c(
-        "{.file boosters.toml} does not exist; {.code boosterpak:::.rescue()} repairs existing boosterpak projects only.",
-        "i" = "Use {.code boosterpak::init()} for a new project, or restore {.file boosters.toml} before running rescue."
-      ),
-      call = NULL
+        "boosters.toml does not exist; boosterpak:::.rescue() repairs existing boosterpak projects only.",
+        "Use boosterpak::init() for a new project, or restore boosters.toml before running rescue."
+      )
     )
   }
 
@@ -46,6 +45,21 @@
 
   .rescue_emit_report(report, verbose)
   invisible(report)
+}
+
+.rescue_check_verbose <- function(verbose) {
+  if (!is.null(verbose) && !isTRUE(verbose) && !identical(verbose, FALSE)) {
+    .rescue_stop("verbose must be NULL, TRUE, or FALSE.")
+  }
+  invisible(TRUE)
+}
+
+.rescue_stop <- function(message) {
+  stop(paste(unname(message), collapse = "\n"), call. = FALSE)
+}
+
+.rescue_has_package <- function(package) {
+  requireNamespace(package, quietly = TRUE)
 }
 
 .rescue_report <- function(root, dry_run) {
@@ -91,7 +105,7 @@
     options(repos = old_repos)
     options(renv.config.repos.override = old_renv_repos)
   } else {
-    changes <- configure_boosterpak_repositories(verbose = should_emit(verbose))
+    changes <- configure_boosterpak_repositories(verbose = FALSE)
     lines <- boosterpak_repository_lines_for_session(changes)
   }
 
@@ -101,7 +115,11 @@
     report <- .rescue_add(
       report,
       "actions",
-      if (isTRUE(dry_run)) "would configure boosterpak package repositories." else "configured boosterpak package repositories."
+      if (isTRUE(dry_run)) {
+        "would configure boosterpak package repositories."
+      } else {
+        "configured boosterpak package repositories."
+      }
     )
   } else {
     report <- .rescue_add(report, "skipped", "repository configuration already set or intentionally custom.")
@@ -113,7 +131,7 @@
 .rescue_config <- function(root) {
   report <- .rescue_report(root, dry_run = FALSE)
   config <- tryCatch(
-    read_config(root),
+    .rescue_read_config(root),
     error = function(err) {
       report <<- .rescue_add(
         report,
@@ -129,7 +147,7 @@
 
   valid <- tryCatch(
     {
-      validate_config(config, root)
+      .rescue_validate_config(config)
       TRUE
     },
     error = function(err) {
@@ -142,6 +160,58 @@
     }
   )
   list(config = config, valid = valid, report = report)
+}
+
+.rescue_read_config <- function(root) {
+  path <- boosters_file(root)
+  if (!file.exists(path)) {
+    .rescue_stop("boosters.toml does not exist.")
+  }
+  data <- tryCatch(
+    RcppTOML::parseTOML(path),
+    error = function(err) {
+      .rescue_stop(c(
+        sprintf("%s is not valid TOML.", path),
+        conditionMessage(err)
+      ))
+    }
+  )
+  normalize_toml_arrays(data)
+}
+
+.rescue_validate_config <- function(config) {
+  .rescue_character_array(config$packs$declared %||% character(), "[packs].declared")
+  .rescue_character_array(config$extras$declared %||% character(), "[extras].declared")
+  .rescue_character_array(config$exclude$declared %||% character(), "[exclude].declared")
+
+  attach <- config$attach %||% list()
+  if (!is.null(attach$enabled) && (!is.logical(attach$enabled) || length(attach$enabled) != 1)) {
+    .rescue_stop("[attach].enabled must be true or false.")
+  }
+  .rescue_character_array(attach$declared %||% character(), "[attach].declared")
+  .rescue_character_array(attach$exclude %||% character(), "[attach].exclude")
+
+  settings <- config$settings %||% list()
+  if (!is.null(settings$air_toml) && (!is.logical(settings$air_toml) || length(settings$air_toml) != 1)) {
+    .rescue_stop("[settings].air_toml must be true or false.")
+  }
+  if (
+    !is.null(settings$auto_snapshot) &&
+      (!is.logical(settings$auto_snapshot) || length(settings$auto_snapshot) != 1)
+  ) {
+    .rescue_stop("[settings].auto_snapshot must be true or false.")
+  }
+  invisible(TRUE)
+}
+
+.rescue_character_array <- function(value, field) {
+  if (is.list(value) && length(value) == 0) {
+    return(character())
+  }
+  if (!is.character(value)) {
+    .rescue_stop(sprintf("%s must be a string array.", field))
+  }
+  value
 }
 
 .rescue_rprofile <- function(root, repository_lines, dry_run, report) {
@@ -270,7 +340,7 @@
     dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
     copied <- file.copy(source, target, overwrite = FALSE)
     if (!isTRUE(copied)) {
-      cli::cli_abort("Failed to write built-in pack {.val {name}} to {.file {target}}.", call = NULL)
+      .rescue_stop(sprintf("Failed to write built-in pack '%s' to %s.", name, target))
     }
   }
   report
@@ -294,15 +364,30 @@
     return(.rescue_add(report, "skipped", "attach file rewrite skipped because boosters.toml is invalid."))
   }
 
-  report <- .rescue_add_path(report, path)
-  report <- .rescue_add(
-    report,
-    "actions",
-    if (isTRUE(dry_run)) "would rewrite managed boosters/attach.R." else "rewrote managed boosters/attach.R."
-  )
-  if (!isTRUE(dry_run)) {
-    write_attach(root, verbose = FALSE)
+  if (isTRUE(dry_run)) {
+    report <- .rescue_add_path(report, path)
+    return(.rescue_add(report, "actions", "would rewrite managed boosters/attach.R."))
   }
+
+  ok <- tryCatch(
+    {
+      write_attach(root, verbose = FALSE)
+      TRUE
+    },
+    error = function(err) {
+      report <<- .rescue_add(
+        report,
+        "warnings",
+        sprintf("attach file rewrite skipped: %s", conditionMessage(err))
+      )
+      FALSE
+    }
+  )
+  if (!isTRUE(ok)) {
+    return(report)
+  }
+  report <- .rescue_add_path(report, path)
+  report <- .rescue_add(report, "actions", "rewrote managed boosters/attach.R.")
   report
 }
 
@@ -314,6 +399,13 @@
       report,
       "skipped",
       "workflow package repair skipped: no project renv found; run boosterpak::init(renv = 'yes') to initialize one."
+    ))
+  }
+  if (!.rescue_has_package("renv")) {
+    return(.rescue_add(
+      report,
+      "skipped",
+      "workflow package repair skipped: renv is unavailable; install renv and rerun boosterpak:::.rescue() to repair workflow packages."
     ))
   }
 
@@ -339,6 +431,14 @@
         return(report)
       }
       report <- .rescue_add(report, "actions", "loaded project renv.")
+      repo_changes <- configure_boosterpak_repositories(verbose = FALSE)
+      if (length(repo_changes) > 0) {
+        report <- .rescue_add(
+          report,
+          "actions",
+          "reapplied boosterpak package repositories after loading project renv."
+        )
+      }
     }
   }
 
@@ -348,7 +448,10 @@
       report <<- .rescue_add(
         report,
         "warnings",
-        sprintf("workflow package repair skipped: project renv library could not be inspected: %s", conditionMessage(err))
+        sprintf(
+          "workflow package repair skipped: project renv library could not be inspected: %s",
+          conditionMessage(err)
+        )
       )
       NULL
     }
@@ -372,7 +475,26 @@
   }
 
   if (length(missing) > 0) {
-    .rescue_install_workflow_packages(root, packages)
+    installed <- tryCatch(
+      {
+        .rescue_install_workflow_packages(root, packages)
+        TRUE
+      },
+      error = function(err) {
+        report <<- .rescue_add(
+          report,
+          "warnings",
+          sprintf(
+            "workflow package install skipped: %s",
+            conditionMessage(err)
+          )
+        )
+        FALSE
+      }
+    )
+    if (!isTRUE(installed)) {
+      return(report)
+    }
     report <- .rescue_add(
       report,
       "actions",
@@ -383,7 +505,26 @@
   }
 
   report <- .rescue_add_path(report, file.path(root, "renv.lock"))
-  call_renv_snapshot(root, packages = packages, update = TRUE)
+  snapshotted <- tryCatch(
+    {
+      call_renv_snapshot(root, packages = packages, update = TRUE)
+      TRUE
+    },
+    error = function(err) {
+      report <<- .rescue_add(
+        report,
+        "warnings",
+        sprintf(
+          "workflow package snapshot skipped: %s",
+          conditionMessage(err)
+        )
+      )
+      FALSE
+    }
+  )
+  if (!isTRUE(snapshotted)) {
+    return(report)
+  }
   .rescue_add(report, "actions", "snapshotted workflow packages with update = TRUE.")
 }
 
@@ -410,15 +551,15 @@
   }
 
   title <- if (isTRUE(report$dry_run)) "boosterpak rescue dry run" else "boosterpak rescue"
-  cli::cli_h1(title)
+  message(title)
   for (action in report$actions) {
-    cli::cli_alert_success(action)
+    message("OK: ", action)
   }
   for (skipped in report$skipped) {
-    cli::cli_alert_info(skipped)
+    message("INFO: ", skipped)
   }
   for (warning in report$warnings) {
-    cli::cli_alert_warning(warning)
+    message("WARNING: ", warning)
   }
   invisible(report)
 }

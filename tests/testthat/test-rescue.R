@@ -109,6 +109,101 @@ test_that("rescue snapshots workflow packages with update true", {
   expect_true(snapshot_update)
 })
 
+test_that("rescue reapplies repositories after loading project renv", {
+  withr::local_options(list(
+    repos = c(CRAN = "https://cran.rstudio.com"),
+    renv.config.repos.override = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = character()
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+  )
+  root <- withr::local_tempdir()
+  boosterpak:::write_default_config(root)
+  repo_at_snapshot <- NULL
+  override_at_snapshot <- NULL
+
+  local_mocked_bindings(
+    has_project_renv = function(root = ".") TRUE,
+    is_project_renv_active = function(root = ".") FALSE,
+    call_renv_load = function(root = ".") {
+      options(repos = c(CRAN = "https://cloud.r-project.org"))
+      options(renv.config.repos.override = NULL)
+    },
+    missing_packages = function(packages, root = ".") character(),
+    call_renv_snapshot = function(root = ".", packages = NULL, update = FALSE) {
+      repo_at_snapshot <<- getOption("repos")[["CRAN"]]
+      override_at_snapshot <<- getOption("renv.config.repos.override")
+    },
+    .package = "boosterpak"
+  )
+
+  report <- boosterpak:::.rescue(root = root, verbose = FALSE)
+
+  expect_equal(
+    repo_at_snapshot,
+    "https://packagemanager.posit.co/cran/latest"
+  )
+  expect_equal(
+    override_at_snapshot,
+    "CRAN=https://packagemanager.posit.co/cran/latest"
+  )
+  expect_true(any(grepl("reapplied", report$actions)))
+})
+
+test_that("rescue skips workflow repair when renv package is unavailable", {
+  root <- withr::local_tempdir()
+  report <- boosterpak:::.rescue_report(root, dry_run = FALSE)
+
+  local_mocked_bindings(
+    has_project_renv = function(root = ".") TRUE,
+    .rescue_has_package = function(package) FALSE,
+    .package = "boosterpak"
+  )
+
+  report <- boosterpak:::.rescue_workflow_packages(root, FALSE, report)
+
+  expect_true(any(grepl("renv is unavailable", report$skipped)))
+})
+
+test_that("rescue reports workflow install and snapshot failures without aborting", {
+  root <- withr::local_tempdir()
+  report <- boosterpak:::.rescue_report(root, dry_run = FALSE)
+
+  local_mocked_bindings(
+    has_project_renv = function(root = ".") TRUE,
+    is_project_renv_active = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".") "pak",
+    .rescue_install_workflow_packages = function(root, packages) {
+      stop("install unavailable", call. = FALSE)
+    },
+    .package = "boosterpak"
+  )
+
+  report <- boosterpak:::.rescue_workflow_packages(root, FALSE, report)
+
+  expect_true(any(grepl("workflow package install skipped", report$warnings)))
+  expect_true(any(grepl("install unavailable", report$warnings)))
+
+  report <- boosterpak:::.rescue_report(root, dry_run = FALSE)
+  local_mocked_bindings(
+    has_project_renv = function(root = ".") TRUE,
+    is_project_renv_active = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".") character(),
+    call_renv_snapshot = function(root = ".", packages = NULL, update = FALSE) {
+      stop("snapshot unavailable", call. = FALSE)
+    },
+    .package = "boosterpak"
+  )
+
+  report <- boosterpak:::.rescue_workflow_packages(root, FALSE, report)
+
+  expect_true(any(grepl("workflow package snapshot skipped", report$warnings)))
+  expect_true(any(grepl("snapshot unavailable", report$warnings)))
+})
+
 test_that("rescue materializes core pack and rewrites managed attach file", {
   withr::local_options(boosterpak.configure_repositories = FALSE)
   root <- withr::local_tempdir()
@@ -134,6 +229,23 @@ test_that("rescue skips workflow repair when project renv is absent", {
   expect_true(any(grepl("no project renv found", report$skipped)))
 })
 
+test_that("rescue reports attach rewrite failures without aborting", {
+  withr::local_options(boosterpak.configure_repositories = FALSE)
+  root <- withr::local_tempdir()
+  boosterpak:::write_default_config(root)
+  local_mocked_bindings(
+    write_attach = function(root = ".", verbose = NULL) {
+      stop("missing emergency dependency", call. = FALSE)
+    },
+    .package = "boosterpak"
+  )
+
+  report <- boosterpak:::.rescue(root = root, verbose = FALSE)
+
+  expect_true(any(grepl("attach file rewrite skipped", report$warnings)))
+  expect_true(any(grepl("missing emergency dependency", report$warnings)))
+})
+
 test_that("README documents bootstrap before hidden rescue when boosterpak is absent", {
   readme_path <- file.path(testthat::test_path(), "..", "..", "README.md")
   skip_if_not(
@@ -144,7 +256,25 @@ test_that("README documents bootstrap before hidden rescue when boosterpak is ab
 
   expect_true(any(grepl('requireNamespace\\("renv"', readme)))
   expect_true(any(grepl("renv::load()", readme, fixed = TRUE)))
-  expect_true(any(grepl('renv::install("pak"', readme, fixed = TRUE)))
-  expect_true(any(grepl('pak::pkg_install("seanthimons/boosterpak"', readme, fixed = TRUE)))
+  expect_true(any(grepl('renv::install("seanthimons/boosterpak"', readme, fixed = TRUE)))
   expect_true(any(grepl("boosterpak:::.rescue()", readme, fixed = TRUE)))
+})
+
+test_that("rescue does not use interactive cli repository messages", {
+  captured_verbose <- NULL
+  local_mocked_bindings(
+    configure_boosterpak_repositories = function(verbose = TRUE) {
+      captured_verbose <<- verbose
+      "repos"
+    },
+    boosterpak_repository_lines_for_session = function(changes = character()) {
+      character()
+    },
+    .package = "boosterpak"
+  )
+
+  result <- boosterpak:::.rescue_repositories(dry_run = FALSE, verbose = TRUE)
+
+  expect_false(captured_verbose)
+  expect_equal(result$changes, "repos")
 })

@@ -144,8 +144,7 @@ If `boosterpak` is absent from the project library, bootstrap enough tooling fir
 ``` r
 if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
 renv::load()
-if (!requireNamespace("pak", quietly = TRUE)) renv::install("pak")
-pak::pkg_install("seanthimons/boosterpak")
+renv::install("seanthimons/boosterpak")
 boosterpak:::.rescue()
 ```
 
