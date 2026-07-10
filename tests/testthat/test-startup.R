@@ -90,6 +90,29 @@ test_that("init preserves existing renv repository override", {
   )
 })
 
+test_that("repository helpers handle NA values and names", {
+  expect_false(boosterpak:::uses_posit_package_manager(c(
+    NA_character_,
+    "https://example.test/repo"
+  )))
+  expect_true(boosterpak:::uses_posit_package_manager(c(
+    NA_character_,
+    "https://packagemanager.posit.co/cran/latest"
+  )))
+
+  repos <- c("https://cloud.r-project.org", "https://example.test/repo")
+  names(repos) <- c("CRAN", NA_character_)
+
+  expect_equal(
+    boosterpak:::format_repos_override(repos),
+    "https://cloud.r-project.org"
+  )
+  expect_equal(
+    boosterpak:::rprofile_repos_value(repos),
+    '"https://cloud.r-project.org", "https://example.test/repo"'
+  )
+})
+
 test_that("init repository configuration can be disabled by option", {
   withr::local_options(list(
     repos = c(CRAN = "@CRAN@"),

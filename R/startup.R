@@ -27,7 +27,15 @@ uses_posit_package_manager <- function(repos) {
   if (is.null(repos) || length(repos) == 0) {
     return(FALSE)
   }
-  any(grepl("packagemanager\\.(posit|rstudio)\\.co", unname(repos)))
+  any(
+    grepl("packagemanager\\.(posit|rstudio)\\.co", unname(repos)),
+    na.rm = TRUE
+  )
+}
+
+repo_names_missing <- function(repos) {
+  repo_names <- names(repos)
+  is.null(repo_names) || any(is.na(repo_names) | !nzchar(repo_names))
 }
 
 renv_repos_override_is_unset <- function() {
@@ -36,7 +44,7 @@ renv_repos_override_is_unset <- function() {
 }
 
 format_repos_override <- function(repos) {
-  if (is.null(names(repos)) || any(!nzchar(names(repos)))) {
+  if (repo_names_missing(repos)) {
     return(unname(repos[[1]]))
   }
   paste(sprintf("%s=%s", names(repos), unname(repos)), collapse = ";")
@@ -52,8 +60,7 @@ rprofile_repository_marker <- function() {
 }
 
 rprofile_repos_value <- function(repos) {
-  repo_names <- names(repos)
-  if (is.null(repo_names) || any(!nzchar(repo_names))) {
+  if (repo_names_missing(repos)) {
     return(paste(
       sprintf(
         '"%s"',
@@ -62,6 +69,7 @@ rprofile_repos_value <- function(repos) {
       collapse = ", "
     ))
   }
+  repo_names <- names(repos)
   paste(
     sprintf(
       '"%s" = "%s"',
