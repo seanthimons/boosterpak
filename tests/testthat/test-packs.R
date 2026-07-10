@@ -2,7 +2,14 @@ test_that("built-in packs are discoverable", {
   packs <- list_packs(scope = "builtin", verbose = FALSE)
   expect_setequal(
     packs$name,
-    c("scaffold-analysis", "core", "eda", "example", "github-example")
+    c(
+      "scaffold-analysis",
+      "core",
+      "databases",
+      "eda",
+      "example",
+      "github-example"
+    )
   )
   expect_true(all(
     c("name", "description", "scope", "sources", "path") %in% names(packs)
@@ -60,6 +67,18 @@ test_that("built-in catalog matches v0.1 PRD contents", {
     boosterpak:::resolve_pack_on_add_hooks("scaffold-analysis"),
     "scaffold_analysis"
   )
+  expect_equal(
+    boosterpak:::resolve_pack("databases"),
+    c("DBI", "dbplyr", "duckdb", "RSQLite", "odbc", "connections")
+  )
+  expect_equal(
+    boosterpak:::resolve_pack_functions("databases"),
+    "enable_duckdb_connection_pane"
+  )
+  expect_equal(
+    boosterpak:::resolve_pack_on_add_hooks("databases"),
+    "enable_duckdb_connection_pane"
+  )
 })
 
 test_that("scaffold analysis pack materializes its nested helper function", {
@@ -83,6 +102,35 @@ test_that("scaffold analysis pack materializes its nested helper function", {
     "functions",
     "fn_scaffold_analysis.R"
   )))
+})
+
+test_that("databases pack injects DuckDB connection pane option helper", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  withr::local_options(
+    list("duckdb.enable_rstudio_connection_pane" = FALSE)
+  )
+  withr::defer(
+    rm(
+      list = intersect("enable_duckdb_connection_pane", ls(envir = .GlobalEnv)),
+      envir = .GlobalEnv
+    ),
+    teardown_env()
+  )
+
+  add_pack("databases", root = root, sync = FALSE, verbose = FALSE)
+
+  expect_true(file.exists(boosterpak:::function_file(
+    "enable_duckdb_connection_pane",
+    root
+  )))
+  expect_true(exists(
+    "enable_duckdb_connection_pane",
+    envir = .GlobalEnv,
+    mode = "function",
+    inherits = FALSE
+  ))
+  expect_true(isTRUE(getOption("duckdb.enable_rstudio_connection_pane")))
 })
 
 test_that("add_pack sources materialized pack functions", {
@@ -222,7 +270,7 @@ test_that("scaffold-analysis on_add hook creates project scaffold after sync", {
   expect_true(dir.exists(file.path(root, "docs")))
   expect_true(dir.exists(file.path(root, "output", "figures")))
   expect_true(dir.exists(file.path(root, "R")))
-  expect_true(dir.exists(file.path(root, "scratch")))
+  expect_true(dir.exists(file.path(root, "dev", "scratch")))
 })
 
 test_that("add_pack with sync false sources hooks but does not run them", {

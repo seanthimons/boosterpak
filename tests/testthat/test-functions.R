@@ -6,7 +6,14 @@ test_that("list_functions reports catalog and installation status", {
 
   expect_setequal(
     functions$name,
-    c("ni", "my_skim", "theme_custom", "geo_mean", "scaffold_analysis")
+    c(
+      "enable_duckdb_connection_pane",
+      "ni",
+      "my_skim",
+      "theme_custom",
+      "geo_mean",
+      "scaffold_analysis"
+    )
   )
   expect_false(any(functions$installed))
 })

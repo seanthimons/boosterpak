@@ -17,6 +17,9 @@ init <- function(
   renv <- match.arg(renv)
   rprofile <- match.arg(rprofile)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
+  repository_changes <- configure_boosterpak_repositories(
+    verbose = should_emit(verbose)
+  )
 
   dir.create(project_packs_dir(root), recursive = TRUE, showWarnings = FALSE)
 
@@ -49,7 +52,12 @@ init <- function(
     bootstrap_project_renv(root, config)
   }
 
-  changed_rprofile <- ensure_rprofile_line(root, rprofile)
+  repository_lines <- boosterpak_repository_lines_for_session(repository_changes)
+  changed_rprofile <- ensure_rprofile_line(
+    root,
+    rprofile,
+    repository_lines = repository_lines
+  )
 
   if (should_emit(verbose)) {
     if (wrote_config) {

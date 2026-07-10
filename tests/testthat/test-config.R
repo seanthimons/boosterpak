@@ -207,6 +207,12 @@ test_that("self install spec follows install metadata", {
 
 test_that("init inserts Rprofile hook after renv activation", {
   root <- withr::local_tempdir()
+  withr::local_options(list(
+    repos = c(CRAN = "@CRAN@"),
+    renv.config.repos.override = NULL,
+    boosterpak.configure_repositories = TRUE
+  ))
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
   writeLines(
     c("before <- TRUE", "source(\"renv/activate.R\")", "after <- TRUE"),
     file.path(root, ".Rprofile")
@@ -217,6 +223,8 @@ test_that("init inserts Rprofile hook after renv activation", {
   lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
   renv_line <- grep('source\\("renv/activate\\.R"\\)', lines)
   hook_line <- match(boosterpak:::rprofile_line(), lines)
+  repo_line <- match(boosterpak:::rprofile_repository_marker(), lines)
+  expect_true(repo_line < renv_line)
   expect_equal(hook_line, renv_line + 1L)
 })
 
@@ -237,6 +245,7 @@ test_that("init upgrades legacy Rprofile hook without duplication", {
 
 test_that("init leaves existing Rprofile hook unchanged", {
   root <- withr::local_tempdir()
+  withr::local_options(boosterpak.configure_repositories = FALSE)
   writeLines(
     c("before <- TRUE", boosterpak:::rprofile_line(), "after <- TRUE"),
     file.path(root, ".Rprofile")
