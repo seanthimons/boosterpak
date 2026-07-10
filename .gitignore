@@ -4,6 +4,7 @@
 .Rhistory
 .RData
 .Ruserdata
+.log/
 
 /.quarto/
 README_files/*
