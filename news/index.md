@@ -1,5 +1,11 @@
 # Changelog
 
+## boosterpak 0.6.2
+
+- Release from PR
+  [\#4](https://github.com/seanthimons/boosterpak/issues/4): Add
+  database pack and rescue tooling
+
 ## boosterpak 0.6.1
 
 - Release config repair, pack settings hook coverage, build workflow,
