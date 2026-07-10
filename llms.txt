@@ -238,8 +238,7 @@ tooling first, then run rescue:
 ``` r
 if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
 renv::load()
-if (!requireNamespace("pak", quietly = TRUE)) renv::install("pak")
-pak::pkg_install("seanthimons/boosterpak")
+renv::install("seanthimons/boosterpak")
 boosterpak:::.rescue()
 ```
 
