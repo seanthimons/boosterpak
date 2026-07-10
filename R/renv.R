@@ -54,6 +54,8 @@ call_renv_snapshot <- function(root = ".", packages = NULL, update = FALSE) {
 call_renv_restore <- function(root = ".") {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
+  configure_boosterpak_repositories(verbose = FALSE)
+  configure_boosterpak_install_policy(verbose = FALSE)
   renv::restore(project = root, prompt = FALSE)
 }
 
@@ -63,13 +65,16 @@ install_via <- function(packages, root = ".") {
   }
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
-  pak::pkg_install(packages)
+  configure_boosterpak_install_policy(verbose = FALSE)
+  pak::pkg_install(packages, upgrade = FALSE)
   invisible(packages)
 }
 
 install_pak_via_renv <- function(root = ".") {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
+  configure_boosterpak_repositories(verbose = FALSE)
+  configure_boosterpak_install_policy(verbose = FALSE)
   renv::install("pak", prompt = FALSE)
   invisible("pak")
 }

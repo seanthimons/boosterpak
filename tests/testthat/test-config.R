@@ -245,7 +245,10 @@ test_that("init upgrades legacy Rprofile hook without duplication", {
 
 test_that("init leaves existing Rprofile hook unchanged", {
   root <- withr::local_tempdir()
-  withr::local_options(boosterpak.configure_repositories = FALSE)
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
   writeLines(
     c("before <- TRUE", boosterpak:::rprofile_line(), "after <- TRUE"),
     file.path(root, ".Rprofile")

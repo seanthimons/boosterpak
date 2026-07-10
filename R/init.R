@@ -20,6 +20,9 @@ init <- function(
   repository_changes <- configure_boosterpak_repositories(
     verbose = should_emit(verbose)
   )
+  install_policy_changes <- configure_boosterpak_install_policy(
+    verbose = should_emit(verbose)
+  )
 
   dir.create(project_packs_dir(root), recursive = TRUE, showWarnings = FALSE)
 
@@ -52,7 +55,10 @@ init <- function(
     bootstrap_project_renv(root, config)
   }
 
-  repository_lines <- boosterpak_repository_lines_for_session(repository_changes)
+  repository_lines <- boosterpak_rprofile_setup_lines(
+    repository_changes,
+    install_policy_changes
+  )
   changed_rprofile <- ensure_rprofile_line(
     root,
     rprofile,

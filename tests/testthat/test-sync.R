@@ -165,6 +165,26 @@ test_that("sync does not hydrate source-specific package specs", {
   expect_equal(installed, "seanthimons/ComptoxR")
 })
 
+test_that("install_via asks pak to avoid dependency upgrades", {
+  root <- withr::local_tempdir()
+  installed <- NULL
+  upgrade <- NULL
+
+  local_mocked_bindings(
+    pkg_install = function(pkg, upgrade = TRUE, ...) {
+      installed <<- pkg
+      upgrade <<- upgrade
+      invisible(TRUE)
+    },
+    .package = "pak"
+  )
+
+  boosterpak:::install_via("cli", root = root)
+
+  expect_equal(installed, "cli")
+  expect_false(upgrade)
+})
+
 test_that("sync restore does not hydrate", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)

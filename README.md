@@ -26,7 +26,7 @@ pak::pkg_install("seanthimons/boosterpak")
 boosterpak::init(renv = "yes", rprofile = "yes")
 ```
 
-`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the recommended `.Rprofile` startup hook, and can initialize project-local `renv`. It also upgrades default-like CRAN mirrors to use Posit Package Manager for faster binary installs when available, including `@CRAN@`, common CRAN cloud mirrors, and mirrors listed in `options(boosterpak.default_cran_mirrors = c(...))` or `BOOSTERPAK_DEFAULT_CRAN_MIRRORS`; matching `.Rprofile` repository setup is written when `rprofile = "yes"`. With `renv = "yes"`, it bootstraps `renv`, `pak`, and `boosterpak` into the project library and snapshots those workflow packages before any restart is needed.
+`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the recommended `.Rprofile` startup hook, and can initialize project-local `renv`. It also upgrades default-like CRAN mirrors to use Posit Package Manager for faster binary installs when available, including `@CRAN@`, common CRAN cloud mirrors, and mirrors listed in `options(boosterpak.default_cran_mirrors = c(...))` or `BOOSTERPAK_DEFAULT_CRAN_MIRRORS`; matching `.Rprofile` repository setup is written when `rprofile = "yes"`. The startup setup also enables the `renv` pak backend and asks R package installs to avoid compiling from source when binaries are available. With `renv = "yes"`, it bootstraps `renv`, `pak`, and `boosterpak` into the project library and snapshots those workflow packages before any restart is needed.
 
 ## 4. Sync the project
 
@@ -148,7 +148,7 @@ renv::install("seanthimons/boosterpak")
 boosterpak:::.rescue()
 ```
 
-`.rescue()` repairs existing boosterpak projects only; it expects `boosters.toml` to already exist.
+`.rescue()` repairs existing boosterpak projects only; it expects `boosters.toml` to already exist. It rewrites the managed startup setup before `renv/activate.R`, reapplies the Posit Package Manager repository policy, enables the `renv` pak backend, and avoids source compilation prompts where binary packages are available.
 
 ## Troubleshooting 0.5 Init Projects
 

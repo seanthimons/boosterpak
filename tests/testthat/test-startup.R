@@ -118,7 +118,8 @@ test_that("init persists PPM repository setup before renv activation", {
   withr::local_options(list(
     repos = c(CRAN = "@CRAN@"),
     renv.config.repos.override = NULL,
-    boosterpak.configure_repositories = TRUE
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
   ))
   withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
   root <- withr::local_tempdir()
@@ -141,6 +142,47 @@ test_that("init persists PPM repository setup before renv activation", {
   )
   expect_match(lines[[marker + 2L]], "renv.config.repos.override")
   expect_equal(hook_line, renv_line + 1L)
+})
+
+test_that("init configures package install policy before renv activation", {
+  withr::local_options(list(
+    repos = c(CRAN = "@CRAN@"),
+    renv.config.repos.override = NULL,
+    renv.config.pak.enabled = FALSE,
+    renv.config.ppm.enabled = FALSE,
+    install.packages.compile.from.source = "interactive",
+    install.packages.check.source = "yes",
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = TRUE
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_CONFIGURE_INSTALL_POLICY = NA
+  )
+  root <- withr::local_tempdir()
+  writeLines(
+    c("before <- TRUE", "source(\"renv/activate.R\")", "after <- TRUE"),
+    file.path(root, ".Rprofile")
+  )
+
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+
+  expect_true(getOption("renv.config.pak.enabled"))
+  expect_true(getOption("renv.config.ppm.enabled"))
+  expect_equal(getOption("install.packages.compile.from.source"), "never")
+  expect_equal(getOption("install.packages.check.source"), "no")
+
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  policy <- match(boosterpak:::rprofile_install_policy_marker(), lines)
+  repo <- match(boosterpak:::rprofile_repository_marker(), lines)
+  renv_line <- grep('source\\("renv/activate\\.R"\\)', lines)
+
+  expect_true(policy < repo)
+  expect_true(repo < renv_line)
+  expect_equal(lines[[policy + 1L]], "options(renv.config.pak.enabled = TRUE)")
+  expect_equal(lines[[policy + 2L]], "options(renv.config.ppm.enabled = TRUE)")
+  expect_equal(lines[[policy + 3L]], 'options(install.packages.compile.from.source = "never")')
+  expect_equal(lines[[policy + 4L]], 'options(install.packages.check.source = "no")')
 })
 
 test_that("init preserves explicit non-PPM repos", {

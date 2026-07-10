@@ -100,13 +100,21 @@
   if (isTRUE(dry_run)) {
     old_repos <- getOption("repos")
     old_renv_repos <- getOption("renv.config.repos.override")
+    old_install_policy <- lapply(
+      names(boosterpak_install_policy_options()),
+      getOption
+    )
+    names(old_install_policy) <- names(boosterpak_install_policy_options())
     changes <- configure_boosterpak_repositories(verbose = FALSE)
-    lines <- boosterpak_repository_lines_for_session(changes)
+    install_policy_changes <- configure_boosterpak_install_policy(verbose = FALSE)
+    lines <- boosterpak_rprofile_setup_lines(changes, install_policy_changes)
     options(repos = old_repos)
     options(renv.config.repos.override = old_renv_repos)
+    options(old_install_policy)
   } else {
     changes <- configure_boosterpak_repositories(verbose = FALSE)
-    lines <- boosterpak_repository_lines_for_session(changes)
+    install_policy_changes <- configure_boosterpak_install_policy(verbose = FALSE)
+    lines <- boosterpak_rprofile_setup_lines(changes, install_policy_changes)
   }
 
   if (!should_configure_repositories()) {
@@ -125,7 +133,23 @@
     report <- .rescue_add(report, "skipped", "repository configuration already set or intentionally custom.")
   }
 
-  list(report = report, lines = lines, changes = changes)
+  if (!should_configure_install_policy()) {
+    report <- .rescue_add(report, "skipped", "package install policy skipped: disabled by option or environment.")
+  } else if (length(install_policy_changes) > 0) {
+    report <- .rescue_add(
+      report,
+      "actions",
+      if (isTRUE(dry_run)) {
+        "would configure boosterpak package install policy."
+      } else {
+        "configured boosterpak package install policy."
+      }
+    )
+  } else {
+    report <- .rescue_add(report, "skipped", "package install policy already set.")
+  }
+
+  list(report = report, lines = lines, changes = changes, install_policy_changes = install_policy_changes)
 }
 
 .rescue_config <- function(root) {
@@ -241,37 +265,12 @@
   lines <- lines[lines != rprofile_line()]
 
   if (length(repository_lines) > 0) {
-    lines <- .rescue_remove_rprofile_repository_block(lines)
+    lines <- remove_rprofile_boosterpak_setup_blocks(lines)
     lines <- insert_before_renv_activation(lines, repository_lines)
   }
 
   lines <- insert_after_renv_activation(lines, rprofile_line())
   list(lines = lines, changed = !identical(original, lines))
-}
-
-.rescue_remove_rprofile_repository_block <- function(lines) {
-  marker <- rprofile_repository_marker()
-  marker_idx <- which(lines == marker)
-  if (length(marker_idx) == 0) {
-    return(lines)
-  }
-
-  keep <- rep(TRUE, length(lines))
-  for (idx in marker_idx) {
-    keep[[idx]] <- FALSE
-    cursor <- idx + 1L
-    if (cursor <= length(lines) && grepl("^options\\(repos\\s*=\\s*c\\(", trimws(lines[[cursor]]))) {
-      keep[[cursor]] <- FALSE
-      cursor <- cursor + 1L
-    }
-    if (
-      cursor <= length(lines) &&
-        grepl("^options\\(renv\\.config\\.repos\\.override\\s*=", trimws(lines[[cursor]]))
-    ) {
-      keep[[cursor]] <- FALSE
-    }
-  }
-  lines[keep]
 }
 
 .rescue_core_assets <- function(root, config, config_valid, dry_run, report) {
@@ -432,11 +431,19 @@
       }
       report <- .rescue_add(report, "actions", "loaded project renv.")
       repo_changes <- configure_boosterpak_repositories(verbose = FALSE)
+      install_policy_changes <- configure_boosterpak_install_policy(verbose = FALSE)
       if (length(repo_changes) > 0) {
         report <- .rescue_add(
           report,
           "actions",
           "reapplied boosterpak package repositories after loading project renv."
+        )
+      }
+      if (length(install_policy_changes) > 0) {
+        report <- .rescue_add(
+          report,
+          "actions",
+          "reapplied boosterpak package install policy after loading project renv."
         )
       }
     }

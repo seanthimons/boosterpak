@@ -14,11 +14,11 @@ ensure_rprofile_line <- function(
   existing <- if (file.exists(path)) readLines(path, warn = FALSE) else character()
 
   legacy <- legacy_rprofile_line()
-  repo_missing <- length(repository_lines) > 0 &&
-    !rprofile_repository_marker() %in% existing
+  setup_missing <- length(repository_lines) > 0 &&
+    !all(repository_lines %in% existing)
   hook_missing <- !line %in% existing || legacy %in% existing
 
-  if (!repo_missing && !hook_missing) {
+  if (!setup_missing && !hook_missing) {
     return(invisible(FALSE))
   }
 
@@ -49,7 +49,8 @@ ensure_rprofile_line <- function(
 
   existing <- existing[existing != legacy]
   updated <- existing
-  if (repo_missing) {
+  if (setup_missing) {
+    updated <- remove_rprofile_boosterpak_setup_blocks(updated)
     updated <- insert_before_renv_activation(updated, repository_lines)
   }
   if (!line %in% updated) {
@@ -57,6 +58,60 @@ ensure_rprofile_line <- function(
   }
   writeLines(updated, path, useBytes = TRUE)
   invisible(TRUE)
+}
+
+remove_rprofile_boosterpak_setup_blocks <- function(lines) {
+  lines <- remove_rprofile_install_policy_block(lines)
+  remove_rprofile_repository_block(lines)
+}
+
+remove_rprofile_install_policy_block <- function(lines) {
+  marker <- rprofile_install_policy_marker()
+  marker_idx <- which(lines == marker)
+  if (length(marker_idx) == 0) {
+    return(lines)
+  }
+
+  keep <- rep(TRUE, length(lines))
+  option_names <- names(boosterpak_install_policy_options())
+  option_pattern <- sprintf(
+    "^options\\((%s)\\s*=",
+    paste(gsub(".", "\\\\.", option_names, fixed = TRUE), collapse = "|")
+  )
+  for (idx in marker_idx) {
+    keep[[idx]] <- FALSE
+    cursor <- idx + 1L
+    while (cursor <= length(lines) && grepl(option_pattern, trimws(lines[[cursor]]))) {
+      keep[[cursor]] <- FALSE
+      cursor <- cursor + 1L
+    }
+  }
+  lines[keep]
+}
+
+remove_rprofile_repository_block <- function(lines) {
+  marker <- rprofile_repository_marker()
+  marker_idx <- which(lines == marker)
+  if (length(marker_idx) == 0) {
+    return(lines)
+  }
+
+  keep <- rep(TRUE, length(lines))
+  for (idx in marker_idx) {
+    keep[[idx]] <- FALSE
+    cursor <- idx + 1L
+    if (cursor <= length(lines) && grepl("^options\\(repos\\s*=\\s*c\\(", trimws(lines[[cursor]]))) {
+      keep[[cursor]] <- FALSE
+      cursor <- cursor + 1L
+    }
+    if (
+      cursor <= length(lines) &&
+        grepl("^options\\(renv\\.config\\.repos\\.override\\s*=", trimws(lines[[cursor]]))
+    ) {
+      keep[[cursor]] <- FALSE
+    }
+  }
+  lines[keep]
 }
 
 insert_before_renv_activation <- function(lines, new_lines) {
