@@ -39,9 +39,12 @@ boosterpak::init(renv = "yes", rprofile = "yes")
 [`init()`](https://seanthimons.github.io/boosterpak/reference/init.md)
 writes `boosters.toml`, creates `boosters/packs/`, optionally writes
 `air.toml`, manages the recommended `.Rprofile` startup hook, and can
-initialize project-local `renv`. With `renv = "yes"`, it bootstraps
-`renv`, `pak`, and `boosterpak` into the project library and snapshots
-those workflow packages before any restart is needed.
+initialize project-local `renv`. It also configures the default CRAN
+placeholder to use Posit Package Manager for faster binary installs when
+available, and writes matching `.Rprofile` repository setup when
+`rprofile = "yes"`. With `renv = "yes"`, it bootstraps `renv`, `pak`,
+and `boosterpak` into the project library and snapshots those workflow
+packages before any restart is needed.
 
 ## 4. Sync the project
 
@@ -106,6 +109,9 @@ boosterpak::add_pack("example")
 The built-in pack catalog contains:
 
 - `core`: minimal bootstrap dependencies, `pak` and `renv`.
+- `databases`: database workflow packages including `DBI`, `dbplyr`,
+  `duckdb`, `RSQLite`, `odbc`, `connections`, and a DuckDB RStudio
+  connection-pane option helper.
 - `eda`: analysis helpers including `fs`, `here`, `janitor`, `rio`, core
   tidyverse packages, `scales`, `glue`, `digest`, `skimr`, and bundled
   helper functions.
@@ -213,6 +219,30 @@ vignette: run
 [`renv::restore()`](https://rstudio.github.io/renv/reference/restore.html)
 first (on default settings it installs `boosterpak` itself from the
 lockfile), restart R, then `boosterpak::sync(mode = "restore")`.
+
+## Emergency Rescue
+
+For an already-initialized boosterpak project with a broken `.Rprofile`,
+missing core pack files, or a lockfile that dropped `renv`, `pak`, or
+`boosterpak`, use the hidden repair helper:
+
+``` r
+boosterpak:::.rescue()
+```
+
+If `boosterpak` is absent from the project library, bootstrap enough
+tooling first, then run rescue:
+
+``` r
+if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
+renv::load()
+if (!requireNamespace("pak", quietly = TRUE)) renv::install("pak")
+pak::pkg_install("seanthimons/boosterpak")
+boosterpak:::.rescue()
+```
+
+`.rescue()` repairs existing boosterpak projects only; it expects
+`boosters.toml` to already exist.
 
 ## Troubleshooting 0.5 Init Projects
 

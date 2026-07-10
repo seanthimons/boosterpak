@@ -35,7 +35,7 @@
 
     <a class="navbar-brand me-2" href="index.html">boosterpak</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -87,7 +87,7 @@
 </h2>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/init.html">init</a></span><span class="op">(</span>renv <span class="op">=</span> <span class="st">"yes"</span>, rprofile <span class="op">=</span> <span class="st">"yes"</span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="reference/init.html">init()</a></code> writes <code>boosters.toml</code>, creates <code>boosters/packs/</code>, optionally writes <code>air.toml</code>, manages the recommended <code>.Rprofile</code> startup hook, and can initialize project-local <code>renv</code>. With <code>renv = "yes"</code>, it bootstraps <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> into the project library and snapshots those workflow packages before any restart is needed.</p>
+<p><code><a href="reference/init.html">init()</a></code> writes <code>boosters.toml</code>, creates <code>boosters/packs/</code>, optionally writes <code>air.toml</code>, manages the recommended <code>.Rprofile</code> startup hook, and can initialize project-local <code>renv</code>. It also configures the default CRAN placeholder to use Posit Package Manager for faster binary installs when available, and writes matching <code>.Rprofile</code> repository setup when <code>rprofile = "yes"</code>. With <code>renv = "yes"</code>, it bootstraps <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> into the project library and snapshots those workflow packages before any restart is needed.</p>
 </div>
 <div class="section level2">
 <h2 id="id_4-sync-the-project">4. Sync the project<a class="anchor" aria-label="anchor" href="#id_4-sync-the-project"></a>
@@ -134,6 +134,8 @@
 <ul>
 <li>
 <code>core</code>: minimal bootstrap dependencies, <code>pak</code> and <code>renv</code>.</li>
+<li>
+<code>databases</code>: database workflow packages including <code>DBI</code>, <code>dbplyr</code>, <code>duckdb</code>, <code>RSQLite</code>, <code>odbc</code>, <code>connections</code>, and a DuckDB RStudio connection-pane option helper.</li>
 <li>
 <code>eda</code>: analysis helpers including <code>fs</code>, <code>here</code>, <code>janitor</code>, <code>rio</code>, core tidyverse packages, <code>scales</code>, <code>glue</code>, <code>digest</code>, <code>skimr</code>, and bundled helper functions.</li>
 <li>
@@ -187,6 +189,21 @@
 <p><code>sync(mode = "apply")</code> treats <code>boosters.toml</code> as reusable setup intent and <code>renv.lock</code> as downstream output. It may hydrate from local libraries before installing the remaining declared packages with <code>pak</code>, then writes <code>boosters/attach.R</code> before snapshot. <code>sync(mode = "restore")</code> is the explicit path for exact lockfile restoration and does not hydrate. For restoring a freshly cloned project on a new machine, see the “Restoring a project on a new machine” vignette: run <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code> first (on default settings it installs <code>boosterpak</code> itself from the lockfile), restart R, then <code>boosterpak::sync(mode = "restore")</code>.</p>
 </div>
 <div class="section level2">
+<h2 id="emergency-rescue">Emergency Rescue<a class="anchor" aria-label="anchor" href="#emergency-rescue"></a>
+</h2>
+<p>For an already-initialized boosterpak project with a broken <code>.Rprofile</code>, missing core pack files, or a lockfile that dropped <code>renv</code>, <code>pak</code>, or <code>boosterpak</code>, use the hidden repair helper:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">:::</span><span class="fu">.rescue</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>If <code>boosterpak</code> is absent from the project library, bootstrap enough tooling first, then run rescue:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"renv"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"renv"</span><span class="op">)</span></span>
+<span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/load.html" class="external-link">load</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"pak"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/install.html" class="external-link">install</a></span><span class="op">(</span><span class="st">"pak"</span><span class="op">)</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pkg_install.html" class="external-link">pkg_install</a></span><span class="op">(</span><span class="st">"seanthimons/boosterpak"</span><span class="op">)</span></span>
+<span><span class="fu">boosterpak</span><span class="fu">:::</span><span class="fu">.rescue</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p><code>.rescue()</code> repairs existing boosterpak projects only; it expects <code>boosters.toml</code> to already exist.</p>
+</div>
+<div class="section level2">
 <h2 id="troubleshooting-05-init-projects">Troubleshooting 0.5 Init Projects<a class="anchor" aria-label="anchor" href="#troubleshooting-05-init-projects"></a>
 </h2>
 <p>If a project was initialized with boosterpak 0.5 and a restart made <code>boosterpak</code> unavailable inside <code>renv</code>, follow the bootstrap recipe under “Troubleshooting: boosterpak absent from the lockfile” in the “Restoring a project on a new machine” vignette (<code>vignettes/restoring-a-project.qmd</code>).</p>
@@ -194,7 +211,7 @@
 <div class="section level2">
 <h2 id="inspect-status">Inspect Status<a class="anchor" aria-label="anchor" href="#inspect-status"></a>
 </h2>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/status.html">status</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/list_packs.html">list_packs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="reference/status.html">status()</a></code> reports config validity, declared and resolved packs, package counts, missing direct packages, attach package count and file presence, function drift or missing materialized files, pack catalog counts, <code>renv</code> state, lockfile presence, and the <code>.Rprofile</code> hook.</p>

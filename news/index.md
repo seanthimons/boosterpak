@@ -1,5 +1,20 @@
 # Changelog
 
+## boosterpak 0.6.1
+
+- Release config repair, pack settings hook coverage, build workflow,
+  and release automation.
+- Added a built-in `databases` pack with `DBI`, `dbplyr`, `duckdb`,
+  `RSQLite`, `odbc`, `connections`, and a DuckDB RStudio connection-pane
+  option helper.
+- [`init()`](https://seanthimons.github.io/boosterpak/reference/init.md)
+  now configures the default CRAN placeholder to use Posit Package
+  Manager, points `renv` restores at the same repository, and persists
+  that setup in `.Rprofile` when boosterpak manages the startup hook.
+- Added hidden `boosterpak:::.rescue()` repair tooling for initialized
+  projects with broken startup files, missing core pack files, or
+  missing workflow packages in `renv.lock`.
+
 ## boosterpak 0.6.0.9000
 
 - Documentation now frames `boosterpak` as reusable project capability

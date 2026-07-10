@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">boosterpak</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -47,6 +47,14 @@
       <small>Source: <a href="https://github.com/seanthimons/boosterpak/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.6.1" id="boosterpak-061">boosterpak 0.6.1<a class="anchor" aria-label="anchor" href="#boosterpak-061"></a></h2>
+<ul><li>Release config repair, pack settings hook coverage, build workflow, and release automation.</li>
+<li>Added a built-in <code>databases</code> pack with <code>DBI</code>, <code>dbplyr</code>, <code>duckdb</code>, <code>RSQLite</code>, <code>odbc</code>, <code>connections</code>, and a DuckDB RStudio connection-pane option helper.</li>
+<li>
+<code><a href="../reference/init.html">init()</a></code> now configures the default CRAN placeholder to use Posit Package Manager, points <code>renv</code> restores at the same repository, and persists that setup in <code>.Rprofile</code> when boosterpak manages the startup hook.</li>
+<li>Added hidden <code>boosterpak:::.rescue()</code> repair tooling for initialized projects with broken startup files, missing core pack files, or missing workflow packages in <code>renv.lock</code>.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.6.0.9000" id="boosterpak-0609000">boosterpak 0.6.0.9000<a class="anchor" aria-label="anchor" href="#boosterpak-0609000"></a></h2>
 <ul><li>Documentation now frames <code>boosterpak</code> as reusable project capability packs: dependencies plus helper files, attachment choices, and setup conventions. The package uses TOML for its own config, but is not a general dependency-manifest standard.</li>
