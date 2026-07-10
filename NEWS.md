@@ -1,3 +1,7 @@
+# boosterpak 0.6.3
+
+* Release from PR #5: Fix PR #4 review feedback
+
 # boosterpak 0.6.2
 
 * Release from PR #4: Add database pack and rescue tooling
