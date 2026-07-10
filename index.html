@@ -35,7 +35,7 @@
 
     <a class="navbar-brand me-2" href="index.html">boosterpak</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -87,7 +87,7 @@
 </h2>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/init.html">init</a></span><span class="op">(</span>renv <span class="op">=</span> <span class="st">"yes"</span>, rprofile <span class="op">=</span> <span class="st">"yes"</span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="reference/init.html">init()</a></code> writes <code>boosters.toml</code>, creates <code>boosters/packs/</code>, optionally writes <code>air.toml</code>, manages the recommended <code>.Rprofile</code> startup hook, and can initialize project-local <code>renv</code>. It also configures the default CRAN placeholder to use Posit Package Manager for faster binary installs when available, and writes matching <code>.Rprofile</code> repository setup when <code>rprofile = "yes"</code>. With <code>renv = "yes"</code>, it bootstraps <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> into the project library and snapshots those workflow packages before any restart is needed.</p>
+<p><code><a href="reference/init.html">init()</a></code> writes <code>boosters.toml</code>, creates <code>boosters/packs/</code>, optionally writes <code>air.toml</code>, manages the recommended <code>.Rprofile</code> startup hook, and can initialize project-local <code>renv</code>. It also upgrades default-like CRAN mirrors to use Posit Package Manager for faster binary installs when available, including <code>@CRAN@</code>, common CRAN cloud mirrors, and mirrors listed in <code>options(boosterpak.default_cran_mirrors = c(...))</code> or <code>BOOSTERPAK_DEFAULT_CRAN_MIRRORS</code>; matching <code>.Rprofile</code> repository setup is written when <code>rprofile = "yes"</code>. With <code>renv = "yes"</code>, it bootstraps <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> into the project library and snapshots those workflow packages before any restart is needed.</p>
 </div>
 <div class="section level2">
 <h2 id="id_4-sync-the-project">4. Sync the project<a class="anchor" aria-label="anchor" href="#id_4-sync-the-project"></a>

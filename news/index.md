@@ -1,5 +1,11 @@
 # Changelog
 
+## boosterpak 0.6.4
+
+- Release from PR
+  [\#6](https://github.com/seanthimons/boosterpak/issues/6): Ignore
+  local log files
+
 ## boosterpak 0.6.3
 
 - Release from PR
