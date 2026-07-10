@@ -124,7 +124,12 @@ test_that("rescue skips workflow repair when project renv is absent", {
 })
 
 test_that("README documents bootstrap before hidden rescue when boosterpak is absent", {
-  readme <- readLines(file.path(testthat::test_path(), "..", "..", "README.md"), warn = FALSE)
+  readme_path <- file.path(testthat::test_path(), "..", "..", "README.md")
+  skip_if_not(
+    file.exists(readme_path),
+    "README.md is not available in installed package checks."
+  )
+  readme <- readLines(readme_path, warn = FALSE)
 
   expect_true(any(grepl('requireNamespace\\("renv"', readme)))
   expect_true(any(grepl("renv::load()", readme, fixed = TRUE)))
