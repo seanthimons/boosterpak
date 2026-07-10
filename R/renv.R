@@ -40,10 +40,15 @@ call_renv_load <- function(root = ".") {
   renv::load(project = root, quiet = TRUE)
 }
 
-call_renv_snapshot <- function(root = ".", packages = NULL) {
+call_renv_snapshot <- function(root = ".", packages = NULL, update = FALSE) {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
-  renv::snapshot(project = root, packages = packages, prompt = FALSE)
+  renv::snapshot(
+    project = root,
+    packages = packages,
+    prompt = FALSE,
+    update = update
+  )
 }
 
 call_renv_restore <- function(root = ".") {

@@ -26,7 +26,7 @@ pak::pkg_install("seanthimons/boosterpak")
 boosterpak::init(renv = "yes", rprofile = "yes")
 ```
 
-`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the recommended `.Rprofile` startup hook, and can initialize project-local `renv`. With `renv = "yes"`, it bootstraps `renv`, `pak`, and `boosterpak` into the project library and snapshots those workflow packages before any restart is needed.
+`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the recommended `.Rprofile` startup hook, and can initialize project-local `renv`. It also configures the default CRAN placeholder to use Posit Package Manager for faster binary installs when available, and writes matching `.Rprofile` repository setup when `rprofile = "yes"`. With `renv = "yes"`, it bootstraps `renv`, `pak`, and `boosterpak` into the project library and snapshots those workflow packages before any restart is needed.
 
 ## 4. Sync the project
 
@@ -76,6 +76,7 @@ boosterpak::add_pack("example")
 The built-in pack catalog contains:
 
 -   `core`: minimal bootstrap dependencies, `pak` and `renv`.
+-   `databases`: database workflow packages including `DBI`, `dbplyr`, `duckdb`, `RSQLite`, `odbc`, `connections`, and a DuckDB RStudio connection-pane option helper.
 -   `eda`: analysis helpers including `fs`, `here`, `janitor`, `rio`, core tidyverse packages, `scales`, `glue`, `digest`, `skimr`, and bundled helper functions.
 -   `example`: small documented example that installs `cli`.
 -   `scaffold-analysis`: installs `fs` and `here` and carries a helper for a compact analysis folder scaffold.
@@ -129,6 +130,26 @@ boosterpak::sync(mode = "restore")
 ```
 
 `sync(mode = "apply")` treats `boosters.toml` as reusable setup intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`, then writes `boosters/attach.R` before snapshot. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate. For restoring a freshly cloned project on a new machine, see the "Restoring a project on a new machine" vignette: run `renv::restore()` first (on default settings it installs `boosterpak` itself from the lockfile), restart R, then `boosterpak::sync(mode = "restore")`.
+
+## Emergency Rescue
+
+For an already-initialized boosterpak project with a broken `.Rprofile`, missing core pack files, or a lockfile that dropped `renv`, `pak`, or `boosterpak`, use the hidden repair helper:
+
+``` r
+boosterpak:::.rescue()
+```
+
+If `boosterpak` is absent from the project library, bootstrap enough tooling first, then run rescue:
+
+``` r
+if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
+renv::load()
+if (!requireNamespace("pak", quietly = TRUE)) renv::install("pak")
+pak::pkg_install("seanthimons/boosterpak")
+boosterpak:::.rescue()
+```
+
+`.rescue()` repairs existing boosterpak projects only; it expects `boosters.toml` to already exist.
 
 ## Troubleshooting 0.5 Init Projects
 

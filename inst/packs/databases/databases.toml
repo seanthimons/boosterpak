@@ -1,0 +1,16 @@
+name = "databases"
+description = "Database workflow pack with DBI, dbplyr, DuckDB, and RStudio connection helpers."
+packages = [
+  "DBI",
+  "dbplyr",
+  "duckdb",
+  "RSQLite",
+  "odbc",
+  "connections",
+]
+attach = ["DBI", "dbplyr", "duckdb", "connections"]
+functions = ["enable_duckdb_connection_pane"]
+
+[hooks]
+on_add = ["enable_duckdb_connection_pane"]
+
