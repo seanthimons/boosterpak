@@ -1,5 +1,12 @@
 # Changelog
 
+## boosterpak 0.6.3
+
+- Release from PR
+  [\#5](https://github.com/seanthimons/boosterpak/issues/5): Fix PR
+  [\#4](https://github.com/seanthimons/boosterpak/issues/4) review
+  feedback
+
 ## boosterpak 0.6.2
 
 - Release from PR
