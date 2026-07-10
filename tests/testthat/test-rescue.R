@@ -9,11 +9,15 @@ test_that("rescue aborts when boosters.toml is absent", {
 
 test_that("rescue dry run reports planned repairs without file changes", {
   withr::local_options(list(
-    repos = c(CRAN = "@CRAN@"),
+    repos = c(CRAN = "https://cran.rstudio.com/"),
     renv.config.repos.override = NULL,
-    boosterpak.configure_repositories = TRUE
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = character()
   ))
-  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+  )
   root <- withr::local_tempdir()
   boosterpak:::write_default_config(root)
   before <- list.files(root, all.files = TRUE, recursive = TRUE, no.. = TRUE)
@@ -32,17 +36,21 @@ test_that("rescue dry run reports planned repairs without file changes", {
   expect_false(file.exists(file.path(root, ".Rprofile")))
   expect_false(file.exists(file.path(root, "boosters", "packs", "core.toml")))
   expect_false(file.exists(file.path(root, "boosters", "attach.R")))
-  expect_equal(getOption("repos")[["CRAN"]], "@CRAN@")
+  expect_equal(getOption("repos")[["CRAN"]], "https://cran.rstudio.com/")
   expect_null(getOption("renv.config.repos.override"))
 })
 
 test_that("rescue repairs legacy Rprofile hook around renv activation", {
   withr::local_options(list(
-    repos = c(CRAN = "@CRAN@"),
+    repos = c(CRAN = "https://cran.rstudio.com"),
     renv.config.repos.override = NULL,
-    boosterpak.configure_repositories = TRUE
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = character()
   ))
-  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+  )
   root <- withr::local_tempdir()
   boosterpak:::write_default_config(root)
   writeLines(
@@ -64,6 +72,9 @@ test_that("rescue repairs legacy Rprofile hook around renv activation", {
 
   expect_false(boosterpak:::legacy_rprofile_line() %in% lines)
   expect_true(marker < renv_line)
+  expect_match(lines[[marker + 1L]], "options\\(repos = c")
+  expect_match(lines[[marker + 1L]], "packagemanager\\.posit\\.co")
+  expect_match(lines[[marker + 2L]], "renv.config.repos.override")
   expect_equal(hook_line, renv_line + 1L)
   expect_true("before <- TRUE" %in% lines)
   expect_true("after <- TRUE" %in% lines)

@@ -28,6 +28,92 @@ test_that("init configures PPM repos from R default CRAN placeholder", {
   expect_false(file.exists(file.path(root, ".Rprofile")))
 })
 
+test_that("init configures PPM repos from known CRAN mirror", {
+  withr::local_options(list(
+    repos = c(CRAN = "https://cran.rstudio.com"),
+    renv.config.repos.override = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = character()
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+  )
+  root <- withr::local_tempdir()
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  expect_equal(
+    getOption("repos")[["CRAN"]],
+    "https://packagemanager.posit.co/cran/latest"
+  )
+  expect_equal(
+    getOption("renv.config.repos.override"),
+    "CRAN=https://packagemanager.posit.co/cran/latest"
+  )
+})
+
+test_that("init normalizes trailing slash and host case for CRAN mirrors", {
+  withr::local_options(list(
+    repos = c(CRAN = "HTTPS://CRAN.RSTUDIO.COM/"),
+    renv.config.repos.override = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = character()
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+  )
+  root <- withr::local_tempdir()
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  expect_equal(
+    getOption("repos")[["CRAN"]],
+    "https://packagemanager.posit.co/cran/latest"
+  )
+  expect_equal(
+    getOption("renv.config.repos.override"),
+    "CRAN=https://packagemanager.posit.co/cran/latest"
+  )
+})
+
+test_that("init preserves extra repos while upgrading CRAN mirror", {
+  withr::local_options(list(
+    repos = c(
+      CRAN = "https://cloud.r-project.org",
+      Internal = "https://example.test/repo"
+    ),
+    renv.config.repos.override = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = character()
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+  )
+  root <- withr::local_tempdir()
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  expect_equal(
+    getOption("repos")[["CRAN"]],
+    "https://packagemanager.posit.co/cran/latest"
+  )
+  expect_equal(
+    getOption("repos")[["Internal"]],
+    "https://example.test/repo"
+  )
+  expect_equal(
+    getOption("renv.config.repos.override"),
+    paste(
+      "CRAN=https://packagemanager.posit.co/cran/latest",
+      "Internal=https://example.test/repo",
+      sep = ";"
+    )
+  )
+})
+
 test_that("init persists PPM repository setup before renv activation", {
   withr::local_options(list(
     repos = c(CRAN = "@CRAN@"),
@@ -56,17 +142,75 @@ test_that("init persists PPM repository setup before renv activation", {
 
 test_that("init preserves explicit non-PPM repos", {
   withr::local_options(list(
-    repos = c(CRAN = "https://cloud.r-project.org"),
+    repos = c(CRAN = "https://example.test/custom-cran"),
     renv.config.repos.override = NULL,
-    boosterpak.configure_repositories = TRUE
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = character()
   ))
-  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+  )
   root <- withr::local_tempdir()
 
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
 
-  expect_equal(getOption("repos")[["CRAN"]], "https://cloud.r-project.org")
+  expect_equal(getOption("repos")[["CRAN"]], "https://example.test/custom-cran")
   expect_null(getOption("renv.config.repos.override"))
+})
+
+test_that("R option allows additional default-like CRAN mirrors", {
+  withr::local_options(list(
+    repos = c(CRAN = "https://mirror.example.test/cran"),
+    renv.config.repos.override = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = "https://mirror.example.test/cran/"
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+  )
+  root <- withr::local_tempdir()
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  expect_equal(
+    getOption("repos")[["CRAN"]],
+    "https://packagemanager.posit.co/cran/latest"
+  )
+  expect_equal(
+    getOption("renv.config.repos.override"),
+    "CRAN=https://packagemanager.posit.co/cran/latest"
+  )
+})
+
+test_that("env var allows additional default-like CRAN mirrors", {
+  withr::local_options(list(
+    repos = c(CRAN = "https://mirror.example.test/cran"),
+    renv.config.repos.override = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = character()
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = paste(
+      "https://other.example.test/cran",
+      "https://mirror.example.test/cran/",
+      sep = ";"
+    )
+  )
+  root <- withr::local_tempdir()
+
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  expect_equal(
+    getOption("repos")[["CRAN"]],
+    "https://packagemanager.posit.co/cran/latest"
+  )
+  expect_equal(
+    getOption("renv.config.repos.override"),
+    "CRAN=https://packagemanager.posit.co/cran/latest"
+  )
 })
 
 test_that("init preserves existing renv repository override", {
