@@ -26,7 +26,7 @@ pak::pkg_install("seanthimons/boosterpak")
 boosterpak::init(renv = "yes", rprofile = "yes")
 ```
 
-`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the recommended `.Rprofile` startup hook, and can initialize project-local `renv`. It also configures the default CRAN placeholder to use Posit Package Manager for faster binary installs when available, and writes matching `.Rprofile` repository setup when `rprofile = "yes"`. With `renv = "yes"`, it bootstraps `renv`, `pak`, and `boosterpak` into the project library and snapshots those workflow packages before any restart is needed.
+`init()` writes `boosters.toml`, creates `boosters/packs/`, optionally writes `air.toml`, manages the recommended `.Rprofile` startup hook, and can initialize project-local `renv`. It also upgrades default-like CRAN mirrors to use Posit Package Manager for faster binary installs when available, including `@CRAN@`, common CRAN cloud mirrors, and mirrors listed in `options(boosterpak.default_cran_mirrors = c(...))` or `BOOSTERPAK_DEFAULT_CRAN_MIRRORS`; matching `.Rprofile` repository setup is written when `rprofile = "yes"`. With `renv = "yes"`, it bootstraps `renv`, `pak`, and `boosterpak` into the project library and snapshots those workflow packages before any restart is needed.
 
 ## 4. Sync the project
 

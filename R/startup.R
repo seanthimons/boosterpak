@@ -13,6 +13,47 @@ should_configure_repositories <- function() {
   isTRUE(getOption("boosterpak.configure_repositories", TRUE))
 }
 
+default_cran_mirrors <- function() {
+  env <- Sys.getenv("BOOSTERPAK_DEFAULT_CRAN_MIRRORS", unset = "")
+  env_mirrors <- if (nzchar(env)) {
+    trimws(strsplit(env, ";", fixed = TRUE)[[1]])
+  } else {
+    character()
+  }
+  mirrors <- c(
+    "@CRAN@",
+    "https://cloud.r-project.org",
+    "https://cran.rstudio.com",
+    "https://cran.r-project.org",
+    getOption("boosterpak.default_cran_mirrors", character()),
+    env_mirrors
+  )
+  mirrors[!is.na(mirrors) & nzchar(mirrors)]
+}
+
+normalize_cran_mirror <- function(x) {
+  x <- trimws(x)
+  x <- sub("/+$", "", x)
+  url <- !is.na(x) & grepl("^[A-Za-z][A-Za-z0-9+.-]*://", x)
+  x[url] <- vapply(x[url], function(mirror) {
+    parts <- regexec("^([A-Za-z][A-Za-z0-9+.-]*://)([^/?#]*)(.*)$", mirror)
+    matches <- regmatches(mirror, parts)[[1]]
+    if (length(matches) == 0) {
+      return(mirror)
+    }
+    paste0(tolower(matches[[2]]), tolower(matches[[3]]), matches[[4]])
+  }, character(1))
+  x
+}
+
+is_default_cran_mirror <- function(repo) {
+  if (length(repo) != 1 || is.na(repo) || !nzchar(repo)) {
+    return(FALSE)
+  }
+  normalize_cran_mirror(repo) %in%
+    normalize_cran_mirror(default_cran_mirrors())
+}
+
 uses_default_cran_repo <- function(repos) {
   if (is.null(repos) || length(repos) == 0) {
     return(TRUE)
@@ -20,7 +61,7 @@ uses_default_cran_repo <- function(repos) {
   if (!"CRAN" %in% names(repos)) {
     return(FALSE)
   }
-  identical(unname(repos[["CRAN"]]), "@CRAN@")
+  is_default_cran_mirror(unname(repos[["CRAN"]]))
 }
 
 uses_posit_package_manager <- function(repos) {
