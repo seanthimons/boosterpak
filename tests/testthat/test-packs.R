@@ -104,7 +104,7 @@ test_that("scaffold analysis pack materializes its nested helper function", {
   )))
 })
 
-test_that("databases pack injects DuckDB connection pane option helper", {
+test_that("databases pack installs DuckDB connection pane option helper", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
   withr::local_options(
@@ -130,6 +130,40 @@ test_that("databases pack injects DuckDB connection pane option helper", {
     mode = "function",
     inherits = FALSE
   ))
+  expect_false(isTRUE(getOption("duckdb.enable_rstudio_connection_pane")))
+  enable_duckdb_connection_pane()
+  expect_true(isTRUE(getOption("duckdb.enable_rstudio_connection_pane")))
+})
+
+test_that("databases on_add hook enables DuckDB connection pane option", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  withr::local_options(
+    list("duckdb.enable_rstudio_connection_pane" = FALSE)
+  )
+  withr::defer(
+    rm(
+      list = intersect("enable_duckdb_connection_pane", ls(envir = .GlobalEnv)),
+      envir = .GlobalEnv
+    ),
+    teardown_env()
+  )
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    sync = function(
+      mode = c("apply", "restore"),
+      root = ".",
+      hydrate = TRUE,
+      verbose = NULL
+    ) {
+      TRUE
+    },
+    .package = "boosterpak"
+  )
+
+  add_pack("databases", root = root, sync = TRUE, verbose = FALSE)
+
   expect_true(isTRUE(getOption("duckdb.enable_rstudio_connection_pane")))
 })
 
