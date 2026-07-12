@@ -149,6 +149,7 @@ functions read the effective value with
 which resolves project override → pack default → the `default` argument:
 
 ``` r
+
 scaffold_targets_curation <- function(
   dirs = boosterpak::pack_setting(
     "targets-curation",

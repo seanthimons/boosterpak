@@ -8,6 +8,7 @@ project setup.
 The short version:
 
 ``` r
+
 # In R, from the cloned project directory:
 renv::restore()
 
@@ -73,6 +74,7 @@ snapshots `renv`, `pak`, and `boosterpak` into the lockfile (unless
 bootstrap this way.
 
 ``` r
+
 renv::restore()
 ```
 
@@ -82,6 +84,7 @@ Restart R so the freshly restored packages and the startup hook load
 cleanly, then run restore mode:
 
 ``` r
+
 boosterpak::sync(mode = "restore")
 ```
 
@@ -98,6 +101,7 @@ are ordinary committed files.
 ## 4. Verify
 
 ``` r
+
 boosterpak::status()
 boosterpak::check_functions()
 ```
@@ -131,6 +135,7 @@ leaves it uninstalled. Bootstrap it once without relying on `boosterpak`
 being loadable:
 
 ``` r
+
 install.packages("renv")
 renv::install(c("pak", "seanthimons/boosterpak"))
 renv::snapshot(

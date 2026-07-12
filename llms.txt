@@ -21,18 +21,21 @@ setup conventions that make this kind of project ready to work in.”
 ## 1. Install pak
 
 ``` r
+
 install.packages("pak")
 ```
 
 ## 2. Install boosterpak
 
 ``` r
+
 pak::pkg_install("seanthimons/boosterpak")
 ```
 
 ## 3. Initialize the project
 
 ``` r
+
 boosterpak::init(renv = "yes", rprofile = "yes")
 ```
 
@@ -53,6 +56,7 @@ those workflow packages before any restart is needed.
 ## 4. Sync the project
 
 ``` r
+
 boosterpak::sync()
 ```
 
@@ -107,6 +111,7 @@ and only reusable setup invariants belong in a pack.
 ## Add a Pack
 
 ``` r
+
 boosterpak::add_pack("example")
 ```
 
@@ -164,6 +169,7 @@ that should go straight to `pak`.
 ## Capture and Reuse Packs
 
 ``` r
+
 boosterpak::create_pack("analysis", c("dplyr", "rstudio/pointblank"), attach = "all")
 boosterpak::save_pack("project_baseline")
 boosterpak::promote_pack("project_baseline")
@@ -209,6 +215,7 @@ requirements format.
 ## Restore from a Lockfile
 
 ``` r
+
 boosterpak::sync(mode = "restore")
 ```
 
@@ -231,6 +238,7 @@ missing core pack files, or a lockfile that dropped `renv`, `pak`, or
 `boosterpak`, use the hidden repair helper:
 
 ``` r
+
 boosterpak:::.rescue()
 ```
 
@@ -238,6 +246,7 @@ If `boosterpak` is absent from the project library, bootstrap enough
 tooling first, then run rescue:
 
 ``` r
+
 if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv")
 renv::load()
 renv::install("seanthimons/boosterpak")
@@ -261,6 +270,7 @@ under “Troubleshooting: boosterpak absent from the lockfile” in the
 ## Inspect Status
 
 ``` r
+
 boosterpak::status()
 boosterpak::list_packs()
 ```

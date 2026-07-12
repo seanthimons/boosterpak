@@ -66,18 +66,21 @@ and only reusable setup invariants belong in a pack.
 ## 1. Install pak
 
 ``` r
+
 install.packages("pak")
 ```
 
 ## 2. Install boosterpak
 
 ``` r
+
 pak::pkg_install("seanthimons/boosterpak")
 ```
 
 ## 3. Initialize the project
 
 ``` r
+
 boosterpak::init(renv = "yes", rprofile = "yes")
 ```
 
@@ -104,6 +107,7 @@ when user confirmation would be required.
 ## 4. Sync the project
 
 ``` r
+
 boosterpak::sync()
 ```
 
@@ -117,6 +121,7 @@ first-run installs.
 ## Add a Pack
 
 ``` r
+
 boosterpak::add_pack("example")
 ```
 
@@ -128,6 +133,7 @@ updating `[packs].declared`. For the analysis baseline of `fs`, `here`,
 `skimr`, and bundled helper functions, add the `eda` pack explicitly:
 
 ``` r
+
 boosterpak::add_pack("eda")
 ```
 
@@ -164,6 +170,7 @@ explicitly listed in `[attach].declared`.
 ## Add a Helper Function
 
 ``` r
+
 boosterpak::add_function("ni")
 ```
 
@@ -177,6 +184,7 @@ edits.
 ## Capture and Reuse
 
 ``` r
+
 boosterpak::save_pack("project_baseline")
 boosterpak::promote_pack("project_baseline")
 ```
@@ -210,6 +218,7 @@ requirements format.
 ## Restore Exact Versions
 
 ``` r
+
 boosterpak::sync(mode = "restore")
 ```
 
@@ -232,6 +241,7 @@ If a project was initialized with boosterpak 0.5 and, after restart,
 ## Inspect
 
 ``` r
+
 boosterpak::status()
 boosterpak::list_packs()
 ```

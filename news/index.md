@@ -88,6 +88,7 @@
 - Projects initialized with boosterpak 0.5 can recover by running:
 
   ``` r
+
   install.packages("renv")
   renv::install(c("pak", "seanthimons/boosterpak"))
   renv::snapshot(packages = c("renv", "pak", "boosterpak"), prompt = FALSE)
