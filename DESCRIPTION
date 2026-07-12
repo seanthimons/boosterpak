@@ -23,6 +23,7 @@ Imports:
     RcppTOML,
     utils
 Suggests:
+    autonewsmd,
     ggplot2,
     knitr,
     quarto,
