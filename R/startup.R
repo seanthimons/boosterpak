@@ -14,7 +14,10 @@ should_configure_repositories <- function() {
 }
 
 should_configure_install_policy <- function() {
-  env <- Sys.getenv("BOOSTERPAK_CONFIGURE_INSTALL_POLICY", unset = NA_character_)
+  env <- Sys.getenv(
+    "BOOSTERPAK_CONFIGURE_INSTALL_POLICY",
+    unset = NA_character_
+  )
   if (!is.na(env)) {
     return(!tolower(env) %in% c("0", "false", "no", "off"))
   }
@@ -77,14 +80,18 @@ normalize_cran_mirror <- function(x) {
   x <- trimws(x)
   x <- sub("/+$", "", x)
   url <- !is.na(x) & grepl("^[A-Za-z][A-Za-z0-9+.-]*://", x)
-  x[url] <- vapply(x[url], function(mirror) {
-    parts <- regexec("^([A-Za-z][A-Za-z0-9+.-]*://)([^/?#]*)(.*)$", mirror)
-    matches <- regmatches(mirror, parts)[[1]]
-    if (length(matches) == 0) {
-      return(mirror)
-    }
-    paste0(tolower(matches[[2]]), tolower(matches[[3]]), matches[[4]])
-  }, character(1))
+  x[url] <- vapply(
+    x[url],
+    function(mirror) {
+      parts <- regexec("^([A-Za-z][A-Za-z0-9+.-]*://)([^/?#]*)(.*)$", mirror)
+      matches <- regmatches(mirror, parts)[[1]]
+      if (length(matches) == 0) {
+        return(mirror)
+      }
+      paste0(tolower(matches[[2]]), tolower(matches[[3]]), matches[[4]])
+    },
+    character(1)
+  )
   x
 }
 
@@ -124,13 +131,6 @@ repo_names_missing <- function(repos) {
 renv_repos_override_is_unset <- function() {
   is.null(getOption("renv.config.repos.override")) &&
     !nzchar(Sys.getenv("RENV_CONFIG_REPOS_OVERRIDE", unset = ""))
-}
-
-format_repos_override <- function(repos) {
-  if (repo_names_missing(repos)) {
-    return(unname(repos[[1]]))
-  }
-  paste(sprintf("%s=%s", names(repos), unname(repos)), collapse = ";")
 }
 
 escape_r_string <- function(x) {
@@ -209,8 +209,8 @@ rprofile_repository_lines <- function(repos, include_renv = TRUE) {
     lines <- c(
       lines,
       sprintf(
-        'options(renv.config.repos.override = "%s")',
-        escape_r_string(format_repos_override(repos))
+        "options(renv.config.repos.override = c(%s))",
+        rprofile_repos_value(repos)
       )
     )
   }
@@ -232,15 +232,16 @@ boosterpak_repository_lines_for_session <- function(changes = character()) {
   if (!uses_posit_package_manager(repos)) {
     return(character())
   }
-  include_renv <- "renv" %in% changes ||
-    identical(
-      getOption("renv.config.repos.override"),
-      format_repos_override(repos)
-    )
+  include_renv <- "renv" %in%
+    changes ||
+    identical(getOption("renv.config.repos.override"), repos)
   rprofile_repository_lines(repos, include_renv = include_renv)
 }
 
-boosterpak_rprofile_setup_lines <- function(repository_changes = character(), install_policy_changes = character()) {
+boosterpak_rprofile_setup_lines <- function(
+  repository_changes = character(),
+  install_policy_changes = character()
+) {
   c(
     boosterpak_install_policy_lines_for_session(install_policy_changes),
     boosterpak_repository_lines_for_session(repository_changes)
@@ -268,7 +269,7 @@ configure_boosterpak_repositories <- function(verbose = TRUE) {
       (uses_default_cran_repo(getOption("repos")) ||
         uses_posit_package_manager(getOption("repos")))
   ) {
-    options(renv.config.repos.override = format_repos_override(getOption("repos")))
+    options(renv.config.repos.override = getOption("repos"))
     changed <- c(changed, "renv")
   }
 

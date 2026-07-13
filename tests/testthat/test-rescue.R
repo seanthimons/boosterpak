@@ -184,7 +184,7 @@ test_that("rescue reapplies repositories after loading project renv", {
   )
   expect_equal(
     override_at_snapshot,
-    "CRAN=https://packagemanager.posit.co/cran/latest"
+    c(CRAN = "https://packagemanager.posit.co/cran/latest")
   )
   expect_true(pak_at_snapshot)
   expect_true(ppm_at_snapshot)
