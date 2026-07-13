@@ -19,10 +19,9 @@ test_that("init configures PPM repos from R default CRAN placeholder", {
   )
   expect_equal(
     getOption("renv.config.repos.override"),
-    paste(
-      "CRAN=https://packagemanager.posit.co/cran/latest",
-      "Internal=https://example.test/repo",
-      sep = ";"
+    c(
+      CRAN = "https://packagemanager.posit.co/cran/latest",
+      Internal = "https://example.test/repo"
     )
   )
   expect_false(file.exists(file.path(root, ".Rprofile")))
@@ -49,7 +48,7 @@ test_that("init configures PPM repos from known CRAN mirror", {
   )
   expect_equal(
     getOption("renv.config.repos.override"),
-    "CRAN=https://packagemanager.posit.co/cran/latest"
+    c(CRAN = "https://packagemanager.posit.co/cran/latest")
   )
 })
 
@@ -74,7 +73,7 @@ test_that("init normalizes trailing slash and host case for CRAN mirrors", {
   )
   expect_equal(
     getOption("renv.config.repos.override"),
-    "CRAN=https://packagemanager.posit.co/cran/latest"
+    c(CRAN = "https://packagemanager.posit.co/cran/latest")
   )
 })
 
@@ -106,10 +105,9 @@ test_that("init preserves extra repos while upgrading CRAN mirror", {
   )
   expect_equal(
     getOption("renv.config.repos.override"),
-    paste(
-      "CRAN=https://packagemanager.posit.co/cran/latest",
-      "Internal=https://example.test/repo",
-      sep = ";"
+    c(
+      CRAN = "https://packagemanager.posit.co/cran/latest",
+      Internal = "https://example.test/repo"
     )
   )
 })
@@ -140,7 +138,10 @@ test_that("init persists PPM repository setup before renv activation", {
     lines[[marker + 1L]],
     'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/latest"))'
   )
-  expect_match(lines[[marker + 2L]], "renv.config.repos.override")
+  expect_equal(
+    lines[[marker + 2L]],
+    'options(renv.config.repos.override = c(CRAN = "https://packagemanager.posit.co/cran/latest"))'
+  )
   expect_equal(hook_line, renv_line + 1L)
 })
 
@@ -181,8 +182,14 @@ test_that("init configures package install policy before renv activation", {
   expect_true(repo < renv_line)
   expect_equal(lines[[policy + 1L]], "options(renv.config.pak.enabled = TRUE)")
   expect_equal(lines[[policy + 2L]], "options(renv.config.ppm.enabled = TRUE)")
-  expect_equal(lines[[policy + 3L]], 'options(install.packages.compile.from.source = "never")')
-  expect_equal(lines[[policy + 4L]], 'options(install.packages.check.source = "no")')
+  expect_equal(
+    lines[[policy + 3L]],
+    'options(install.packages.compile.from.source = "never")'
+  )
+  expect_equal(
+    lines[[policy + 4L]],
+    'options(install.packages.check.source = "no")'
+  )
 })
 
 test_that("init preserves explicit non-PPM repos", {
@@ -225,7 +232,7 @@ test_that("R option allows additional default-like CRAN mirrors", {
   )
   expect_equal(
     getOption("renv.config.repos.override"),
-    "CRAN=https://packagemanager.posit.co/cran/latest"
+    c(CRAN = "https://packagemanager.posit.co/cran/latest")
   )
 })
 
@@ -254,7 +261,7 @@ test_that("env var allows additional default-like CRAN mirrors", {
   )
   expect_equal(
     getOption("renv.config.repos.override"),
-    "CRAN=https://packagemanager.posit.co/cran/latest"
+    c(CRAN = "https://packagemanager.posit.co/cran/latest")
   )
 })
 
@@ -292,10 +299,6 @@ test_that("repository helpers handle NA values and names", {
   repos <- c("https://cloud.r-project.org", "https://example.test/repo")
   names(repos) <- c("CRAN", NA_character_)
 
-  expect_equal(
-    boosterpak:::format_repos_override(repos),
-    "https://cloud.r-project.org"
-  )
   expect_equal(
     boosterpak:::rprofile_repos_value(repos),
     '"https://cloud.r-project.org", "https://example.test/repo"'

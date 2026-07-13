@@ -1,6 +1,6 @@
 Package: boosterpak
 Title: Reusable Project Capability Packs
-Version: 0.6.4
+Version: 0.6.4.9000
 Authors@R: 
     person("Sean", "Thimons", email = "sxthimons@gmail.com", role = c("aut", "cre"))
 Author: Sean Thimons [aut, cre]
