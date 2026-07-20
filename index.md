@@ -11,8 +11,10 @@ copied files.
 `boosters.toml` is the project-local control file for those packs. It is
 not a general dependency-manifest standard and `boosterpak` does not
 depend on one. `pak` remains the installer, `renv` remains the lockfile
-and project-library layer, and `boosterpak` sits above them as a small
-capability-bundle layer for reusable setup conventions.
+and default project-library layer, and `boosterpak` sits above them as a
+small capability-bundle layer for reusable setup conventions. Existing
+projects can instead apply packs to an active user or site library
+without creating a project-local `renv` environment.
 
 Use `boosterpak` when the reusable thing is not just “these packages”,
 but “these packages plus the helper functions, attachment choices, and
@@ -59,6 +61,41 @@ those workflow packages before any restart is needed.
 
 boosterpak::sync()
 ```
+
+## Use an Active Library Without a Project renv
+
+For a live project that should keep using its existing R libraries,
+initialize without creating a project-local `renv` environment:
+
+``` r
+
+boosterpak::init(renv = "no", rprofile = "yes")
+```
+
+Then select the persistent active-library strategy in `boosters.toml`:
+
+``` toml
+[settings]
+library = "active"
+```
+
+[`boosterpak::sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
+and eager pack mutations will now detect and install packages in the
+first writable entry of
+[`.libPaths()`](https://rdrr.io/r/base/libPaths.html). Package source
+overrides, helper functions, and `boosters/attach.R` work normally.
+Active-library apply mode skips
+[`renv::hydrate()`](https://rstudio.github.io/renv/reference/hydrate.html)
+and
+[`renv::snapshot()`](https://rstudio.github.io/renv/reference/snapshot.html);
+it does not create `renv/` or `renv.lock`. For a one-off override
+without editing TOML, use `boosterpak::sync(library = "active")` or
+`boosterpak::add_pack("eda", library = "active")`.
+
+The `renv` package remains an installation dependency because lockfile
+restore support is part of `boosterpak`, but no project-local renv
+environment is activated in this mode. `sync(mode = "restore")` remains
+the separate renv lockfile workflow.
 
 ## Typical Workflow
 
@@ -157,14 +194,16 @@ unless explicitly listed in `[attach].declared`.
 Pack mutation is additive. Removing a pack updates `boosters.toml` and
 can run sync, but it does not uninstall packages.
 
-By default,
+With the default `library = "renv"` strategy,
 [`add_pack()`](https://seanthimons.github.io/boosterpak/reference/add_pack.md)
 and `sync(mode = "apply")` use `hydrate = TRUE`, so ordinary CRAN-style
 package names can be copied from renv-discoverable local libraries
 before `pak` downloads anything. Source-specific declarations, such as
 GitHub remotes in `[sources]`, skip hydration and install through their
 declared spec. Use `hydrate = FALSE` for stricter first-run installs
-that should go straight to `pak`.
+that should go straight to `pak`. The `library = "active"` strategy
+installs directly into the selected active library and ignores
+hydration.
 
 ## Capture and Reuse Packs
 

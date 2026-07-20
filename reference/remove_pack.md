@@ -10,7 +10,8 @@ remove_pack(
   root = ".",
   sync = TRUE,
   remove_functions = FALSE,
-  verbose = NULL
+  verbose = NULL,
+  library = NULL
 )
 ```
 
@@ -36,6 +37,12 @@ remove_pack(
 - verbose:
 
   Whether to print routine summaries.
+
+- library:
+
+  Package-library strategy passed to
+  [`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md).
+  `NULL` uses the project configuration.
 
 ## Value
 

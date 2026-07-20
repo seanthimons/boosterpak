@@ -9,18 +9,20 @@ copied files.
 `boosters.toml` is the project-local control file for those packs. It is
 not a general dependency-manifest standard and `boosterpak` does not
 depend on one. `pak` remains the installer, `renv` remains the lockfile
-and project-library layer, and `boosterpak` sits above them as a small
-capability-bundle layer for reusable setup conventions.
+and default project-library layer, and `boosterpak` sits above them as a
+small capability-bundle layer for reusable setup conventions. Existing
+projects can instead apply packs to an active user or site library
+without creating a project-local `renv` environment.
 
 A project declares the packs it wants in `boosters.toml`;
 [`boosterpak::sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
 resolves those packs, hydrates plain-name packages from local libraries
-when possible, and installs anything still missing into the active
-project-local `renv` library. It also writes `boosters/attach.R` with
-explicit startup [`library()`](https://rdrr.io/r/base/library.html)
-calls for packages intended to be attached. Packs can also carry exact
-copied helper files, so a useful project setup can be reused without
-separating “packages” from customized `boosters/fn_*.R` files.
+when possible, and installs anything still missing into the selected
+package library. It also writes `boosters/attach.R` with explicit
+startup [`library()`](https://rdrr.io/r/base/library.html) calls for
+packages intended to be attached. Packs can also carry exact copied
+helper files, so a useful project setup can be reused without separating
+“packages” from customized `boosters/fn_*.R` files.
 
 ## Typical workflow
 
@@ -111,12 +113,45 @@ when user confirmation would be required.
 boosterpak::sync()
 ```
 
-Apply mode is additive. It hydrates plain-name missing packages from
-renv-discoverable local libraries, installs anything still missing with
-`pak`, materializes missing bundled or installed helper functions, and,
-when `auto_snapshot = true`, writes `boosters/attach.R` and snapshots
-with `renv`. Use `hydrate = FALSE` to skip local reuse for stricter
-first-run installs.
+Apply mode is additive. With the default renv-library strategy, it
+hydrates plain-name missing packages from renv-discoverable local
+libraries, installs anything still missing with `pak`, materializes
+missing bundled or installed helper functions, and, when
+`auto_snapshot = true`, writes `boosters/attach.R` and snapshots with
+`renv`. Use `hydrate = FALSE` to skip local reuse for stricter first-run
+installs.
+
+## Use an active library without a project renv
+
+For an existing live project that should keep using its current R
+libraries, initialize without creating a project-local `renv`
+environment:
+
+``` r
+
+boosterpak::init(renv = "no", rprofile = "yes")
+```
+
+Then edit the generated setting in `boosters.toml`:
+
+``` toml
+[settings]
+library = "active"
+```
+
+[`boosterpak::sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
+and eager pack mutations now detect and install packages in the first
+writable entry of [`.libPaths()`](https://rdrr.io/r/base/libPaths.html).
+Source-specific install specs, helper functions, and startup attachment
+work normally. Active-library apply mode skips hydration and
+snapshotting and does not create `renv/` or `renv.lock`. The same
+behavior can be selected for one call with
+`boosterpak::sync(library = "active")`.
+
+The `renv` package remains an installation dependency because boosterpak
+also supports lockfile restoration, but active-library mode does not
+create or load a project-local renv environment.
+`sync(mode = "restore")` remains the separate renv lockfile workflow.
 
 ## Add a Pack
 

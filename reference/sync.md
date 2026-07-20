@@ -5,7 +5,13 @@ Synchronize a boosterpak project
 ## Usage
 
 ``` r
-sync(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL)
+sync(
+  mode = c("apply", "restore"),
+  root = ".",
+  hydrate = TRUE,
+  verbose = NULL,
+  library = NULL
+)
 ```
 
 ## Arguments
@@ -23,11 +29,18 @@ sync(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL)
 
   Whether additive apply mode should reuse packages from
   renv-discoverable local libraries before downloading with pak. Restore
-  mode ignores this option and remains lockfile-exact.
+  mode and active-library apply mode ignore this option.
 
 - verbose:
 
   Whether to print routine summaries.
+
+- library:
+
+  Package-library strategy for apply mode: `"renv"` uses the
+  project-local renv library, while `"active"` uses the first writable
+  entry in [`.libPaths()`](https://rdrr.io/r/base/libPaths.html). `NULL`
+  uses `[settings].library`, defaulting to `"renv"`.
 
 ## Value
 

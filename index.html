@@ -11,8 +11,8 @@
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Reusable Project Capability Packs">
-<meta name="description" content="Provides reusable project packs for bootstrapping R workflows. A pack is a typed bundle of package dependencies, optional source specifications, startup attachment intent, helper-function sidecars, and project-local setup conventions. Applies packs with pak and renv while leaving exact version restoration to renv lockfiles.">
-<meta property="og:description" content="Provides reusable project packs for bootstrapping R workflows. A pack is a typed bundle of package dependencies, optional source specifications, startup attachment intent, helper-function sidecars, and project-local setup conventions. Applies packs with pak and renv while leaving exact version restoration to renv lockfiles.">
+<meta name="description" content="Provides reusable project packs for bootstrapping R workflows. A pack is a typed bundle of package dependencies, optional source specifications, startup attachment intent, helper-function sidecars, and project-local setup conventions. Applies packs with pak to either the active R library or a project-local renv library while leaving exact version restoration to renv lockfiles.">
+<meta property="og:description" content="Provides reusable project packs for bootstrapping R workflows. A pack is a typed bundle of package dependencies, optional source specifications, startup attachment intent, helper-function sidecars, and project-local setup conventions. Applies packs with pak to either the active R library or a project-local renv library while leaving exact version restoration to renv lockfiles.">
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script><script>
   document.addEventListener('DOMContentLoaded', function() {
     mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
@@ -35,7 +35,7 @@
 
     <a class="navbar-brand me-2" href="index.html">boosterpak</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.4.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -68,7 +68,7 @@
 </h1></div>
 <p><img src="reference/figures/boosterpak_hex.png" alt="boosterpak hex logo" align="right" width="140"></p>
 <p><code>boosterpak</code> installs reusable R project packs: typed bundles of package dependencies, optional source specs, startup attachment intent, and helper-function sidecars that make a project usable without turning it into a package. It is less than a package, but more than a fistful of copied files.</p>
-<p><code>boosters.toml</code> is the project-local control file for those packs. It is not a general dependency-manifest standard and <code>boosterpak</code> does not depend on one. <code>pak</code> remains the installer, <code>renv</code> remains the lockfile and project-library layer, and <code>boosterpak</code> sits above them as a small capability-bundle layer for reusable setup conventions.</p>
+<p><code>boosters.toml</code> is the project-local control file for those packs. It is not a general dependency-manifest standard and <code>boosterpak</code> does not depend on one. <code>pak</code> remains the installer, <code>renv</code> remains the lockfile and default project-library layer, and <code>boosterpak</code> sits above them as a small capability-bundle layer for reusable setup conventions. Existing projects can instead apply packs to an active user or site library without creating a project-local <code>renv</code> environment.</p>
 <p>Use <code>boosterpak</code> when the reusable thing is not just “these packages”, but “these packages plus the helper functions, attachment choices, and setup conventions that make this kind of project ready to work in.”</p>
 <div class="section level2">
 <h2 id="id_1-install-pak">1. Install pak<a class="anchor" aria-label="anchor" href="#id_1-install-pak"></a>
@@ -94,6 +94,18 @@
 </h2>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/sync.html">sync</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="use-an-active-library-without-a-project-renv">Use an Active Library Without a Project renv<a class="anchor" aria-label="anchor" href="#use-an-active-library-without-a-project-renv"></a>
+</h2>
+<p>For a live project that should keep using its existing R libraries, initialize without creating a project-local <code>renv</code> environment:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/init.html">init</a></span><span class="op">(</span>renv <span class="op">=</span> <span class="st">"no"</span>, rprofile <span class="op">=</span> <span class="st">"yes"</span><span class="op">)</span></span></code></pre></div>
+<p>Then select the persistent active-library strategy in <code>boosters.toml</code>:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="kw">[settings]</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="dt">library</span> <span class="op">=</span> <span class="st">"active"</span></span></code></pre></div>
+<p><code><a href="reference/sync.html">boosterpak::sync()</a></code> and eager pack mutations will now detect and install packages in the first writable entry of <code><a href="https://rdrr.io/r/base/libPaths.html" class="external-link">.libPaths()</a></code>. Package source overrides, helper functions, and <code>boosters/attach.R</code> work normally. Active-library apply mode skips <code><a href="https://rstudio.github.io/renv/reference/hydrate.html" class="external-link">renv::hydrate()</a></code> and <code><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">renv::snapshot()</a></code>; it does not create <code>renv/</code> or <code>renv.lock</code>. For a one-off override without editing TOML, use <code>boosterpak::sync(library = "active")</code> or <code>boosterpak::add_pack("eda", library = "active")</code>.</p>
+<p>The <code>renv</code> package remains an installation dependency because lockfile restore support is part of <code>boosterpak</code>, but no project-local renv environment is activated in this mode. <code>sync(mode = "restore")</code> remains the separate renv lockfile workflow.</p>
 </div>
 <div class="section level2">
 <h2 id="typical-workflow">Typical Workflow<a class="anchor" aria-label="anchor" href="#typical-workflow"></a>
@@ -128,7 +140,7 @@
 <div class="section level2">
 <h2 id="add-a-pack">Add a Pack<a class="anchor" aria-label="anchor" href="#add-a-pack"></a>
 </h2>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/add_pack.html">add_pack</a></span><span class="op">(</span><span class="st">"example"</span><span class="op">)</span></span></code></pre></div>
 <p>The built-in pack catalog contains:</p>
 <ul>
@@ -146,21 +158,21 @@
 <code>github-example</code>: installs <code>ComptoxR</code> from <code>seanthimons/ComptoxR</code>.</li>
 </ul>
 <p>Packs can mix ordinary CRAN package names with source-specific install specs. Declare every package in <code>packages</code>, then add a <code>[sources]</code> entry only for packages that should come from somewhere else:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">"plotting"</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Plotting packages from CRAN and GitHub."</span></span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"ggplot2"</span><span class="op">,</span> <span class="st">"patchwork"</span><span class="op">,</span> <span class="st">"ggtext"</span><span class="op">]</span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="kw">[sources]</span></span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">"plotting"</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Plotting packages from CRAN and GitHub."</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"ggplot2"</span><span class="op">,</span> <span class="st">"patchwork"</span><span class="op">,</span> <span class="st">"ggtext"</span><span class="op">]</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="kw">[sources]</span></span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code></pre></div>
 <p>In this pack, <code>ggplot2</code> and <code>patchwork</code> install by package name, while <code>ggtext</code> uses the GitHub source spec.</p>
 <p>Attachment is separate from installation. Missing <code>attach</code> means a pack attaches its direct <code>packages</code>; packs can also use <code>attach = true</code>, <code>attach = false</code>, or <code>attach = ["pkg1", "pkg2"]</code>. The top-level <code>[attach]</code> table can add packages with <code>declared</code>, remove packages with <code>exclude</code>, or set <code>enabled = false</code> to remove the managed <code>boosters/attach.R</code> file. Workflow packages from <code>core</code> and <code>[extras]</code>, such as <code>pak</code>, <code>renv</code>, and <code>boosterpak</code>, are installed but not attached unless explicitly listed in <code>[attach].declared</code>.</p>
 <p>Pack mutation is additive. Removing a pack updates <code>boosters.toml</code> and can run sync, but it does not uninstall packages.</p>
-<p>By default, <code><a href="reference/add_pack.html">add_pack()</a></code> and <code>sync(mode = "apply")</code> use <code>hydrate = TRUE</code>, so ordinary CRAN-style package names can be copied from renv-discoverable local libraries before <code>pak</code> downloads anything. Source-specific declarations, such as GitHub remotes in <code>[sources]</code>, skip hydration and install through their declared spec. Use <code>hydrate = FALSE</code> for stricter first-run installs that should go straight to <code>pak</code>.</p>
+<p>With the default <code>library = "renv"</code> strategy, <code><a href="reference/add_pack.html">add_pack()</a></code> and <code>sync(mode = "apply")</code> use <code>hydrate = TRUE</code>, so ordinary CRAN-style package names can be copied from renv-discoverable local libraries before <code>pak</code> downloads anything. Source-specific declarations, such as GitHub remotes in <code>[sources]</code>, skip hydration and install through their declared spec. Use <code>hydrate = FALSE</code> for stricter first-run installs that should go straight to <code>pak</code>. The <code>library = "active"</code> strategy installs directly into the selected active library and ignores hydration.</p>
 </div>
 <div class="section level2">
 <h2 id="capture-and-reuse-packs">Capture and Reuse Packs<a class="anchor" aria-label="anchor" href="#capture-and-reuse-packs"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/create_pack.html">create_pack</a></span><span class="op">(</span><span class="st">"analysis"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"dplyr"</span>, <span class="st">"rstudio/pointblank"</span><span class="op">)</span>, attach <span class="op">=</span> <span class="st">"all"</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/save_pack.html">save_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/promote_pack.html">promote_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span></code></pre></div>
@@ -184,7 +196,7 @@
 <div class="section level2">
 <h2 id="restore-from-a-lockfile">Restore from a Lockfile<a class="anchor" aria-label="anchor" href="#restore-from-a-lockfile"></a>
 </h2>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/sync.html">sync</a></span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"restore"</span><span class="op">)</span></span></code></pre></div>
 <p><code>sync(mode = "apply")</code> treats <code>boosters.toml</code> as reusable setup intent and <code>renv.lock</code> as downstream output. It may hydrate from local libraries before installing the remaining declared packages with <code>pak</code>, then writes <code>boosters/attach.R</code> before snapshot. <code>sync(mode = "restore")</code> is the explicit path for exact lockfile restoration and does not hydrate. For restoring a freshly cloned project on a new machine, see the “Restoring a project on a new machine” vignette: run <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code> first (on default settings it installs <code>boosterpak</code> itself from the lockfile), restart R, then <code>boosterpak::sync(mode = "restore")</code>.</p>
 </div>
@@ -192,10 +204,10 @@
 <h2 id="emergency-rescue">Emergency Rescue<a class="anchor" aria-label="anchor" href="#emergency-rescue"></a>
 </h2>
 <p>For an already-initialized boosterpak project with a broken <code>.Rprofile</code>, missing core pack files, or a lockfile that dropped <code>renv</code>, <code>pak</code>, or <code>boosterpak</code>, use the hidden repair helper:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">:::</span><span class="fu">.rescue</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>If <code>boosterpak</code> is absent from the project library, bootstrap enough tooling first, then run rescue:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"renv"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"renv"</span><span class="op">)</span></span>
 <span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/load.html" class="external-link">load</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/install.html" class="external-link">install</a></span><span class="op">(</span><span class="st">"seanthimons/boosterpak"</span><span class="op">)</span></span>
@@ -210,7 +222,7 @@
 <div class="section level2">
 <h2 id="inspect-status">Inspect Status<a class="anchor" aria-label="anchor" href="#inspect-status"></a>
 </h2>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/status.html">status</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/list_packs.html">list_packs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="reference/status.html">status()</a></code> reports config validity, declared and resolved packs, package counts, missing direct packages, attach package count and file presence, function drift or missing materialized files, pack catalog counts, <code>renv</code> state, lockfile presence, and the <code>.Rprofile</code> hook.</p>

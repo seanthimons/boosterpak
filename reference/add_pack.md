@@ -11,7 +11,8 @@ add_pack(
   sync = TRUE,
   hydrate = TRUE,
   overwrite_functions = FALSE,
-  verbose = NULL
+  verbose = NULL,
+  library = NULL
 )
 ```
 
@@ -31,8 +32,9 @@ add_pack(
 
 - hydrate:
 
-  Whether additive sync should reuse packages from renv-discoverable
-  local libraries before downloading with pak.
+  Whether renv-library additive sync should reuse packages from
+  renv-discoverable local libraries before downloading with pak. The
+  active library strategy ignores this option.
 
 - overwrite_functions:
 
@@ -41,6 +43,12 @@ add_pack(
 - verbose:
 
   Whether to print routine summaries.
+
+- library:
+
+  Package-library strategy passed to
+  [`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md).
+  `NULL` uses the project configuration.
 
 ## Value
 

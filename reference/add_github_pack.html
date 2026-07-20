@@ -25,7 +25,7 @@ optionally runs the normal additive sync flow."><script src="https://cdn.jsdeliv
 
     <a class="navbar-brand me-2" href="../index.html">boosterpak</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.4.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -73,7 +73,8 @@ optionally runs the normal additive sync flow.</p>
 <span>  hydrate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  overwrite <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  overwrite_functions <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  verbose <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  verbose <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  library <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -107,8 +108,9 @@ discovered packs, or <code>NULL</code> to select interactively.</p></dd>
 
 
 <dt id="arg-hydrate">hydrate<a class="anchor" aria-label="anchor" href="#arg-hydrate"></a></dt>
-<dd><p>Whether additive sync should reuse packages from
-renv-discoverable local libraries before downloading with pak.</p></dd>
+<dd><p>Whether renv-library additive sync should reuse packages from
+renv-discoverable local libraries before downloading with pak. The active
+library strategy ignores this option.</p></dd>
 
 
 <dt id="arg-overwrite">overwrite<a class="anchor" aria-label="anchor" href="#arg-overwrite"></a></dt>
@@ -122,6 +124,11 @@ provided by the pack.</p></dd>
 
 <dt id="arg-verbose">verbose<a class="anchor" aria-label="anchor" href="#arg-verbose"></a></dt>
 <dd><p>Whether to print routine summaries.</p></dd>
+
+
+<dt id="arg-library">library<a class="anchor" aria-label="anchor" href="#arg-library"></a></dt>
+<dd><p>Package-library strategy passed to <code><a href="sync.html">sync()</a></code>. <code>NULL</code> uses the
+project configuration.</p></dd>
 
 </dl></div>
     <div class="section level2">
