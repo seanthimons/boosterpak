@@ -12,12 +12,15 @@
 #' @param path Directory inside the repository that contains pack manifests.
 #' @param root Project root.
 #' @param sync Whether to run additive sync after editing TOML.
-#' @param hydrate Whether additive sync should reuse packages from
-#'   renv-discoverable local libraries before downloading with pak.
+#' @param hydrate Whether renv-library additive sync should reuse packages from
+#'   renv-discoverable local libraries before downloading with pak. The active
+#'   library strategy ignores this option.
 #' @param overwrite Whether to replace existing project pack files.
 #' @param overwrite_functions Whether to overwrite existing function files
 #'   provided by the pack.
 #' @param verbose Whether to print routine summaries.
+#' @param library Package-library strategy passed to [sync()]. `NULL` uses the
+#'   project configuration.
 #' @return Updated declared pack names, invisibly.
 #' @export
 add_github_pack <- function(
@@ -30,7 +33,8 @@ add_github_pack <- function(
   hydrate = TRUE,
   overwrite = FALSE,
   overwrite_functions = FALSE,
-  verbose = NULL
+  verbose = NULL,
+  library = NULL
 ) {
   check_verbose(verbose)
   repo_url <- normalize_github_pack_repo(repo)
@@ -59,7 +63,8 @@ add_github_pack <- function(
     sync = sync,
     hydrate = hydrate,
     overwrite_functions = overwrite_functions,
-    verbose = verbose
+    verbose = verbose,
+    library = library
   )
 }
 
@@ -351,7 +356,8 @@ declare_project_packs <- function(
   sync = TRUE,
   hydrate = TRUE,
   overwrite_functions = FALSE,
-  verbose = NULL
+  verbose = NULL,
+  library = NULL
 ) {
   config <- read_config(root)
   validate_config(config, root)
@@ -362,7 +368,8 @@ declare_project_packs <- function(
   next_packs <- unique(c(current, names))
 
   if (isTRUE(sync)) {
-    ensure_project_renv(root)
+    library <- resolve_library_strategy(library, config)
+    ensure_package_library(root, library)
   }
   if (length(new_adds) > 0 && !isTRUE(overwrite_functions)) {
     check_pack_function_conflicts(new_adds, root)
@@ -381,7 +388,13 @@ declare_project_packs <- function(
   }
 
   if (isTRUE(sync)) {
-    sync(mode = "apply", root = root, hydrate = hydrate, verbose = verbose)
+    sync(
+      mode = "apply",
+      root = root,
+      hydrate = hydrate,
+      verbose = verbose,
+      library = library
+    )
     invisible(lapply(new_adds, run_pack_on_add_hooks, root = root))
   } else if (should_emit(verbose)) {
     cli::cli_alert_success(

@@ -182,7 +182,8 @@ test_that("on_add hooks can read settings through exported helper", {
       mode = c("apply", "restore"),
       root = ".",
       hydrate = TRUE,
-      verbose = NULL
+      verbose = NULL,
+      ...
     ) {
       TRUE
     },

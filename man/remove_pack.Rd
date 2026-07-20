@@ -9,7 +9,8 @@ remove_pack(
   root = ".",
   sync = TRUE,
   remove_functions = FALSE,
-  verbose = NULL
+  verbose = NULL,
+  library = NULL
 )
 }
 \arguments{
@@ -23,6 +24,9 @@ remove_pack(
 only by the removed pack.}
 
 \item{verbose}{Whether to print routine summaries.}
+
+\item{library}{Package-library strategy passed to \code{\link[=sync]{sync()}}. \code{NULL} uses the
+project configuration.}
 }
 \value{
 Updated declared pack names, invisibly.

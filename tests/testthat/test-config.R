@@ -21,6 +21,7 @@ test_that("init writes v0.1 config and Rprofile hook when explicit", {
 
   config <- boosterpak:::read_config(root)
   expect_equal(config$packs$declared, "core")
+  expect_equal(config$settings$library, "renv")
   expect_true(config$attach$enabled)
   expect_equal(config$attach$declared, list())
   expect_equal(config$attach$exclude, list())
@@ -438,7 +439,7 @@ test_that("status reports broader package, pack, and function state", {
   writeLines(c(readLines(path, warn = FALSE), "# local edit"), path)
 
   local_mocked_bindings(
-    missing_packages = function(packages, root = ".") {
+    missing_packages = function(packages, root = ".", ...) {
       packages[packages %in% "cli"]
     },
     .package = "boosterpak"
@@ -473,6 +474,28 @@ test_that("status reports TOML-installed functions with missing files", {
 
   expect_equal(s$function_missing_count, 1L)
   expect_false(s$function_status$exists[s$function_status$name == "ni"])
+})
+
+test_that("status reports the configured active library", {
+  root <- withr::local_tempdir()
+  active_lib <- file.path(root, "active-library")
+  dir.create(active_lib)
+  old_libpaths <- .libPaths()
+  withr::defer(.libPaths(old_libpaths))
+  .libPaths(c(active_lib, old_libpaths))
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines <- sub('library = "renv"', 'library = "active"', lines, fixed = TRUE)
+  writeLines(lines, path)
+
+  s <- status(root = root, verbose = FALSE)
+
+  expect_identical(s$library_strategy, "active")
+  expect_equal(
+    s$library_path,
+    normalizePath(active_lib, winslash = "/", mustWork = TRUE)
+  )
 })
 
 test_that("v0.1 settings validation accepts documented shapes", {
@@ -571,6 +594,28 @@ test_that("v0.1 settings validation rejects invalid setting types", {
   expect_error(
     boosterpak:::validate_config(boosterpak:::read_config(root), root),
     "settings.packs"
+  )
+})
+
+test_that("settings library accepts supported strategies and rejects others", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines <- sub('library = "renv"', 'library = "active"', lines, fixed = TRUE)
+  writeLines(lines, path)
+
+  expect_silent(boosterpak:::validate_config(
+    boosterpak:::read_config(root),
+    root
+  ))
+
+  lines <- sub('library = "active"', 'library = "shared"', lines, fixed = TRUE)
+  writeLines(lines, path)
+
+  expect_error(
+    boosterpak:::validate_config(boosterpak:::read_config(root), root),
+    "renv.*active"
   )
 })
 

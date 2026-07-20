@@ -102,8 +102,8 @@ test_that("sync writes attach file before snapshot", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages, root = ".") character(),
-    install_via = function(specs, root = ".") TRUE,
+    missing_packages = function(packages, root = ".", ...) character(),
+    install_via = function(specs, root = ".", ...) TRUE,
     call_renv_snapshot = function(root = ".", packages = NULL) {
       snapshotted_after_attach <<- file.exists(boosterpak:::attach_file(root))
     },
@@ -126,8 +126,8 @@ test_that("sync removes managed attach file when attach is disabled", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages, root = ".") character(),
-    install_via = function(specs, root = ".") TRUE,
+    missing_packages = function(packages, root = ".", ...) character(),
+    install_via = function(specs, root = ".", ...) TRUE,
     call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
     .package = "boosterpak"
   )

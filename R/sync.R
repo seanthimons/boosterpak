@@ -5,11 +5,14 @@
 #' @param root Project root.
 #' @param hydrate Whether additive apply mode should reuse packages from
 #'   renv-discoverable local libraries before downloading with pak. Restore
-#'   mode ignores this option and remains lockfile-exact.
+#'   mode and active-library apply mode ignore this option.
 #' @param verbose Whether to print routine summaries.
+#' @param library Package-library strategy for apply mode: `"renv"` uses the
+#'   project-local renv library, while `"active"` uses the first writable entry
+#'   in `.libPaths()`. `NULL` uses `[settings].library`, defaulting to `"renv"`.
 #' @return Resolved package names, invisibly.
 #' @export
-sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL) {
+sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL, library = NULL) {
   check_verbose(verbose)
   mode <- match.arg(mode)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
@@ -18,23 +21,27 @@ sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbo
     return(sync_restore(root, verbose))
   }
 
-  ensure_project_renv(root)
   config <- read_config(root)
   validate_config(config, root)
+  library <- resolve_library_strategy(library, config)
+  ensure_package_library(root, library)
   materialize_config_packs(config, root)
   packages <- resolve_config_packages(config, root)
   install_specs <- resolve_config_install_specs(config, root)
-  missing <- missing_packages(packages, root)
-  if (isTRUE(hydrate)) {
+  missing <- missing_packages(packages, root, library)
+  if (isTRUE(hydrate) && identical(library, "renv")) {
     hydrate_via_renv(plain_missing_packages(packages, install_specs, missing), root)
-    missing <- missing_packages(packages, root)
+    missing <- missing_packages(packages, root, library)
   }
   missing_specs <- install_specs[packages %in% missing]
-  install_via(missing_specs, root)
+  install_via(missing_specs, root, library)
   sync_functions(config, root)
   write_attach(root, verbose = FALSE)
 
-  if (isTRUE(config$settings$auto_snapshot %||% TRUE)) {
+  if (
+    identical(library, "renv") &&
+      isTRUE(config$settings$auto_snapshot %||% TRUE)
+  ) {
     call_renv_snapshot(root, packages)
   }
 

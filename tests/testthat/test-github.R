@@ -196,7 +196,7 @@ test_that("sync true batches sync once and runs hooks for new additions", {
   sync_calls <- 0L
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    sync = function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL) {
+    sync = function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL, ...) {
       sync_calls <<- sync_calls + 1L
       TRUE
     },

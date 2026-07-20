@@ -8,8 +8,9 @@ Maintainer: Sean Thimons <sxthimons@gmail.com>
 Description: Provides reusable project packs for bootstrapping R workflows. A
     pack is a typed bundle of package dependencies, optional source
     specifications, startup attachment intent, helper-function sidecars, and
-    project-local setup conventions. Applies packs with 'pak' and 'renv' while
-    leaving exact version restoration to 'renv' lockfiles.
+    project-local setup conventions. Applies packs with 'pak' to either the
+    active R library or a project-local 'renv' library while leaving exact
+    version restoration to 'renv' lockfiles.
 License: MIT + file LICENSE
 URL: https://seanthimons.github.io/boosterpak/, https://github.com/seanthimons/boosterpak
 BugReports: https://github.com/seanthimons/boosterpak/issues

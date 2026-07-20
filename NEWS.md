@@ -1,3 +1,7 @@
+# boosterpak 0.6.4.9000
+
+* Added a first-class active-library strategy for projects that do not use a project-local `renv` environment. Set `[settings].library = "active"` or pass `library = "active"` to apply packs through the first writable `.libPaths()` entry without hydration or snapshotting.
+
 # boosterpak 0.6.4
 
 * Release from PR #6: Ignore local log files

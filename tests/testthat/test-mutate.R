@@ -56,7 +56,7 @@ test_that("add_pack passes hydrate opt-out through to sync", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    sync = function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL) {
+    sync = function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL, ...) {
       hydrate_value <<- hydrate
     },
     .package = "boosterpak"
@@ -65,4 +65,33 @@ test_that("add_pack passes hydrate opt-out through to sync", {
   add_pack("example", root = root, sync = TRUE, hydrate = FALSE, verbose = FALSE)
 
   expect_false(hydrate_value)
+})
+
+test_that("eager add_pack supports the active-library strategy", {
+  root <- withr::local_tempdir()
+  active_lib <- file.path(root, "active-library")
+  dir.create(active_lib)
+  old_libpaths <- .libPaths()
+  withr::defer(.libPaths(old_libpaths))
+  .libPaths(c(active_lib, old_libpaths))
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  used_library <- NULL
+
+  local_mocked_bindings(
+    sync = function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL, library = NULL) {
+      used_library <<- library
+    },
+    .package = "boosterpak"
+  )
+
+  add_pack(
+    "example",
+    root = root,
+    sync = TRUE,
+    verbose = FALSE,
+    library = "active"
+  )
+
+  expect_identical(used_library, "active")
+  expect_true("example" %in% boosterpak:::read_config(root)$packs$declared)
 })

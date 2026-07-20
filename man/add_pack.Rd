@@ -10,7 +10,8 @@ add_pack(
   sync = TRUE,
   hydrate = TRUE,
   overwrite_functions = FALSE,
-  verbose = NULL
+  verbose = NULL,
+  library = NULL
 )
 }
 \arguments{
@@ -20,13 +21,17 @@ add_pack(
 
 \item{sync}{Whether to run additive sync after editing TOML.}
 
-\item{hydrate}{Whether additive sync should reuse packages from
-renv-discoverable local libraries before downloading with pak.}
+\item{hydrate}{Whether renv-library additive sync should reuse packages from
+renv-discoverable local libraries before downloading with pak. The active
+library strategy ignores this option.}
 
 \item{overwrite_functions}{Whether to overwrite existing function files
 provided by the pack.}
 
 \item{verbose}{Whether to print routine summaries.}
+
+\item{library}{Package-library strategy passed to \code{\link[=sync]{sync()}}. \code{NULL} uses the
+project configuration.}
 }
 \value{
 Updated declared pack names, invisibly.
