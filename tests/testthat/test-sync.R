@@ -47,8 +47,8 @@ test_that("sync snapshots declared packages explicitly", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages, root = ".") character(),
-    install_via = function(specs, root = ".") TRUE,
+    missing_packages = function(packages, root = ".", ...) character(),
+    install_via = function(specs, root = ".", ...) TRUE,
     call_renv_snapshot = function(root = ".", packages = NULL) {
       snapshot_packages <<- packages
     },
@@ -69,11 +69,11 @@ test_that("sync hydrates missing plain-name packages before pak install", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages, root = ".") c("pak", "renv", "boosterpak", "cli"),
+    missing_packages = function(packages, root = ".", ...) c("pak", "renv", "boosterpak", "cli"),
     hydrate_via_renv = function(packages, root = ".") {
       hydrated <<- packages
     },
-    install_via = function(specs, root = ".") {
+    install_via = function(specs, root = ".", ...) {
       installed <<- specs
     },
     call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
@@ -99,12 +99,12 @@ test_that("sync rechecks missing packages after hydration before calling pak", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages, root = ".") {
+    missing_packages = function(packages, root = ".", ...) {
       calls <<- calls + 1
       if (calls == 1) c("pak", "renv", "boosterpak", "cli") else "boosterpak"
     },
     hydrate_via_renv = function(packages, root = ".") TRUE,
-    install_via = function(specs, root = ".") {
+    install_via = function(specs, root = ".", ...) {
       installed <<- specs
     },
     call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
@@ -125,11 +125,11 @@ test_that("sync hydrate false skips hydration", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages, root = ".") c("pak", "renv", "boosterpak", "cli"),
+    missing_packages = function(packages, root = ".", ...) c("pak", "renv", "boosterpak", "cli"),
     hydrate_via_renv = function(packages, root = ".") {
       hydrated <<- TRUE
     },
-    install_via = function(specs, root = ".") TRUE,
+    install_via = function(specs, root = ".", ...) TRUE,
     call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
     .package = "boosterpak"
   )
@@ -148,11 +148,11 @@ test_that("sync does not hydrate source-specific package specs", {
 
   local_mocked_bindings(
     ensure_project_renv = function(root = ".") TRUE,
-    missing_packages = function(packages, root = ".") "ComptoxR",
+    missing_packages = function(packages, root = ".", ...) "ComptoxR",
     hydrate_via_renv = function(packages, root = ".") {
       hydrated <<- packages
     },
-    install_via = function(specs, root = ".") {
+    install_via = function(specs, root = ".", ...) {
       installed <<- specs
     },
     call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
@@ -167,22 +167,103 @@ test_that("sync does not hydrate source-specific package specs", {
 
 test_that("install_via asks pak to avoid dependency upgrades", {
   root <- withr::local_tempdir()
+  active_lib <- file.path(root, "active-library")
+  dir.create(active_lib)
+  old_libpaths <- .libPaths()
+  withr::defer(.libPaths(old_libpaths))
+  .libPaths(c(active_lib, old_libpaths))
   installed <- NULL
+  installed_lib <- NULL
   upgrade <- NULL
 
   local_mocked_bindings(
-    pkg_install = function(pkg, upgrade = TRUE, ...) {
+    pkg_install = function(pkg, lib = .libPaths()[[1]], upgrade = TRUE, ...) {
       installed <<- pkg
+      installed_lib <<- lib
       upgrade <<- upgrade
       invisible(TRUE)
     },
     .package = "pak"
   )
 
-  boosterpak:::install_via("cli", root = root)
+  boosterpak:::install_via("cli", root = root, library = "active")
 
   expect_equal(installed, "cli")
+  expect_equal(
+    installed_lib,
+    normalizePath(active_lib, winslash = "/", mustWork = TRUE)
+  )
   expect_false(upgrade)
+})
+
+test_that("active-library sync installs without renv and skips renv operations", {
+  root <- withr::local_tempdir()
+  active_lib <- file.path(root, "active-library")
+  dir.create(active_lib)
+  old_libpaths <- .libPaths()
+  withr::defer(.libPaths(old_libpaths))
+  .libPaths(c(active_lib, old_libpaths))
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("github-example", root = root, sync = FALSE, verbose = FALSE)
+
+  installed <- NULL
+  used_library <- NULL
+  hydrated <- FALSE
+  snapshotted <- FALSE
+
+  local_mocked_bindings(
+    missing_packages = function(packages, root = ".", library = "renv") {
+      used_library <<- library
+      packages
+    },
+    install_via = function(specs, root = ".", library = "renv") {
+      installed <<- specs
+      used_library <<- library
+    },
+    hydrate_via_renv = function(packages, root = ".") {
+      hydrated <<- TRUE
+    },
+    call_renv_snapshot = function(root = ".", packages = NULL) {
+      snapshotted <<- TRUE
+    },
+    .package = "boosterpak"
+  )
+
+  sync(root = root, library = "active", verbose = FALSE)
+
+  expect_identical(used_library, "active")
+  expect_true("seanthimons/ComptoxR" %in% installed)
+  expect_false(hydrated)
+  expect_false(snapshotted)
+  expect_true(file.exists(file.path(root, "boosters", "attach.R")))
+})
+
+test_that("sync reads the active-library strategy from project config", {
+  root <- withr::local_tempdir()
+  active_lib <- file.path(root, "active-library")
+  dir.create(active_lib)
+  old_libpaths <- .libPaths()
+  withr::defer(.libPaths(old_libpaths))
+  .libPaths(c(active_lib, old_libpaths))
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines <- sub('library = "renv"', 'library = "active"', lines, fixed = TRUE)
+  writeLines(lines, path)
+
+  used_library <- NULL
+  local_mocked_bindings(
+    missing_packages = function(packages, root = ".", library = "renv") {
+      used_library <<- library
+      character()
+    },
+    install_via = function(specs, root = ".", library = "renv") TRUE,
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+
+  expect_identical(used_library, "active")
 })
 
 test_that("sync restore does not hydrate", {
@@ -215,6 +296,24 @@ test_that("missing package detection checks the project renv library", {
   writeLines("Package: cli", file.path(lib, "cli", "DESCRIPTION"))
 
   missing <- boosterpak:::missing_packages(c("boosterpak", "cli"), root = root)
+
+  expect_equal(missing, "boosterpak")
+})
+
+test_that("missing package detection checks the selected active library", {
+  root <- withr::local_tempdir()
+  active_lib <- file.path(root, "active-library")
+  dir.create(file.path(active_lib, "cli"), recursive = TRUE)
+  writeLines("Package: cli", file.path(active_lib, "cli", "DESCRIPTION"))
+  old_libpaths <- .libPaths()
+  withr::defer(.libPaths(old_libpaths))
+  .libPaths(c(active_lib, old_libpaths))
+
+  missing <- boosterpak:::missing_packages(
+    c("boosterpak", "cli"),
+    root = root,
+    library = "active"
+  )
 
   expect_equal(missing, "boosterpak")
 })

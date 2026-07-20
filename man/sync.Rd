@@ -4,7 +4,13 @@
 \alias{sync}
 \title{Synchronize a boosterpak project}
 \usage{
-sync(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL)
+sync(
+  mode = c("apply", "restore"),
+  root = ".",
+  hydrate = TRUE,
+  verbose = NULL,
+  library = NULL
+)
 }
 \arguments{
 \item{mode}{\code{"apply"} installs packages declared by \code{boosters.toml} and
@@ -14,9 +20,13 @@ writes \code{boosters/attach.R}; \code{"restore"} restores from \code{renv.lock}
 
 \item{hydrate}{Whether additive apply mode should reuse packages from
 renv-discoverable local libraries before downloading with pak. Restore
-mode ignores this option and remains lockfile-exact.}
+mode and active-library apply mode ignore this option.}
 
 \item{verbose}{Whether to print routine summaries.}
+
+\item{library}{Package-library strategy for apply mode: \code{"renv"} uses the
+project-local renv library, while \code{"active"} uses the first writable entry
+in \code{.libPaths()}. \code{NULL} uses \verb{[settings].library}, defaulting to \code{"renv"}.}
 }
 \value{
 Resolved package names, invisibly.

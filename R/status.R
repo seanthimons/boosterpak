@@ -5,7 +5,8 @@
 #' @return A list describing project status, invisibly. Includes config
 #'   validity, declared and resolved packs, package and missing-package counts,
 #'   attach state, materialized function drift/missing counts, pack catalog
-#'   counts, renv state, lockfile presence, and `.Rprofile` hook state.
+#'   counts, selected package-library strategy and path, renv state, lockfile
+#'   presence, and `.Rprofile` hook state.
 #' @export
 status <- function(root = ".", verbose = NULL) {
   check_verbose(verbose)
@@ -21,6 +22,7 @@ status <- function(root = ".", verbose = NULL) {
   function_status <- function_status_frame()
   attach_enabled <- TRUE
   attach_packages <- character()
+  library_strategy <- "renv"
   parse_error <- NULL
   if (config_exists) {
     config <- tryCatch(
@@ -57,10 +59,11 @@ status <- function(root = ".", verbose = NULL) {
       function_status <- collect_function_status(functions, root)
       attach_enabled <- !identical((config$attach %||% list())$enabled, FALSE)
       attach_packages <- resolve_config_attach_packages(config, root)
+      library_strategy <- resolve_library_strategy(config = config)
     }
   }
   pack_catalog <- available_packs(root)
-  missing <- missing_packages(packages, root)
+  missing <- missing_packages(packages, root, library_strategy)
   out <- list(
     config_exists = config_exists,
     config_valid = valid,
@@ -92,6 +95,8 @@ status <- function(root = ".", verbose = NULL) {
       ),
       c("project", "user", "builtin")
     ),
+    library_strategy = library_strategy,
+    library_path = package_library(root, library_strategy),
     renv_active = is_project_renv_active(root),
     lockfile_exists = file.exists(file.path(root, "renv.lock")),
     rprofile_hook = has_rprofile_line(root),
@@ -104,6 +109,9 @@ status <- function(root = ".", verbose = NULL) {
     )
     cli::cli_li("config valid: {out$config_valid}")
     cli::cli_li("renv active: {out$renv_active}")
+    cli::cli_li(
+      "package library: {out$library_strategy} ({out$library_path})"
+    )
     cli::cli_li(
       "renv.lock: {if (out$lockfile_exists) 'present' else 'missing'}"
     )

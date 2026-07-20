@@ -14,7 +14,8 @@ default_config <- function(root = ".") {
     ),
     settings = list(
       air_toml = TRUE,
-      auto_snapshot = TRUE
+      auto_snapshot = TRUE,
+      library = "renv"
     )
   )
 }
@@ -63,6 +64,7 @@ validate_config <- function(config, root = ".") {
       call = NULL
     )
   }
+  resolve_library_strategy(config = config)
   if (!is.null(settings$parallel_daemons)) {
     cli::cli_warn(
       "{.field [settings].parallel_daemons} is deprecated; declare the value as a pack setting instead, e.g. {.field [settings.packs.sean-parallel].daemons}."
@@ -125,6 +127,7 @@ warn_unknown_keys <- function(config) {
     "air_toml",
     "parallel_daemons",
     "auto_snapshot",
+    "library",
     "camcorder",
     "packs"
   )
@@ -171,6 +174,7 @@ write_default_config <- function(root = ".") {
     "[settings]",
     "air_toml = true",
     "auto_snapshot = true",
+    'library = "renv"',
     ""
   )
   writeLines(lines, path, useBytes = TRUE)

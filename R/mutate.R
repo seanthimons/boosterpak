@@ -6,7 +6,8 @@ mutate_pack <- function(
   hydrate = TRUE,
   overwrite_functions = FALSE,
   remove_functions = FALSE,
-  verbose = NULL
+  verbose = NULL,
+  library = NULL
 ) {
   check_verbose(verbose)
   action <- match.arg(action)
@@ -27,7 +28,8 @@ mutate_pack <- function(
   }
 
   if (isTRUE(sync)) {
-    ensure_project_renv(root)
+    library <- resolve_library_strategy(library, config)
+    ensure_package_library(root, library)
   }
   if (is_new_add && !isTRUE(overwrite_functions)) {
     check_pack_function_conflicts(name, root)
@@ -50,7 +52,13 @@ mutate_pack <- function(
   }
 
   if (isTRUE(sync)) {
-    sync(mode = "apply", root = root, hydrate = hydrate, verbose = verbose)
+    sync(
+      mode = "apply",
+      root = root,
+      hydrate = hydrate,
+      verbose = verbose,
+      library = library
+    )
     if (is_new_add) {
       run_pack_on_add_hooks(name, root = root)
     }
@@ -67,11 +75,14 @@ mutate_pack <- function(
 #' @param name Pack name.
 #' @param root Project root.
 #' @param sync Whether to run additive sync after editing TOML.
-#' @param hydrate Whether additive sync should reuse packages from
-#'   renv-discoverable local libraries before downloading with pak.
+#' @param hydrate Whether renv-library additive sync should reuse packages from
+#'   renv-discoverable local libraries before downloading with pak. The active
+#'   library strategy ignores this option.
 #' @param overwrite_functions Whether to overwrite existing function files
 #'   provided by the pack.
 #' @param verbose Whether to print routine summaries.
+#' @param library Package-library strategy passed to [sync()]. `NULL` uses the
+#'   project configuration.
 #' @return Updated declared pack names, invisibly.
 #' @export
 add_pack <- function(
@@ -80,7 +91,8 @@ add_pack <- function(
   sync = TRUE,
   hydrate = TRUE,
   overwrite_functions = FALSE,
-  verbose = NULL
+  verbose = NULL,
+  library = NULL
 ) {
   mutate_pack(
     name,
@@ -89,7 +101,8 @@ add_pack <- function(
     sync,
     hydrate = hydrate,
     overwrite_functions = overwrite_functions,
-    verbose = verbose
+    verbose = verbose,
+    library = library
   )
 }
 
@@ -101,6 +114,8 @@ add_pack <- function(
 #' @param remove_functions Whether to remove unchanged function files provided
 #'   only by the removed pack.
 #' @param verbose Whether to print routine summaries.
+#' @param library Package-library strategy passed to [sync()]. `NULL` uses the
+#'   project configuration.
 #' @return Updated declared pack names, invisibly.
 #' @export
 remove_pack <- function(
@@ -108,7 +123,8 @@ remove_pack <- function(
   root = ".",
   sync = TRUE,
   remove_functions = FALSE,
-  verbose = NULL
+  verbose = NULL,
+  library = NULL
 ) {
   mutate_pack(
     name,
@@ -116,7 +132,8 @@ remove_pack <- function(
     root,
     sync,
     remove_functions = remove_functions,
-    verbose = verbose
+    verbose = verbose,
+    library = library
   )
 }
 

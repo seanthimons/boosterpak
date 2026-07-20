@@ -30,6 +30,53 @@ ensure_project_renv <- function(root = ".") {
   invisible(TRUE)
 }
 
+resolve_library_strategy <- function(library = NULL, config = NULL) {
+  configured <- (config$settings %||% list())$library %||% "renv"
+  strategy <- library %||% configured
+  if (!is.character(strategy) || length(strategy) != 1 || is.na(strategy)) {
+    cli::cli_abort(
+      "{.arg library} must be one of {.val renv} or {.val active}.",
+      call = NULL
+    )
+  }
+  match.arg(strategy, c("renv", "active"))
+}
+
+active_package_library <- function() {
+  libraries <- .libPaths()
+  writable <- libraries[file.access(libraries, mode = 2) == 0]
+  if (length(writable) == 0) {
+    cli::cli_abort(
+      "No writable library was found in {.code .libPaths()}.",
+      call = NULL
+    )
+  }
+  normalizePath(writable[[1]], winslash = "/", mustWork = TRUE)
+}
+
+package_library <- function(root = ".", library = "renv") {
+  library <- resolve_library_strategy(library)
+  if (identical(library, "active")) {
+    active_package_library()
+  } else {
+    normalizePath(
+      renv::paths$library(project = root),
+      winslash = "/",
+      mustWork = FALSE
+    )
+  }
+}
+
+ensure_package_library <- function(root = ".", library = "renv") {
+  library <- resolve_library_strategy(library)
+  if (identical(library, "renv")) {
+    ensure_project_renv(root)
+  } else {
+    active_package_library()
+  }
+  invisible(TRUE)
+}
+
 call_renv_init <- function(root = ".") {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
@@ -59,14 +106,18 @@ call_renv_restore <- function(root = ".") {
   renv::restore(project = root, prompt = FALSE)
 }
 
-install_via <- function(packages, root = ".") {
+install_via <- function(packages, root = ".", library = "renv") {
   if (length(packages) == 0) {
     return(invisible(character()))
   }
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
   configure_boosterpak_install_policy(verbose = FALSE)
-  pak::pkg_install(packages, upgrade = FALSE)
+  pak::pkg_install(
+    packages,
+    lib = package_library(root, library),
+    upgrade = FALSE
+  )
   invisible(packages)
 }
 
@@ -99,8 +150,8 @@ plain_missing_packages <- function(packages, install_specs, missing) {
   missing_packages[missing_specs == missing_packages]
 }
 
-missing_packages <- function(packages, root = ".") {
-  lib <- renv::paths$library(project = root)
+missing_packages <- function(packages, root = ".", library = "renv") {
+  lib <- package_library(root, library)
   installed <- vapply(
     packages,
     function(package) {

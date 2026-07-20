@@ -155,7 +155,8 @@ test_that("databases on_add hook enables DuckDB connection pane option", {
       mode = c("apply", "restore"),
       root = ".",
       hydrate = TRUE,
-      verbose = NULL
+      verbose = NULL,
+      ...
     ) {
       TRUE
     },
@@ -255,7 +256,8 @@ test_that("add_pack runs on_add hooks only for synced new additions", {
       mode = c("apply", "restore"),
       root = ".",
       hydrate = TRUE,
-      verbose = NULL
+      verbose = NULL,
+      ...
     ) {
       TRUE
     },
@@ -290,7 +292,8 @@ test_that("scaffold-analysis on_add hook creates project scaffold after sync", {
       mode = c("apply", "restore"),
       root = ".",
       hydrate = TRUE,
-      verbose = NULL
+      verbose = NULL,
+      ...
     ) {
       TRUE
     },
