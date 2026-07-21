@@ -77,6 +77,11 @@ init <- function(
   invisible(list(config = config_path, rprofile_changed = changed_rprofile))
 }
 
+#' Write the default Air formatter configuration
+#'
+#' @param path Destination path for the Air configuration.
+#' @return `path`, invisibly.
+#' @noRd
 write_default_air_config <- function(path) {
   lines <- c(
     "[format]",
@@ -96,6 +101,11 @@ write_default_air_config <- function(path) {
   invisible(path)
 }
 
+#' Add boosterpak to a generated extras declaration
+#'
+#' @param path Path to an existing `boosters.toml` file.
+#' @return A logical scalar indicating whether the file was updated, invisibly.
+#' @noRd
 repair_self_extra <- function(path) {
   lines <- readLines(path, warn = FALSE)
   extras_start <- grep("^\\s*\\[extras\\]\\s*(#.*)?$", lines)
@@ -151,6 +161,11 @@ repair_self_extra <- function(path) {
   invisible(TRUE)
 }
 
+#' Remove the generated legacy parallel daemons setting
+#'
+#' @param path Path to an existing `boosters.toml` file.
+#' @return A logical scalar indicating whether the file was updated, invisibly.
+#' @noRd
 repair_legacy_parallel_daemons <- function(path) {
   data <- tryCatch(read_toml_file(path), error = function(err) NULL)
   value <- (data$settings %||% list())$parallel_daemons
@@ -180,6 +195,12 @@ repair_legacy_parallel_daemons <- function(path) {
   invisible(TRUE)
 }
 
+#' Parse the contents of a TOML string array literal
+#'
+#' @param x Text between the array brackets.
+#' @return A character vector, or `NULL` when `x` is not a valid TOML string
+#'   array.
+#' @noRd
 parse_toml_string_array_literal <- function(x) {
   x <- trimws(x)
   if (!nzchar(x)) {
@@ -198,6 +219,13 @@ parse_toml_string_array_literal <- function(x) {
   parsed
 }
 
+#' Initialize or load project-local renv
+#'
+#' @param root Project root.
+#' @param renv Requested renv action: `"ask"`, `"yes"`, or `"no"`.
+#' @return A logical scalar indicating whether project renv is ready,
+#'   invisibly.
+#' @noRd
 handle_renv_init <- function(root, renv) {
   if (identical(renv, "no")) {
     return(invisible(FALSE))
@@ -225,6 +253,12 @@ handle_renv_init <- function(root, renv) {
   invisible(TRUE)
 }
 
+#' Bootstrap workflow packages in project renv
+#'
+#' @param root Project root.
+#' @param config Parsed boosterpak configuration.
+#' @return The workflow package names, invisibly.
+#' @noRd
 bootstrap_project_renv <- function(root, config) {
   package_names <- c("pak", "renv", "boosterpak")
   install_specs <- c("pak", "renv", self_install_spec())

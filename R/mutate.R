@@ -1,3 +1,19 @@
+#' Mutate a pack declaration
+#'
+#' @param name Pack name.
+#' @param action Whether to add or remove the declaration.
+#' @param root Project root.
+#' @param sync Whether to synchronize packages after editing the configuration.
+#' @param hydrate Whether renv-library sync may reuse packages from local
+#'   libraries before downloading them.
+#' @param overwrite_functions Whether to overwrite function files supplied by
+#'   an added pack.
+#' @param remove_functions Whether to remove unchanged function files supplied
+#'   only by a removed pack.
+#' @param verbose Whether to print routine summaries.
+#' @param library Package-library strategy, or `NULL` to use configuration.
+#' @return The updated declared pack names, invisibly.
+#' @noRd
 mutate_pack <- function(
   name,
   action = c("add", "remove"),
@@ -137,6 +153,14 @@ remove_pack <- function(
   )
 }
 
+#' Update a declared TOML array
+#'
+#' @param path Path to the TOML configuration file.
+#' @param section Name of the TOML section.
+#' @param key Name of the array field within `section`.
+#' @param values Character vector of values to write.
+#' @return The configuration file path, invisibly.
+#' @noRd
 update_declared_array <- function(path, section, key, values) {
   read_toml_file(path)
   lines <- readLines(path, warn = FALSE)

@@ -1,3 +1,7 @@
+#' Get the Posit Package Manager Repository
+#'
+#' @return The configured Posit Package Manager repository URL.
+#' @noRd
 posit_package_manager_repo <- function() {
   Sys.getenv(
     "BOOSTERPAK_PPM_REPO",
@@ -5,6 +9,10 @@ posit_package_manager_repo <- function() {
   )
 }
 
+#' Check Whether to Configure Repositories
+#'
+#' @return `TRUE` if boosterpak should configure package repositories.
+#' @noRd
 should_configure_repositories <- function() {
   env <- Sys.getenv("BOOSTERPAK_CONFIGURE_REPOSITORIES", unset = NA_character_)
   if (!is.na(env)) {
@@ -13,6 +21,10 @@ should_configure_repositories <- function() {
   isTRUE(getOption("boosterpak.configure_repositories", TRUE))
 }
 
+#' Check Whether to Configure the Install Policy
+#'
+#' @return `TRUE` if boosterpak should configure package installation options.
+#' @noRd
 should_configure_install_policy <- function() {
   env <- Sys.getenv(
     "BOOSTERPAK_CONFIGURE_INSTALL_POLICY",
@@ -24,6 +36,10 @@ should_configure_install_policy <- function() {
   isTRUE(getOption("boosterpak.configure_install_policy", TRUE))
 }
 
+#' Get Boosterpak Install Policy Options
+#'
+#' @return A named list of package installation option values.
+#' @noRd
 boosterpak_install_policy_options <- function() {
   list(
     renv.config.pak.enabled = TRUE,
@@ -33,6 +49,11 @@ boosterpak_install_policy_options <- function() {
   )
 }
 
+#' Configure the Boosterpak Install Policy
+#'
+#' @param verbose Whether to report changed options.
+#' @return A character vector of changed option names, invisibly.
+#' @noRd
 configure_boosterpak_install_policy <- function(verbose = TRUE) {
   if (!should_configure_install_policy()) {
     return(invisible(character()))
@@ -58,6 +79,11 @@ configure_boosterpak_install_policy <- function(verbose = TRUE) {
   invisible(changed)
 }
 
+#' Get Default-Like CRAN Mirrors
+#'
+#' @return A character vector of repository values treated as default CRAN
+#'   mirrors.
+#' @noRd
 default_cran_mirrors <- function() {
   env <- Sys.getenv("BOOSTERPAK_DEFAULT_CRAN_MIRRORS", unset = "")
   env_mirrors <- if (nzchar(env)) {
@@ -76,6 +102,12 @@ default_cran_mirrors <- function() {
   mirrors[!is.na(mirrors) & nzchar(mirrors)]
 }
 
+#' Normalize CRAN Mirror Values
+#'
+#' @param x Character vector of repository values.
+#' @return A character vector with trailing slashes removed and URL schemes and
+#'   hosts normalized to lowercase.
+#' @noRd
 normalize_cran_mirror <- function(x) {
   x <- trimws(x)
   x <- sub("/+$", "", x)
@@ -95,6 +127,11 @@ normalize_cran_mirror <- function(x) {
   x
 }
 
+#' Check for a Default CRAN Mirror
+#'
+#' @param repo A single repository value.
+#' @return `TRUE` if `repo` is a recognized default CRAN mirror.
+#' @noRd
 is_default_cran_mirror <- function(repo) {
   if (length(repo) != 1 || is.na(repo) || !nzchar(repo)) {
     return(FALSE)
@@ -103,6 +140,11 @@ is_default_cran_mirror <- function(repo) {
     normalize_cran_mirror(default_cran_mirrors())
 }
 
+#' Check Whether Repositories Use the Default CRAN Mirror
+#'
+#' @param repos A named character vector of repositories, or `NULL`.
+#' @return `TRUE` if the CRAN repository is unset or uses a recognized default.
+#' @noRd
 uses_default_cran_repo <- function(repos) {
   if (is.null(repos) || length(repos) == 0) {
     return(TRUE)
@@ -113,6 +155,11 @@ uses_default_cran_repo <- function(repos) {
   is_default_cran_mirror(unname(repos[["CRAN"]]))
 }
 
+#' Check Whether Repositories Use Posit Package Manager
+#'
+#' @param repos A character vector of repositories, or `NULL`.
+#' @return `TRUE` if any repository uses a Posit Package Manager host.
+#' @noRd
 uses_posit_package_manager <- function(repos) {
   if (is.null(repos) || length(repos) == 0) {
     return(FALSE)
@@ -123,21 +170,41 @@ uses_posit_package_manager <- function(repos) {
   )
 }
 
+#' Check for Missing Repository Names
+#'
+#' @param repos A repository vector.
+#' @return `TRUE` if repository names are absent, missing, or empty.
+#' @noRd
 repo_names_missing <- function(repos) {
   repo_names <- names(repos)
   is.null(repo_names) || any(is.na(repo_names) | !nzchar(repo_names))
 }
 
+#' Check Whether the Renv Repository Override Is Unset
+#'
+#' @return `TRUE` if neither the option nor environment variable sets a
+#'   repository override for renv.
+#' @noRd
 renv_repos_override_is_unset <- function() {
   is.null(getOption("renv.config.repos.override")) &&
     !nzchar(Sys.getenv("RENV_CONFIG_REPOS_OVERRIDE", unset = ""))
 }
 
+#' Escape Text for an R String Literal
+#'
+#' @param x Character vector to escape.
+#' @return The escaped character vector.
+#' @noRd
 escape_r_string <- function(x) {
   x <- gsub("\\\\", "\\\\\\\\", x)
   gsub('"', '\\"', x, fixed = TRUE)
 }
 
+#' Format a Repository Name for an R Profile
+#'
+#' @param name A single repository name.
+#' @return The escaped name, quoted when it is not syntactic.
+#' @noRd
 rprofile_repo_name <- function(name) {
   escaped <- escape_r_string(name)
   if (identical(make.names(name), name)) {
@@ -146,14 +213,27 @@ rprofile_repo_name <- function(name) {
   sprintf('"%s"', escaped)
 }
 
+#' Get the Repository Setup Marker
+#'
+#' @return The repository setup marker line.
+#' @noRd
 rprofile_repository_marker <- function() {
   "# Configure boosterpak package repositories."
 }
 
+#' Get the Install Policy Marker
+#'
+#' @return The install policy marker line.
+#' @noRd
 rprofile_install_policy_marker <- function() {
   "# Configure boosterpak package installation."
 }
 
+#' Format an R Profile Option Value
+#'
+#' @param value A scalar logical or character option value.
+#' @return A character scalar containing R code for `value`.
+#' @noRd
 rprofile_option_value <- function(value) {
   if (identical(value, TRUE)) {
     return("TRUE")
@@ -167,6 +247,10 @@ rprofile_option_value <- function(value) {
   stop("Unsupported .Rprofile option value.", call. = FALSE)
 }
 
+#' Build Install Policy R Profile Lines
+#'
+#' @return A character vector of install policy setup lines.
+#' @noRd
 rprofile_install_policy_lines <- function() {
   options <- boosterpak_install_policy_options()
   c(
@@ -179,6 +263,11 @@ rprofile_install_policy_lines <- function() {
   )
 }
 
+#' Format Repositories for an R Profile
+#'
+#' @param repos A character vector of repository values, optionally named.
+#' @return A character scalar containing the entries for an R `c()` call.
+#' @noRd
 rprofile_repos_value <- function(repos) {
   if (repo_names_missing(repos)) {
     return(paste(
@@ -200,6 +289,12 @@ rprofile_repos_value <- function(repos) {
   )
 }
 
+#' Build Repository R Profile Lines
+#'
+#' @param repos A character vector of repository values, optionally named.
+#' @param include_renv Whether to include the renv repository override option.
+#' @return A character vector of repository setup lines.
+#' @noRd
 rprofile_repository_lines <- function(repos, include_renv = TRUE) {
   lines <- c(
     rprofile_repository_marker(),
@@ -217,6 +312,13 @@ rprofile_repository_lines <- function(repos, include_renv = TRUE) {
   lines
 }
 
+#' Build Install Policy Lines for the Current Session
+#'
+#' @param changes Character vector of options changed in the current session.
+#'   Currently unused.
+#' @return A character vector of install policy setup lines, or an empty vector
+#'   when configuration is disabled.
+#' @noRd
 boosterpak_install_policy_lines_for_session <- function(changes = character()) {
   if (!should_configure_install_policy()) {
     return(character())
@@ -224,6 +326,13 @@ boosterpak_install_policy_lines_for_session <- function(changes = character()) {
   rprofile_install_policy_lines()
 }
 
+#' Build Repository Lines for the Current Session
+#'
+#' @param changes Character vector identifying repository settings changed in
+#'   the current session.
+#' @return A character vector of repository setup lines, or an empty vector when
+#'   repository configuration is disabled or Posit Package Manager is unused.
+#' @noRd
 boosterpak_repository_lines_for_session <- function(changes = character()) {
   if (!should_configure_repositories()) {
     return(character())
@@ -238,6 +347,14 @@ boosterpak_repository_lines_for_session <- function(changes = character()) {
   rprofile_repository_lines(repos, include_renv = include_renv)
 }
 
+#' Build Boosterpak R Profile Setup Lines
+#'
+#' @param repository_changes Character vector identifying repository settings
+#'   changed in the current session.
+#' @param install_policy_changes Character vector of install policy options
+#'   changed in the current session.
+#' @return A character vector of boosterpak setup lines for an R profile.
+#' @noRd
 boosterpak_rprofile_setup_lines <- function(
   repository_changes = character(),
   install_policy_changes = character()
@@ -248,6 +365,12 @@ boosterpak_rprofile_setup_lines <- function(
   )
 }
 
+#' Configure Boosterpak Repositories
+#'
+#' @param verbose Whether to report repository changes.
+#' @return A character vector identifying changed repository settings,
+#'   invisibly.
+#' @noRd
 configure_boosterpak_repositories <- function(verbose = TRUE) {
   if (!should_configure_repositories()) {
     return(invisible(character()))

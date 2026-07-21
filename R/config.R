@@ -1,3 +1,8 @@
+#' Build the default boosterpak configuration
+#'
+#' @param root Project root used to derive the project name.
+#' @return A list containing the default project configuration.
+#' @noRd
 default_config <- function(root = ".") {
   list(
     project = list(
@@ -20,6 +25,11 @@ default_config <- function(root = ".") {
   )
 }
 
+#' Read a boosterpak project configuration
+#'
+#' @param root Project root.
+#' @return The parsed `boosters.toml` configuration.
+#' @noRd
 read_config <- function(root = ".") {
   path <- boosters_file(root)
   if (!file.exists(path)) {
@@ -31,6 +41,12 @@ read_config <- function(root = ".") {
   read_toml_file(path)
 }
 
+#' Validate a boosterpak project configuration
+#'
+#' @param config Parsed boosterpak configuration.
+#' @param root Project root used to resolve declared packs and functions.
+#' @return `TRUE`, invisibly, or an error if the configuration is invalid.
+#' @noRd
 validate_config <- function(config, root = ".") {
   config$packs$declared <- toml_string_array(
     config$packs$declared %||% character(),
@@ -76,6 +92,11 @@ validate_config <- function(config, root = ".") {
   invisible(TRUE)
 }
 
+#' Validate project pack settings
+#'
+#' @param settings Parsed project settings table.
+#' @return `TRUE`, invisibly, or an error if a pack settings entry is invalid.
+#' @noRd
 validate_pack_settings <- function(settings) {
   packs <- settings$packs
   if (is.null(packs)) {
@@ -99,6 +120,12 @@ validate_pack_settings <- function(settings) {
   invisible(TRUE)
 }
 
+#' Normalize and validate a TOML string array
+#'
+#' @param value Parsed TOML value to validate.
+#' @param field Field description used in error messages.
+#' @return A character vector, with an empty list normalized to `character()`.
+#' @noRd
 toml_string_array <- function(value, field) {
   if (is.list(value) && length(value) == 0) {
     return(character())
@@ -109,6 +136,11 @@ toml_string_array <- function(value, field) {
   value
 }
 
+#' Warn about unknown configuration keys
+#'
+#' @param config Parsed boosterpak configuration.
+#' @return `TRUE`, invisibly.
+#' @noRd
 warn_unknown_keys <- function(config) {
   known_top <- c(
     "project",
@@ -141,6 +173,11 @@ warn_unknown_keys <- function(config) {
   invisible(TRUE)
 }
 
+#' Write the default project configuration
+#'
+#' @param root Project root.
+#' @return The path to `boosters.toml`, invisibly.
+#' @noRd
 write_default_config <- function(root = ".") {
   path <- boosters_file(root)
   lines <- c(
@@ -181,6 +218,11 @@ write_default_config <- function(root = ".") {
   invisible(path)
 }
 
+#' Format a supported pack setting as TOML
+#'
+#' @param value A scalar string, logical or number, or a character vector.
+#' @return A character scalar containing the TOML representation of `value`.
+#' @noRd
 format_toml_value <- function(value) {
   if (is.character(value) && length(value) == 1) {
     sprintf('"%s"', escape_toml_string(value))
@@ -204,6 +246,13 @@ format_toml_value <- function(value) {
   }
 }
 
+#' Ensure a project pack settings section exists
+#'
+#' @param path Path to `boosters.toml`.
+#' @param pack_name Pack name used in the settings table header.
+#' @param settings Named list of default pack settings.
+#' @return `path`, invisibly.
+#' @noRd
 ensure_pack_settings_section <- function(path, pack_name, settings) {
   if (length(settings) == 0) {
     return(invisible(path))
@@ -222,6 +271,14 @@ ensure_pack_settings_section <- function(path, pack_name, settings) {
   invisible(path)
 }
 
+#' Scaffold settings for resolved packs
+#'
+#' @param names Character vector of pack names whose settings should be
+#'   scaffolded.
+#' @param root Project root.
+#' @return A list with one settings-scaffolding result per resolved pack,
+#'   invisibly.
+#' @noRd
 scaffold_pack_settings <- function(names, root = ".") {
   packs <- unique(unlist(
     lapply(names, resolve_pack_names, root = root),
@@ -236,10 +293,20 @@ scaffold_pack_settings <- function(names, root = ".") {
   }))
 }
 
+#' Escape a string for a TOML basic string
+#'
+#' @param x Character vector to escape.
+#' @return `x` with double quotes escaped.
+#' @noRd
 escape_toml_string <- function(x) {
   gsub('"', '\\"', x, fixed = TRUE)
 }
 
+#' Resolve boosterpak's self-install specification
+#'
+#' @param desc Package description metadata.
+#' @return A GitHub `owner/repo` installation specification.
+#' @noRd
 self_install_spec <- function(desc = utils::packageDescription("boosterpak")) {
   remote_type <- desc[["RemoteType"]]
   remote_user <- desc[["RemoteUsername"]] %||% desc[["GithubUsername"]]

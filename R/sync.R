@@ -51,6 +51,12 @@ sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbo
   invisible(packages)
 }
 
+#' Restore a boosterpak project from its lockfile
+#'
+#' @param root Project root.
+#' @param verbose Whether to print routine summaries.
+#' @return The resolved package names, invisibly.
+#' @noRd
 sync_restore <- function(root, verbose = NULL) {
   if (!file.exists(boosters_file(root))) {
     cli::cli_abort(c(
@@ -75,6 +81,13 @@ sync_restore <- function(root, verbose = NULL) {
   invisible(packages)
 }
 
+#' Warn about declared packages missing from a lockfile
+#'
+#' @param packages Character vector of declared package names.
+#' @param lockfile Path to an `renv` lockfile.
+#' @return `TRUE` invisibly when lockfile packages can be inspected, otherwise
+#'   `FALSE` invisibly.
+#' @noRd
 warn_missing_lock_packages <- function(packages, lockfile) {
   lock <- tryCatch(jsonlite::read_json(lockfile), error = function(err) NULL)
   if (is.null(lock) || is.null(lock$Packages)) {

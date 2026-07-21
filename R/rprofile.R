@@ -1,8 +1,21 @@
+#' Check for the boosterpak startup hook
+#'
+#' @param root Project root.
+#' @return A single logical value indicating whether `.Rprofile` has the hook.
+#' @noRd
 has_rprofile_line <- function(root = ".") {
   path <- file.path(root, ".Rprofile")
   file.exists(path) && any(readLines(path, warn = FALSE) == rprofile_line())
 }
 
+#' Ensure the boosterpak startup setup
+#'
+#' @param root Project root.
+#' @param rprofile Whether to ask, add, or skip the startup setup.
+#' @param repository_lines Character vector of repository setup lines to add.
+#' @return `TRUE` invisibly when `.Rprofile` changes, otherwise `FALSE`
+#'   invisibly.
+#' @noRd
 ensure_rprofile_line <- function(
   root = ".",
   rprofile = c("ask", "yes", "no"),
@@ -60,11 +73,21 @@ ensure_rprofile_line <- function(
   invisible(TRUE)
 }
 
+#' Remove managed boosterpak setup blocks
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @return `lines` without managed install-policy and repository blocks.
+#' @noRd
 remove_rprofile_boosterpak_setup_blocks <- function(lines) {
   lines <- remove_rprofile_install_policy_block(lines)
   remove_rprofile_repository_block(lines)
 }
 
+#' Remove the managed install-policy block
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @return `lines` without managed install-policy settings.
+#' @noRd
 remove_rprofile_install_policy_block <- function(lines) {
   marker <- rprofile_install_policy_marker()
   marker_idx <- which(lines == marker)
@@ -89,6 +112,11 @@ remove_rprofile_install_policy_block <- function(lines) {
   lines[keep]
 }
 
+#' Remove the managed repository block
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @return `lines` without managed repository settings.
+#' @noRd
 remove_rprofile_repository_block <- function(lines) {
   marker <- rprofile_repository_marker()
   marker_idx <- which(lines == marker)
@@ -114,6 +142,12 @@ remove_rprofile_repository_block <- function(lines) {
   lines[keep]
 }
 
+#' Insert lines before renv activation
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @param new_lines Character vector of lines to insert.
+#' @return The updated character vector of `.Rprofile` lines.
+#' @noRd
 insert_before_renv_activation <- function(lines, new_lines) {
   renv_line <- grep('source\\([\'"]renv/activate\\.R[\'"]\\)', lines)
   if (length(renv_line) > 0) {
@@ -124,6 +158,12 @@ insert_before_renv_activation <- function(lines, new_lines) {
   }
 }
 
+#' Insert a line after renv activation
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @param line A single line to insert.
+#' @return The updated character vector of `.Rprofile` lines.
+#' @noRd
 insert_after_renv_activation <- function(lines, line) {
   renv_line <- grep('source\\([\'"]renv/activate\\.R[\'"]\\)', lines)
   if (length(renv_line) > 0) {
