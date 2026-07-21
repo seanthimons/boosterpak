@@ -19,7 +19,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">boosterpak</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.4.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.6.5</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -47,60 +47,7 @@
       <small>Source: <a href="https://github.com/seanthimons/boosterpak/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.6.4.9000" id="boosterpak-0649000">boosterpak 0.6.4.9000<a class="anchor" aria-label="anchor" href="#boosterpak-0649000"></a></h2>
-<ul><li>Added a first-class active-library strategy for projects that do not use a project-local <code>renv</code> environment. Set <code>[settings].library = "active"</code> or pass <code>library = "active"</code> to apply packs through the first writable <code><a href="https://rdrr.io/r/base/libPaths.html" class="external-link">.libPaths()</a></code> entry without hydration or snapshotting.</li>
-</ul></div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.6.4" id="boosterpak-064">boosterpak 0.6.4<a class="anchor" aria-label="anchor" href="#boosterpak-064"></a></h2>
-<ul><li>Release from PR <a href="https://github.com/seanthimons/boosterpak/issues/6" class="external-link">#6</a>: Ignore local log files</li>
-</ul></div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.6.3" id="boosterpak-063">boosterpak 0.6.3<a class="anchor" aria-label="anchor" href="#boosterpak-063"></a></h2>
-<ul><li>Release from PR <a href="https://github.com/seanthimons/boosterpak/issues/5" class="external-link">#5</a>: Fix PR <a href="https://github.com/seanthimons/boosterpak/issues/4" class="external-link">#4</a> review feedback</li>
-</ul></div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.6.2" id="boosterpak-062">boosterpak 0.6.2<a class="anchor" aria-label="anchor" href="#boosterpak-062"></a></h2>
-<ul><li>Release from PR <a href="https://github.com/seanthimons/boosterpak/issues/4" class="external-link">#4</a>: Add database pack and rescue tooling</li>
-</ul></div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.6.1" id="boosterpak-061">boosterpak 0.6.1<a class="anchor" aria-label="anchor" href="#boosterpak-061"></a></h2>
-<ul><li>Release config repair, pack settings hook coverage, build workflow, and release automation.</li>
-<li>Added a built-in <code>databases</code> pack with <code>DBI</code>, <code>dbplyr</code>, <code>duckdb</code>, <code>RSQLite</code>, <code>odbc</code>, <code>connections</code>, and a DuckDB RStudio connection-pane option helper.</li>
-<li>
-<code><a href="../reference/init.html">init()</a></code> now configures the default CRAN placeholder to use Posit Package Manager, points <code>renv</code> restores at the same repository, and persists that setup in <code>.Rprofile</code> when boosterpak manages the startup hook.</li>
-<li>Added hidden <code>boosterpak:::.rescue()</code> repair tooling for initialized projects with broken startup files, missing core pack files, or missing workflow packages in <code>renv.lock</code>.</li>
-</ul></div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.6.0.9000" id="boosterpak-0609000">boosterpak 0.6.0.9000<a class="anchor" aria-label="anchor" href="#boosterpak-0609000"></a></h2>
-<ul><li>Documentation now frames <code>boosterpak</code> as reusable project capability packs: dependencies plus helper files, attachment choices, and setup conventions. The package uses TOML for its own config, but is not a general dependency-manifest standard.</li>
-<li>Added <code><a href="../reference/add_github_pack.html">add_github_pack()</a></code> to import pack manifests from a GitHub repository or git URL into project-local <code>boosters/packs/</code>, declare selected packs, and optionally run the existing sync flow.</li>
-<li>Added <code><a href="../reference/create_pack.html">create_pack()</a></code> for guided pack authoring from a declared package set. It writes pack TOML, optional source specs, explicit attach intent, and an optional nested function-template sidecar without mutating <code>boosters.toml</code> or running <code><a href="../reference/sync.html">sync()</a></code>.</li>
-<li>
-<code>sync(mode = "apply")</code> now writes a managed <code>boosters/attach.R</code> file with static <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls for startup attachment intent. Packs can declare <code>attach = true</code>, <code>attach = false</code>, or <code>attach = ["pkg"]</code>; missing <code>attach</code> attaches direct pack packages by default.</li>
-<li>New top-level <code>[attach]</code> config supports <code>enabled</code>, <code>declared</code>, and <code>exclude</code>. Workflow packages from <code>core</code> and <code>[extras]</code> are installed but not attached unless explicitly listed in <code>[attach].declared</code>.</li>
-<li>The recommended <code>.Rprofile</code> hook now sources <code>boosters/attach.R</code> before <code>boosters/fn_*.R</code> helper files, and <code><a href="../reference/status.html">status()</a></code> reports attach state.</li>
-</ul></div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.5.0.9001" id="boosterpak-0509001">boosterpak 0.5.0.9001<a class="anchor" aria-label="anchor" href="#boosterpak-0509001"></a></h2>
-<ul><li>
-<code>sync(mode = "apply")</code> and eager <code><a href="../reference/add_pack.html">add_pack()</a></code> now hydrate plain-name missing packages from renv-discoverable local libraries before falling back to <code><a href="https://pak.r-lib.org/reference/pkg_install.html" class="external-link">pak::pkg_install()</a></code>. Use <code>hydrate = FALSE</code> to skip local reuse; <code>sync(mode = "restore")</code> remains an exact lockfile restore path.</li>
-</ul></div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.5.0.9000" id="boosterpak-0509000">boosterpak 0.5.0.9000<a class="anchor" aria-label="anchor" href="#boosterpak-0509000"></a></h2>
-<ul><li><p><code>init(renv = "yes")</code> now initializes and loads <code>renv</code> without an immediate restart, installs the bootstrap workflow packages <code>pak</code>, <code>renv</code>, and <code>boosterpak</code> into the project library, and snapshots them when <code>auto_snapshot = true</code>.</p></li>
-<li><p>The built-in <code>core</code> pack is now minimal (<code>pak</code>, <code>renv</code>). The previous analysis-oriented package set is available as the new <code>eda</code> pack.</p></li>
-<li>
-<p>Projects initialized with boosterpak 0.5 can recover by running:</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"renv"</span><span class="op">)</span></span>
-<span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/install.html" class="external-link">install</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"pak"</span>, <span class="st">"seanthimons/boosterpak"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">snapshot</a></span><span class="op">(</span>packages <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"renv"</span>, <span class="st">"pak"</span>, <span class="st">"boosterpak"</span><span class="op">)</span>, prompt <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<p>Then restart R and run <code><a href="../reference/sync.html">boosterpak::sync()</a></code>.</p>
-</li>
-</ul></div>
-  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
-    </nav></aside></div>
+  </main></div>
 
 
     <footer><div class="pkgdown-footer-left">
