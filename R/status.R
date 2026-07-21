@@ -133,6 +133,10 @@ status <- function(root = ".", verbose = NULL) {
   invisible(out)
 }
 
+#' Create an empty function status table
+#'
+#' @return An empty data frame with function status columns.
+#' @noRd
 function_status_frame <- function() {
   data.frame(
     name = character(),
@@ -143,6 +147,12 @@ function_status_frame <- function() {
   )
 }
 
+#' Collect project function status
+#'
+#' @param functions Character vector of installed function names.
+#' @param root Project root.
+#' @return A data frame describing each function's path, existence, and drift.
+#' @noRd
 collect_function_status <- function(functions, root) {
   rows <- lapply(functions, function(name) {
     local <- function_file(name, root)
@@ -164,6 +174,11 @@ collect_function_status <- function(functions, root) {
   do.call(rbind, rows) %||% function_status_frame()
 }
 
+#' Format values for status output
+#'
+#' @param values Character vector of values to display.
+#' @return A comma-separated string, or `"(none)"` for no values.
+#' @noRd
 format_status_values <- function(values) {
   if (length(values) == 0) {
     "(none)"

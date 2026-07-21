@@ -68,6 +68,12 @@ add_github_pack <- function(
   )
 }
 
+#' Normalize a GitHub pack repository specification
+#'
+#' @param repo GitHub repository as `"owner/repo"`, a git URL, or a local git
+#'   repository path.
+#' @return A normalized local path, GitHub clone URL, or unchanged git URL.
+#' @noRd
 normalize_github_pack_repo <- function(repo) {
   if (!is.character(repo) || length(repo) != 1 || !nzchar(repo)) {
     cli::cli_abort(
@@ -98,6 +104,11 @@ normalize_github_pack_repo <- function(repo) {
   )
 }
 
+#' Validate an optional git reference
+#'
+#' @param ref Git reference or `NULL`.
+#' @return `NULL` or the validated git reference.
+#' @noRd
 validate_optional_git_ref <- function(ref) {
   if (is.null(ref)) {
     return(NULL)
@@ -111,6 +122,11 @@ validate_optional_git_ref <- function(ref) {
   ref
 }
 
+#' Validate a remote pack directory path
+#'
+#' @param path Relative path inside a cloned repository.
+#' @return The validated relative path.
+#' @noRd
 validate_remote_pack_path <- function(path) {
   if (!is.character(path) || length(path) != 1 || !nzchar(path)) {
     cli::cli_abort(
@@ -127,6 +143,11 @@ validate_remote_pack_path <- function(path) {
   path
 }
 
+#' Clone a repository containing booster packs
+#'
+#' @param repo Repository URL or local repository path accepted by git.
+#' @return The normalized path to the temporary clone.
+#' @noRd
 clone_github_pack_repo <- function(repo) {
   ensure_git_available()
   clone_dir <- tempfile("boosterpak-github-")
@@ -134,6 +155,12 @@ clone_github_pack_repo <- function(repo) {
   normalizePath(clone_dir, winslash = "/", mustWork = TRUE)
 }
 
+#' Check out a git reference in a cloned pack repository
+#'
+#' @param repo_dir Path to the cloned repository.
+#' @param ref Git reference to check out, or `NULL` to keep the cloned ref.
+#' @return `repo_dir`, invisibly.
+#' @noRd
 checkout_github_pack_ref <- function(repo_dir, ref = NULL) {
   if (is.null(ref)) {
     return(invisible(repo_dir))
@@ -142,6 +169,10 @@ checkout_github_pack_ref <- function(repo_dir, ref = NULL) {
   invisible(repo_dir)
 }
 
+#' Ensure git is available
+#'
+#' @return `TRUE`, invisibly, or an error if git is not on `PATH`.
+#' @noRd
 ensure_git_available <- function() {
   if (!nzchar(Sys.which("git"))) {
     cli::cli_abort(
@@ -152,6 +183,12 @@ ensure_git_available <- function() {
   invisible(TRUE)
 }
 
+#' Run a git command for GitHub pack import
+#'
+#' @param args Character vector of command-line arguments passed to git.
+#' @param action Description of the git action used in error messages.
+#' @return The captured command output, invisibly.
+#' @noRd
 run_git <- function(args, action) {
   output <- tryCatch(
     suppressWarnings(git_system2("git", args, stdout = TRUE, stderr = TRUE)),
@@ -179,10 +216,24 @@ run_git <- function(args, action) {
   invisible(output)
 }
 
+#' Invoke a git system command
+#'
+#' @param command Command to invoke.
+#' @param args Character vector of command-line arguments.
+#' @param stdout How standard output should be handled by [base::system2()].
+#' @param stderr How standard error should be handled by [base::system2()].
+#' @return The value returned by [base::system2()].
+#' @noRd
 git_system2 <- function(command, args, stdout = TRUE, stderr = TRUE) {
   system2(command, args, stdout = stdout, stderr = stderr)
 }
 
+#' Resolve the pack directory inside a cloned repository
+#'
+#' @param repo_dir Path to the cloned repository.
+#' @param path Relative pack directory within `repo_dir`.
+#' @return The normalized path to the pack directory.
+#' @noRd
 remote_pack_dir <- function(repo_dir, path) {
   candidate <- file.path(repo_dir, path)
   if (!dir.exists(candidate)) {
@@ -203,6 +254,13 @@ remote_pack_dir <- function(repo_dir, path) {
   candidate
 }
 
+#' Check whether a path is within a root directory
+#'
+#' @param path Existing path to check.
+#' @param root Existing root directory.
+#' @return A logical scalar indicating whether `path` is `root` or is contained
+#'   by it.
+#' @noRd
 path_is_within <- function(path, root) {
   path <- normalizePath(path, winslash = "/", mustWork = TRUE)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
@@ -213,6 +271,11 @@ path_is_within <- function(path, root) {
   identical(path, root) || startsWith(paste0(path, "/"), paste0(root, "/"))
 }
 
+#' Discover booster packs in a cloned repository
+#'
+#' @param dir Directory to search for pack manifests.
+#' @return A data frame describing the discovered packs.
+#' @noRd
 discover_remote_packs <- function(dir) {
   packs <- discover_pack_scope("github", dir)
   if (nrow(packs) == 0) {
@@ -224,6 +287,15 @@ discover_remote_packs <- function(dir) {
   packs
 }
 
+#' Resolve selected packs from a cloned repository
+#'
+#' @param packs Requested pack names, `"all"`, or `NULL` for interactive
+#'   selection.
+#' @param discovered Data frame describing available packs.
+#' @param repo Repository specification used in prompts and error messages.
+#' @param path Pack directory used in prompts and error messages.
+#' @return A unique character vector of selected pack names.
+#' @noRd
 resolve_remote_pack_selection <- function(packs, discovered, repo, path) {
   available <- discovered$name
 
@@ -273,6 +345,11 @@ resolve_remote_pack_selection <- function(packs, discovered, repo, path) {
   unique(packs)
 }
 
+#' Format strings as an R character vector
+#'
+#' @param x Character vector to format.
+#' @return A character scalar containing an R string or `c()` expression.
+#' @noRd
 format_r_string_vector <- function(x) {
   quoted <- vapply(x, encodeString, character(1), quote = '"')
   if (length(quoted) == 1) {
@@ -282,6 +359,13 @@ format_r_string_vector <- function(x) {
   }
 }
 
+#' Copy selected remote packs into a project
+#'
+#' @param packs Data frame of selected packs with `name` and `path` columns.
+#' @param root Project root.
+#' @param overwrite Whether to replace existing project pack files.
+#' @return A list of copied pack target paths, invisibly.
+#' @noRd
 copy_remote_packs_to_project <- function(packs, root, overwrite = FALSE) {
   invisible(lapply(seq_len(nrow(packs)), function(i) {
     copy_remote_pack_to_project(
@@ -292,6 +376,14 @@ copy_remote_packs_to_project <- function(packs, root, overwrite = FALSE) {
   }))
 }
 
+#' Copy one remote pack into a project
+#'
+#' @param pack One-row data frame describing a pack with `name` and `path`
+#'   columns.
+#' @param root Project root.
+#' @param overwrite Whether to replace an existing project pack.
+#' @return The normalized target manifest path, invisibly.
+#' @noRd
 copy_remote_pack_to_project <- function(pack, root, overwrite = FALSE) {
   name <- pack$name[[1]]
   source <- pack$path[[1]]
@@ -342,6 +434,13 @@ copy_remote_pack_to_project <- function(pack, root, overwrite = FALSE) {
   invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
 }
 
+#' Build a project target path for a remote pack
+#'
+#' @param name Pack name.
+#' @param source Source manifest path.
+#' @param root Project root.
+#' @return The target manifest path in the project's pack directory.
+#' @noRd
 remote_pack_target <- function(name, source, root) {
   if (pack_is_nested_manifest(source)) {
     file.path(project_packs_dir(root), name, sprintf("%s.toml", name))
@@ -350,6 +449,20 @@ remote_pack_target <- function(name, source, root) {
   }
 }
 
+#' Declare and materialize imported project packs
+#'
+#' @param names Character vector of imported pack names.
+#' @param root Project root.
+#' @param sync Whether to run additive synchronization after declaration.
+#' @param hydrate Whether renv-library synchronization should reuse packages
+#'   from local libraries before downloading them.
+#' @param overwrite_functions Whether to overwrite existing function files
+#'   provided by the packs.
+#' @param verbose Whether to print routine summaries.
+#' @param library Package-library strategy passed to [sync()]. `NULL` uses the
+#'   project configuration.
+#' @return The updated declared pack names, invisibly.
+#' @noRd
 declare_project_packs <- function(
   names,
   root = ".",

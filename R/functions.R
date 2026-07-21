@@ -1,3 +1,8 @@
+#' Build the Function Catalog
+#'
+#' @param root Project root.
+#' @return A data frame with one row per uniquely named available function.
+#' @noRd
 function_catalog <- function(root = ".") {
   packs <- available_packs(root)
   rows <- lapply(seq_len(nrow(packs)), function(i) {
@@ -29,6 +34,12 @@ function_catalog <- function(root = ".") {
   out[!duplicated(out$name), , drop = FALSE]
 }
 
+#' Validate a Function Name
+#'
+#' @param name Function catalog name.
+#' @param root Project root.
+#' @return The matching catalog row, invisibly.
+#' @noRd
 validate_function_name <- function(name, root = ".") {
   catalog <- function_catalog(root)
   match <- catalog[catalog$name == name, , drop = FALSE]
@@ -52,6 +63,11 @@ validate_function_name <- function(name, root = ".") {
   invisible(match)
 }
 
+#' Read Installed Function Names
+#'
+#' @param config Parsed project configuration.
+#' @return A character vector of installed function names.
+#' @noRd
 installed_functions <- function(config) {
   toml_string_array(
     config$functions$installed %||% character(),
@@ -59,12 +75,23 @@ installed_functions <- function(config) {
   )
 }
 
+#' Validate Configured Functions
+#'
+#' @param config Parsed project configuration.
+#' @param root Project root.
+#' @return `TRUE`, invisibly.
+#' @noRd
 validate_config_functions <- function(config, root = ".") {
   installed <- installed_functions(config)
   invisible(lapply(installed, validate_function_name, root = root))
   invisible(TRUE)
 }
 
+#' Ensure the Functions Configuration Section Exists
+#'
+#' @param path Path to a `boosters.toml` file.
+#' @return `path`, invisibly.
+#' @noRd
 ensure_functions_section <- function(path) {
   lines <- readLines(path, warn = FALSE)
   if (!any(grepl("^\\[functions\\]\\s*$", lines))) {
@@ -77,12 +104,25 @@ ensure_functions_section <- function(path) {
   invisible(path)
 }
 
+#' Update Installed Function Names
+#'
+#' @param root Project root.
+#' @param values Character vector of function names to record as installed.
+#' @return The path to `boosters.toml`, invisibly.
+#' @noRd
 update_installed_functions <- function(root, values) {
   path <- boosters_file(root)
   ensure_functions_section(path)
   update_declared_array(path, "functions", "installed", values)
 }
 
+#' Materialize a Catalog Function
+#'
+#' @param name Function catalog name.
+#' @param root Project root.
+#' @param overwrite Whether to replace an existing function file.
+#' @return The materialized file path, invisibly.
+#' @noRd
 materialize_function <- function(name, root = ".", overwrite = FALSE) {
   match <- validate_function_name(name, root)
   dir.create(functions_dir(root), recursive = TRUE, showWarnings = FALSE)
@@ -100,6 +140,14 @@ materialize_function <- function(name, root = ".", overwrite = FALSE) {
   invisible(target)
 }
 
+#' Materialize a Pack Function
+#'
+#' @param pack_path Path to the pack manifest.
+#' @param name Function name declared by the pack.
+#' @param root Project root.
+#' @param overwrite Whether to replace an existing function file.
+#' @return The materialized file path, invisibly.
+#' @noRd
 materialize_pack_function <- function(
   pack_path,
   name,
@@ -129,10 +177,25 @@ materialize_pack_function <- function(
   invisible(target)
 }
 
+#' Locate a Pack Function Source File
+#'
+#' @param pack_path Path to the pack manifest.
+#' @param name Function name declared by the pack.
+#' @param scope Pack scope. Currently unused because the manifest path determines
+#'   the source location.
+#' @return The path to the pack's function source file.
+#' @noRd
 pack_function_source_file <- function(pack_path, name, scope) {
   pack_function_file(pack_path, name)
 }
 
+#' Materialize Functions Provided by Packs
+#'
+#' @param names Character vector of pack names.
+#' @param root Project root.
+#' @param overwrite Whether to replace existing function files.
+#' @return A list of per-pack materialization results, invisibly.
+#' @noRd
 materialize_pack_functions <- function(names, root = ".", overwrite = FALSE) {
   packs <- unique(unlist(
     lapply(names, resolve_pack_names, root = root),
@@ -153,6 +216,13 @@ materialize_pack_functions <- function(names, root = ".", overwrite = FALSE) {
   }))
 }
 
+#' Source Materialized Function Files
+#'
+#' @param names Character vector of function names.
+#' @param root Project root.
+#' @param envir Environment in which to source the functions.
+#' @return A list of source results, invisibly.
+#' @noRd
 source_function_files <- function(names, root = ".", envir = .GlobalEnv) {
   invisible(lapply(names, function(name) {
     path <- function_file(name, root)
@@ -166,6 +236,13 @@ source_function_files <- function(names, root = ".", envir = .GlobalEnv) {
   }))
 }
 
+#' Source Functions Provided by Packs
+#'
+#' @param names Character vector of pack names.
+#' @param root Project root.
+#' @param envir Environment in which to source the functions.
+#' @return The resolved function names, invisibly.
+#' @noRd
 source_pack_functions <- function(names, root = ".", envir = .GlobalEnv) {
   functions <- unique(unlist(
     lapply(names, resolve_pack_functions, root = root),
@@ -175,6 +252,13 @@ source_pack_functions <- function(names, root = ".", envir = .GlobalEnv) {
   invisible(functions)
 }
 
+#' Run Pack On-Add Hooks
+#'
+#' @param name Pack name.
+#' @param root Project root used as the working directory while hooks run.
+#' @param envir Environment containing the sourced hook functions.
+#' @return The resolved hook names, invisibly.
+#' @noRd
 run_pack_on_add_hooks <- function(name, root = ".", envir = .GlobalEnv) {
   hooks <- resolve_pack_on_add_hooks(name, root = root)
   old_wd <- getwd()
@@ -193,6 +277,12 @@ run_pack_on_add_hooks <- function(name, root = ".", envir = .GlobalEnv) {
   invisible(hooks)
 }
 
+#' Check for Pack Function Conflicts
+#'
+#' @param names Character vector of pack names.
+#' @param root Project root.
+#' @return `TRUE`, invisibly, if no pack function conflicts exist.
+#' @noRd
 check_pack_function_conflicts <- function(names, root = ".") {
   packs <- unique(unlist(
     lapply(names, resolve_pack_names, root = root),
@@ -221,6 +311,12 @@ check_pack_function_conflicts <- function(names, root = ".") {
   invisible(TRUE)
 }
 
+#' Synchronize Configured Functions
+#'
+#' @param config Parsed project configuration.
+#' @param root Project root.
+#' @return A character vector of installed catalog function names.
+#' @noRd
 sync_functions <- function(config, root = ".") {
   installed <- installed_functions(config)
   invisible(lapply(installed, function(name) {
@@ -237,6 +333,12 @@ sync_functions <- function(config, root = ".") {
   installed
 }
 
+#' Resolve Function Names Provided by Configured Packs
+#'
+#' @param config Parsed project configuration.
+#' @param root Project root.
+#' @return A character vector of unique function names.
+#' @noRd
 pack_provided_function_names <- function(config, root = ".") {
   declared <- toml_string_array(
     config$packs$declared %||% character(),
@@ -248,6 +350,13 @@ pack_provided_function_names <- function(config, root = ".") {
   ))
 }
 
+#' Remove Unshared Pack Functions
+#'
+#' @param name Name of the pack being removed.
+#' @param remaining_packs Character vector of pack names that remain declared.
+#' @param root Project root.
+#' @return A character vector of removed function names, invisibly.
+#' @noRd
 remove_pack_functions <- function(name, remaining_packs, root = ".") {
   pack <- load_pack(name, root)
   removable <- toml_string_array(
@@ -476,6 +585,12 @@ pack_setting <- function(pack, key, default = NULL, root = ".") {
   value %||% default
 }
 
+#' Build a Simple Line Diff
+#'
+#' @param package_lines Character vector of package-version lines.
+#' @param local_lines Character vector of local-version lines.
+#' @return A character vector containing a simple line diff.
+#' @noRd
 simple_line_diff <- function(package_lines, local_lines) {
   n <- max(length(package_lines), length(local_lines))
   out <- c("--- package", "+++ local")

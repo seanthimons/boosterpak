@@ -15,3 +15,4 @@ vignettes/*.html
 vignettes/*_files/
 vignettes/.gitignore
 .check-user-config/
+.vscode/

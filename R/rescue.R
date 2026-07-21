@@ -1,3 +1,11 @@
+#' Rescue an existing boosterpak project
+#'
+#' @param root Project root containing an existing `boosters.toml` file.
+#' @param dry_run Whether to report repairs without modifying files or the
+#'   active R session.
+#' @param verbose Whether to print the rescue report.
+#' @return A rescue report, invisibly.
+#' @noRd
 .rescue <- function(root = ".", dry_run = FALSE, verbose = NULL) {
   .rescue_check_verbose(verbose)
   if (!is.logical(dry_run) || length(dry_run) != 1 || is.na(dry_run)) {
@@ -47,6 +55,11 @@
   invisible(report)
 }
 
+#' Validate rescue verbosity
+#'
+#' @param verbose Verbosity value to validate.
+#' @return `TRUE`, invisibly, or an error if `verbose` is invalid.
+#' @noRd
 .rescue_check_verbose <- function(verbose) {
   if (!is.null(verbose) && !isTRUE(verbose) && !identical(verbose, FALSE)) {
     .rescue_stop("verbose must be NULL, TRUE, or FALSE.")
@@ -54,14 +67,31 @@
   invisible(TRUE)
 }
 
+#' Signal a rescue error
+#'
+#' @param message Character vector of error message lines.
+#' @return This function does not return; it signals an error.
+#' @noRd
 .rescue_stop <- function(message) {
   stop(paste(unname(message), collapse = "\n"), call. = FALSE)
 }
 
+#' Check whether a package is available during rescue
+#'
+#' @param package Package name.
+#' @return A logical scalar indicating whether the package namespace is
+#'   available.
+#' @noRd
 .rescue_has_package <- function(package) {
   requireNamespace(package, quietly = TRUE)
 }
 
+#' Create an empty rescue report
+#'
+#' @param root Project root recorded in the report.
+#' @param dry_run Whether the report describes a dry run.
+#' @return A rescue report list with empty result fields.
+#' @noRd
 .rescue_report <- function(root, dry_run) {
   list(
     root = root,
@@ -74,6 +104,12 @@
   )
 }
 
+#' Merge rescue report fields
+#'
+#' @param report Rescue report to update.
+#' @param other Rescue report whose result fields are merged into `report`.
+#' @return The updated rescue report.
+#' @noRd
 .rescue_merge_report <- function(report, other) {
   for (field in c("actions", "skipped", "warnings", "paths")) {
     report[[field]] <- unique(c(report[[field]], other[[field]]))
@@ -81,11 +117,24 @@
   report
 }
 
+#' Add unique values to a rescue report field
+#'
+#' @param report Rescue report to update.
+#' @param field Name of the report field to update.
+#' @param values Values to add.
+#' @return The updated rescue report.
+#' @noRd
 .rescue_add <- function(report, field, values) {
   report[[field]] <- unique(c(report[[field]], values))
   report
 }
 
+#' Add a normalized path to a rescue report
+#'
+#' @param report Rescue report to update.
+#' @param path File path to record.
+#' @return The updated rescue report.
+#' @noRd
 .rescue_add_path <- function(report, path) {
   .rescue_add(
     report,
@@ -94,6 +143,14 @@
   )
 }
 
+#' Repair repository and install-policy options
+#'
+#' @param dry_run Whether to restore session options after calculating changes.
+#' @param verbose Verbosity value accepted for interface consistency;
+#'   repository configuration is always run quietly.
+#' @return A list containing the rescue report, `.Rprofile` setup lines,
+#'   repository changes, and install-policy changes.
+#' @noRd
 .rescue_repositories <- function(dry_run, verbose) {
   report <- .rescue_report(root = "", dry_run = dry_run)
 
@@ -152,6 +209,12 @@
   list(report = report, lines = lines, changes = changes, install_policy_changes = install_policy_changes)
 }
 
+#' Read and validate the rescue configuration
+#'
+#' @param root Project root.
+#' @return A list containing the parsed configuration, its validity, and a
+#'   rescue report containing any warnings.
+#' @noRd
 .rescue_config <- function(root) {
   report <- .rescue_report(root, dry_run = FALSE)
   config <- tryCatch(
@@ -186,6 +249,11 @@
   list(config = config, valid = valid, report = report)
 }
 
+#' Read a configuration for rescue
+#'
+#' @param root Project root.
+#' @return The parsed configuration with TOML arrays normalized.
+#' @noRd
 .rescue_read_config <- function(root) {
   path <- boosters_file(root)
   if (!file.exists(path)) {
@@ -203,6 +271,11 @@
   normalize_toml_arrays(data)
 }
 
+#' Validate configuration fields needed by rescue
+#'
+#' @param config Parsed boosterpak configuration.
+#' @return `TRUE`, invisibly, or an error if a required field is invalid.
+#' @noRd
 .rescue_validate_config <- function(config) {
   .rescue_character_array(config$packs$declared %||% character(), "[packs].declared")
   .rescue_character_array(config$extras$declared %||% character(), "[extras].declared")
@@ -228,6 +301,13 @@
   invisible(TRUE)
 }
 
+#' Validate a rescue configuration string array
+#'
+#' @param value Configuration value to validate.
+#' @param field Configuration field name used in error messages.
+#' @return The character vector, with an empty list normalized to
+#'   `character()`.
+#' @noRd
 .rescue_character_array <- function(value, field) {
   if (is.list(value) && length(value) == 0) {
     return(character())
@@ -238,6 +318,14 @@
   value
 }
 
+#' Repair the project startup profile
+#'
+#' @param root Project root.
+#' @param repository_lines Repository and install-policy setup lines to insert.
+#' @param dry_run Whether to report the repair without writing the file.
+#' @param report Rescue report to update.
+#' @return The updated rescue report.
+#' @noRd
 .rescue_rprofile <- function(root, repository_lines, dry_run, report) {
   path <- file.path(root, ".Rprofile")
   existing <- if (file.exists(path)) readLines(path, warn = FALSE) else character()
@@ -259,6 +347,12 @@
   report
 }
 
+#' Plan rescued startup profile lines
+#'
+#' @param lines Existing `.Rprofile` lines.
+#' @param repository_lines Repository and install-policy setup lines to insert.
+#' @return A list containing the planned `lines` and a logical `changed` flag.
+#' @noRd
 .rescue_rprofile_lines <- function(lines, repository_lines = character()) {
   original <- lines
   lines <- lines[lines != legacy_rprofile_line()]
@@ -273,6 +367,15 @@
   list(lines = lines, changed = !identical(original, lines))
 }
 
+#' Repair core and declared pack assets
+#'
+#' @param root Project root.
+#' @param config Parsed boosterpak configuration.
+#' @param config_valid Whether `config` passed rescue validation.
+#' @param dry_run Whether to report repairs without writing files.
+#' @param report Rescue report to update.
+#' @return The updated rescue report.
+#' @noRd
 .rescue_core_assets <- function(root, config, config_valid, dry_run, report) {
   report <- .rescue_builtin_pack("core", root, dry_run, report)
   if (!isTRUE(config_valid)) {
@@ -314,6 +417,14 @@
   report
 }
 
+#' Repair a built-in pack manifest
+#'
+#' @param name Built-in pack name.
+#' @param root Project root.
+#' @param dry_run Whether to report the repair without writing the manifest.
+#' @param report Rescue report to update.
+#' @return The updated rescue report.
+#' @noRd
 .rescue_builtin_pack <- function(name, root, dry_run, report) {
   source <- system.file("packs", sprintf("%s.toml", name), package = "boosterpak")
   target <- file.path(project_packs_dir(root), sprintf("%s.toml", name))
@@ -345,6 +456,11 @@
   report
 }
 
+#' List materialized project pack files
+#'
+#' @param root Project root.
+#' @return A character vector of normalized project pack file paths.
+#' @noRd
 .rescue_project_pack_files <- function(root) {
   dir <- project_packs_dir(root)
   if (!dir.exists(dir)) {
@@ -357,6 +473,14 @@
   )
 }
 
+#' Repair the managed attach file
+#'
+#' @param root Project root.
+#' @param config_valid Whether the project configuration passed validation.
+#' @param dry_run Whether to report the repair without writing the file.
+#' @param report Rescue report to update.
+#' @return The updated rescue report.
+#' @noRd
 .rescue_attach <- function(root, config_valid, dry_run, report) {
   path <- attach_file(root)
   if (!isTRUE(config_valid)) {
@@ -390,6 +514,13 @@
   report
 }
 
+#' Repair workflow packages in the project library
+#'
+#' @param root Project root.
+#' @param dry_run Whether to report package repairs without applying them.
+#' @param report Rescue report to update.
+#' @return The updated rescue report.
+#' @noRd
 .rescue_workflow_packages <- function(root, dry_run, report) {
   packages <- c("renv", "pak", "boosterpak")
 
@@ -535,6 +666,12 @@
   .rescue_add(report, "actions", "snapshotted workflow packages with update = TRUE.")
 }
 
+#' Install missing rescue workflow packages
+#'
+#' @param root Project root.
+#' @param packages Workflow package names to ensure are installed.
+#' @return `packages`, invisibly.
+#' @noRd
 .rescue_install_workflow_packages <- function(root, packages) {
   install_specs <- c(
     renv = "renv",
@@ -552,6 +689,12 @@
   invisible(packages)
 }
 
+#' Emit a rescue report
+#'
+#' @param report Rescue report to emit.
+#' @param verbose Verbosity value controlling whether messages are emitted.
+#' @return `report`, invisibly.
+#' @noRd
 .rescue_emit_report <- function(report, verbose) {
   if (!should_emit(verbose)) {
     return(invisible(report))

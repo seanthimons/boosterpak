@@ -1,3 +1,8 @@
+#' Read and normalize a TOML file
+#'
+#' @param path Path to a TOML file.
+#' @return A normalized list containing the parsed TOML data.
+#' @noRd
 read_toml_file <- function(path) {
   data <- tryCatch(
     RcppTOML::parseTOML(path),
@@ -14,6 +19,11 @@ read_toml_file <- function(path) {
   normalize_toml_arrays(data)
 }
 
+#' Normalize arrays in parsed TOML data
+#'
+#' @param x An object returned by the TOML parser.
+#' @return `x` with `NULL` values and nested arrays normalized to lists.
+#' @noRd
 normalize_toml_arrays <- function(x) {
   if (is.null(x)) {
     return(list())
@@ -24,6 +34,11 @@ normalize_toml_arrays <- function(x) {
   x
 }
 
+#' Locate pack directories
+#'
+#' @param root Project root.
+#' @return A named list of non-empty project, user, and built-in pack paths.
+#' @noRd
 pack_paths <- function(root = ".") {
   builtin_dir <- system.file("packs", package = "boosterpak")
   paths <- list(
@@ -34,6 +49,12 @@ pack_paths <- function(root = ".") {
   paths[vapply(paths, nzchar, logical(1))]
 }
 
+#' Discover packs in one scope
+#'
+#' @param scope Name of the pack scope being searched.
+#' @param dir Directory containing pack manifests.
+#' @return A data frame describing the discovered packs.
+#' @noRd
 discover_pack_scope <- function(scope, dir) {
   if (!dir.exists(dir)) {
     return(data.frame(
@@ -103,6 +124,13 @@ discover_pack_scope <- function(scope, dir) {
   out
 }
 
+#' Validate a pack's filesystem layout
+#'
+#' @param name Pack name.
+#' @param path Path to the pack manifest.
+#' @param data Parsed pack manifest data.
+#' @return `TRUE`, invisibly, or an error if the layout is invalid.
+#' @noRd
 validate_pack_layout <- function(name, path, data) {
   functions <- toml_string_array(
     data$functions %||% character(),
@@ -125,6 +153,11 @@ validate_pack_layout <- function(name, path, data) {
   invisible(TRUE)
 }
 
+#' Summarize package sources
+#'
+#' @param sources A named collection of package source specifications.
+#' @return A single comma-separated source summary, or an empty string.
+#' @noRd
 summarize_sources <- function(sources) {
   sources <- unlist(sources, use.names = TRUE)
   if (length(sources) == 0) {
@@ -133,6 +166,11 @@ summarize_sources <- function(sources) {
   paste(sprintf("%s=%s", names(sources), unname(sources)), collapse = ", ")
 }
 
+#' Discover all available packs
+#'
+#' @param root Project root.
+#' @return A data frame of packs, with higher-precedence duplicates removed.
+#' @noRd
 available_packs <- function(root = ".") {
   paths <- pack_paths(root)
   rows <- Map(discover_pack_scope, names(paths), paths)
@@ -140,6 +178,12 @@ available_packs <- function(root = ".") {
   packs[!duplicated(packs$name), , drop = FALSE]
 }
 
+#' Load and validate a pack
+#'
+#' @param name Pack name.
+#' @param root Project root.
+#' @return The parsed pack data with manifest path and scope metadata.
+#' @noRd
 load_pack <- function(name, root = ".") {
   packs <- available_packs(root)
   match <- packs[packs$name == name, , drop = FALSE]
@@ -155,6 +199,12 @@ load_pack <- function(name, root = ".") {
   data
 }
 
+#' Abort for an unknown pack
+#'
+#' @param name Unknown pack name.
+#' @param packs Data frame of available packs.
+#' @return This function does not return; it raises an error.
+#' @noRd
 abort_unknown_pack <- function(name, packs) {
   hint <- suggest_pack_name(name, packs$name)
   msg <- c(
@@ -169,6 +219,12 @@ abort_unknown_pack <- function(name, packs) {
   cli::cli_abort(msg, call = NULL)
 }
 
+#' Suggest a similar pack name
+#'
+#' @param name Unknown pack name.
+#' @param choices Character vector of available pack names.
+#' @return The closest pack name within the distance threshold, or `NULL`.
+#' @noRd
 suggest_pack_name <- function(name, choices) {
   if (length(choices) == 0) {
     return(NULL)
@@ -181,6 +237,12 @@ suggest_pack_name <- function(name, choices) {
   }
 }
 
+#' Format pack names for one scope
+#'
+#' @param packs Data frame of available packs.
+#' @param scope Scope to select.
+#' @return A comma-separated string of pack names, or `"(none)"`.
+#' @noRd
 format_pack_group <- function(packs, scope) {
   names <- packs$name[packs$scope == scope]
   if (length(names) == 0) {
@@ -190,6 +252,14 @@ format_pack_group <- function(packs, scope) {
   }
 }
 
+#' Validate a pack manifest
+#'
+#' @param expected_name Pack name requested by the caller.
+#' @param path Path to the pack manifest.
+#' @param data Parsed pack manifest data.
+#' @param scope Scope containing the manifest.
+#' @return `TRUE`, invisibly, or an error if the manifest is invalid.
+#' @noRd
 validate_pack_schema <- function(expected_name, path, data, scope) {
   file_name <- tools::file_path_sans_ext(basename(path))
   if (
@@ -276,6 +346,13 @@ validate_pack_schema <- function(expected_name, path, data, scope) {
   invisible(TRUE)
 }
 
+#' Resolve packages inherited by a pack
+#'
+#' @param name Pack name.
+#' @param root Project root.
+#' @param stack Pack names already visited while detecting cycles.
+#' @return A character vector of unique package names.
+#' @noRd
 resolve_pack <- function(name, root = ".", stack = character()) {
   if (name %in% stack) {
     cycle <- paste(c(stack, name), collapse = " -> ")
@@ -298,6 +375,13 @@ resolve_pack <- function(name, root = ".", stack = character()) {
   unique(c(parent_packages, pack$packages))
 }
 
+#' Resolve inherited pack names
+#'
+#' @param name Pack name.
+#' @param root Project root.
+#' @param stack Pack names already visited while detecting cycles.
+#' @return A character vector of unique pack names in inheritance order.
+#' @noRd
 resolve_pack_names <- function(name, root = ".", stack = character()) {
   if (name %in% stack) {
     cycle <- paste(c(stack, name), collapse = " -> ")
@@ -316,6 +400,13 @@ resolve_pack_names <- function(name, root = ".", stack = character()) {
   unique(c(parent_names, name))
 }
 
+#' Resolve functions inherited by a pack
+#'
+#' @param name Pack name.
+#' @param root Project root.
+#' @param stack Pack names already visited while detecting cycles.
+#' @return A character vector of unique function names.
+#' @noRd
 resolve_pack_functions <- function(name, root = ".", stack = character()) {
   if (name %in% stack) {
     cycle <- paste(c(stack, name), collapse = " -> ")
@@ -339,6 +430,13 @@ resolve_pack_functions <- function(name, root = ".", stack = character()) {
   unique(c(parent_functions, pack$functions %||% character()))
 }
 
+#' Resolve on-add hooks inherited by a pack
+#'
+#' @param name Pack name.
+#' @param root Project root.
+#' @param stack Pack names already visited while detecting cycles.
+#' @return A character vector of unique on-add hook names.
+#' @noRd
 resolve_pack_on_add_hooks <- function(name, root = ".", stack = character()) {
   if (name %in% stack) {
     cycle <- paste(c(stack, name), collapse = " -> ")
@@ -366,6 +464,12 @@ resolve_pack_on_add_hooks <- function(name, root = ".", stack = character()) {
   unique(c(parent_hooks, hooks))
 }
 
+#' Resolve pack names declared by a configuration
+#'
+#' @param config Parsed project configuration.
+#' @param root Project root.
+#' @return A character vector of unique declared and inherited pack names.
+#' @noRd
 resolve_config_pack_names <- function(config, root = ".") {
   declared <- toml_string_array(
     config$packs$declared %||% character(),
@@ -377,6 +481,12 @@ resolve_config_pack_names <- function(config, root = ".") {
   ))
 }
 
+#' Copy a pack into project scope
+#'
+#' @param name Pack name.
+#' @param root Project root.
+#' @return The destination manifest path, invisibly.
+#' @noRd
 materialize_pack <- function(name, root = ".") {
   pack <- load_pack(name, root)
   dir.create(project_packs_dir(root), recursive = TRUE, showWarnings = FALSE)
@@ -412,12 +522,25 @@ materialize_pack <- function(name, root = ".") {
   invisible(target)
 }
 
+#' Materialize packs declared by a configuration
+#'
+#' @param config Parsed project configuration.
+#' @param root Project root.
+#' @return A character vector of resolved pack names.
+#' @noRd
 materialize_config_packs <- function(config, root = ".") {
   names <- resolve_config_pack_names(config, root)
   invisible(lapply(names, materialize_pack, root = root))
   names
 }
 
+#' Resolve package sources inherited by a pack
+#'
+#' @param name Pack name.
+#' @param root Project root.
+#' @param stack Pack names already visited while detecting cycles.
+#' @return A named vector of package source specifications.
+#' @noRd
 resolve_pack_sources <- function(name, root = ".", stack = character()) {
   if (name %in% stack) {
     cycle <- paste(c(stack, name), collapse = " -> ")
@@ -442,6 +565,12 @@ resolve_pack_sources <- function(name, root = ".", stack = character()) {
   sources[!duplicated(names(sources), fromLast = TRUE)]
 }
 
+#' Resolve packages declared by a configuration
+#'
+#' @param config Parsed project configuration.
+#' @param root Project root.
+#' @return A character vector of unique package names after exclusions.
+#' @noRd
 resolve_config_packages <- function(config, root = ".") {
   declared <- toml_string_array(
     config$packs$declared %||% character(),
@@ -467,6 +596,12 @@ resolve_config_packages <- function(config, root = ".") {
   setdiff(unique(c(packages, extras)), exclude)
 }
 
+#' Resolve package installation specifications
+#'
+#' @param config Parsed project configuration.
+#' @param root Project root.
+#' @return A character vector of package names or source-specific install specs.
+#' @noRd
 resolve_config_install_specs <- function(config, root = ".") {
   declared <- toml_string_array(
     config$packs$declared %||% character(),
@@ -511,6 +646,11 @@ resolve_config_install_specs <- function(config, root = ".") {
   )
 }
 
+#' Extract a package name from an install specification
+#'
+#' @param spec A package name or source-specific installation specification.
+#' @return The inferred package name as a single string.
+#' @noRd
 package_name_from_spec <- function(spec) {
   if (grepl("^[A-Za-z][A-Za-z0-9.]*$", spec)) {
     return(spec)
@@ -562,6 +702,12 @@ list_packs <- function(scope = NULL, root = ".", verbose = NULL) {
   invisible(packs)
 }
 
+#' Select a pack scope directory
+#'
+#' @param scope Pack scope, either `"project"` or `"user"`.
+#' @param root Project root.
+#' @return The path to the selected pack directory.
+#' @noRd
 pack_scope_dir <- function(scope, root = ".") {
   switch(
     scope,
@@ -571,6 +717,11 @@ pack_scope_dir <- function(scope, root = ".") {
   )
 }
 
+#' Validate a new pack name
+#'
+#' @param name Proposed pack name.
+#' @return The validated pack name, invisibly.
+#' @noRd
 validate_new_pack_name <- function(name) {
   if (
     !is.character(name) ||
@@ -585,6 +736,12 @@ validate_new_pack_name <- function(name) {
   invisible(name)
 }
 
+#' Build a captured-pack description
+#'
+#' @param name Name of the pack being saved.
+#' @param from Optional name of the source pack.
+#' @return A single description string.
+#' @noRd
 pack_description <- function(name, from = NULL) {
   if (is.null(from)) {
     sprintf("Captured package snapshot for %s.", name)
@@ -593,6 +750,20 @@ pack_description <- function(name, from = NULL) {
   }
 }
 
+#' Write a pack manifest
+#'
+#' @param path Destination manifest path.
+#' @param name Pack name.
+#' @param description Pack description.
+#' @param packages Character vector of package names.
+#' @param sources Named character vector of package source specifications.
+#' @param functions Character vector of function names.
+#' @param overwrite Whether to replace an existing manifest.
+#' @param extends Character vector of parent pack names.
+#' @param attach Attach intent as a logical value or package-name vector.
+#' @param include_functions Whether to write the `functions` field.
+#' @return The manifest path, invisibly.
+#' @noRd
 write_pack_file <- function(
   path,
   name,
@@ -651,6 +822,11 @@ write_pack_file <- function(
   invisible(path)
 }
 
+#' Format a TOML inline string array
+#'
+#' @param x Character vector to format.
+#' @return A single comma-separated string of quoted TOML values.
+#' @noRd
 toml_inline_string_array <- function(x) {
   paste(
     sprintf('"%s"', vapply(x, escape_toml_string, character(1))),
@@ -658,6 +834,11 @@ toml_inline_string_array <- function(x) {
   )
 }
 
+#' Format a TOML attach setting
+#'
+#' @param attach A logical value or character vector of package names.
+#' @return A TOML assignment for the `attach` field.
+#' @noRd
 toml_attach_line <- function(attach) {
   if (identical(attach, TRUE)) {
     return("attach = true")
@@ -668,6 +849,12 @@ toml_attach_line <- function(attach) {
   sprintf("attach = [%s]", toml_inline_string_array(attach))
 }
 
+#' Select sources for resolved packages
+#'
+#' @param packages Character vector of package names.
+#' @param sources Named collection of package source specifications.
+#' @return A deduplicated named character vector of relevant sources.
+#' @noRd
 pack_sources_for_packages <- function(packages, sources) {
   sources <- unlist(sources %||% list(), use.names = TRUE)
   if (length(sources) == 0) {
@@ -677,6 +864,12 @@ pack_sources_for_packages <- function(packages, sources) {
   sources[!duplicated(names(sources), fromLast = TRUE)]
 }
 
+#' Resolve the contents of a pack to save
+#'
+#' @param from Optional existing pack name to resolve.
+#' @param root Project root.
+#' @return A list containing `packages`, `sources`, and `functions`.
+#' @noRd
 resolve_save_pack_contents <- function(from = NULL, root = ".") {
   if (is.null(from)) {
     config <- read_config(root)
@@ -698,6 +891,11 @@ resolve_save_pack_contents <- function(from = NULL, root = ".") {
   list(packages = unique(packages), sources = sources, functions = functions)
 }
 
+#' List local project function names
+#'
+#' @param root Project root.
+#' @return A character vector of function names inferred from function files.
+#' @noRd
 local_function_names <- function(root = ".") {
   files <- list.files(
     functions_dir(root),
@@ -707,6 +905,13 @@ local_function_names <- function(root = ".") {
   sub("^fn_(.*)\\.R$", "\\1", files)
 }
 
+#' Select functions to save with a pack
+#'
+#' @param functions A selection mode or character vector of function names.
+#' @param contents Resolved pack contents containing installed function names.
+#' @param root Project root.
+#' @return A unique character vector of selected function names.
+#' @noRd
 resolve_save_pack_functions <- function(functions, contents, root = ".") {
   if (
     is.character(functions) &&
@@ -730,6 +935,14 @@ resolve_save_pack_functions <- function(functions, contents, root = ".") {
   unique(names)
 }
 
+#' Write a pack function sidecar
+#'
+#' @param path Path to the pack manifest.
+#' @param names Character vector of function names to copy.
+#' @param root Project root.
+#' @param overwrite Whether to replace an existing sidecar directory.
+#' @return The sidecar directory path, invisibly.
+#' @noRd
 write_pack_function_sidecar <- function(
   path,
   names,
@@ -816,6 +1029,12 @@ save_pack <- function(
   invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
 }
 
+#' Create a default pack description
+#'
+#' @param name Pack name.
+#' @param description Optional explicit description.
+#' @return The explicit, entered, or generated description string.
+#' @noRd
 create_pack_description <- function(name, description) {
   if (!is.null(description)) {
     return(description)
@@ -829,6 +1048,11 @@ create_pack_description <- function(name, description) {
   sprintf("Custom booster pack for %s.", name)
 }
 
+#' Resolve package specs for a new pack
+#'
+#' @param packages Character vector of package or source specifications.
+#' @return A list containing package names and named source specifications.
+#' @noRd
 resolve_create_pack_specs <- function(packages) {
   if (!is.character(packages)) {
     cli::cli_abort("{.arg packages} must be a character vector.", call = NULL)
@@ -849,6 +1073,12 @@ resolve_create_pack_specs <- function(packages) {
   )
 }
 
+#' Resolve parent packs for a new pack
+#'
+#' @param extends Optional character vector of parent pack names.
+#' @param root Project root.
+#' @return A character vector of selected parent pack names.
+#' @noRd
 resolve_create_pack_extends <- function(extends, root) {
   if (is.null(extends)) {
     if (!interactive()) {
@@ -866,6 +1096,12 @@ resolve_create_pack_extends <- function(extends, root) {
   }
 }
 
+#' Validate parent packs for a new pack
+#'
+#' @param extends Character vector of parent pack names.
+#' @param root Project root.
+#' @return `TRUE`, invisibly, or an error if a parent pack is unknown.
+#' @noRd
 validate_create_pack_extends <- function(extends, root) {
   if (!is.character(extends)) {
     cli::cli_abort(
@@ -887,6 +1123,12 @@ validate_create_pack_extends <- function(extends, root) {
   invisible(TRUE)
 }
 
+#' Resolve attach intent for a new pack
+#'
+#' @param attach An attach mode or character vector of package specifications.
+#' @param packages Character vector of package names declared by the pack.
+#' @return A logical attach-all flag or character vector of package names.
+#' @noRd
 resolve_create_pack_attach <- function(attach, packages) {
   package_names <- packages
   choices <- c("ask", "all", "some", "none")
@@ -944,6 +1186,11 @@ resolve_create_pack_attach <- function(attach, packages) {
   )
 }
 
+#' Resolve function-template intent
+#'
+#' @param function_template One of `"ask"`, `"yes"`, or `"no"`.
+#' @return A single logical value indicating whether to create a template.
+#' @noRd
 resolve_create_pack_function_template <- function(function_template) {
   function_template <- match.arg(function_template, c("ask", "yes", "no"))
   if (identical(function_template, "ask")) {
@@ -959,6 +1206,12 @@ resolve_create_pack_function_template <- function(function_template) {
   identical(function_template, "yes")
 }
 
+#' Write a pack function template
+#'
+#' @param path Path to the pack manifest.
+#' @param overwrite Whether to replace an existing template.
+#' @return The template file path, invisibly.
+#' @noRd
 write_function_template <- function(path, overwrite = FALSE) {
   target <- pack_function_file(path, "template")
   if (file.exists(target) && !isTRUE(overwrite)) {
@@ -1063,6 +1316,16 @@ create_pack <- function(
   invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
 }
 
+#' Copy a pack between scopes
+#'
+#' @param name Pack name.
+#' @param from_scope Source pack scope.
+#' @param to_scope Destination pack scope.
+#' @param root Project root.
+#' @param overwrite Whether to replace an existing destination pack.
+#' @param verbose Whether to print routine summaries.
+#' @return The destination manifest path, invisibly.
+#' @noRd
 copy_pack_between_scopes <- function(
   name,
   from_scope,
@@ -1133,6 +1396,15 @@ copy_pack_between_scopes <- function(
   invisible(normalizePath(target, winslash = "/", mustWork = FALSE))
 }
 
+#' Guard against conflicting pack layouts
+#'
+#' @param name Pack name.
+#' @param scope Destination pack scope.
+#' @param root Project root.
+#' @param target Intended destination manifest path.
+#' @param overwrite Whether to remove a conflicting alternate layout.
+#' @return `TRUE`, invisibly, or an error if a conflicting layout exists.
+#' @noRd
 guard_pack_target_layout <- function(
   name,
   scope,
@@ -1164,6 +1436,13 @@ guard_pack_target_layout <- function(
   invisible(TRUE)
 }
 
+#' Locate a pack manifest in one scope
+#'
+#' @param name Pack name.
+#' @param scope Pack scope.
+#' @param root Project root.
+#' @return The nested manifest path when present, otherwise the flat path.
+#' @noRd
 pack_manifest_in_scope <- function(name, scope, root = ".") {
   dir <- pack_scope_dir(scope, root)
   flat <- file.path(dir, sprintf("%s.toml", name))
@@ -1206,6 +1485,12 @@ demote_pack <- function(name, root = ".", overwrite = FALSE, verbose = NULL) {
   copy_pack_between_scopes(name, "user", "project", root, overwrite, verbose)
 }
 
+#' Use a fallback for a null value
+#'
+#' @param x A possibly `NULL` value.
+#' @param y The fallback value.
+#' @return `y` when `x` is `NULL`; otherwise `x`.
+#' @noRd
 `%||%` <- function(x, y) {
   if (is.null(x)) y else x
 }
