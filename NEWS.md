@@ -2,6 +2,21 @@
 
 # boosterpak NEWS
 
+## v0.7.0 (2026-07-21)
+
+#### Docs
+
+- document package internals for CRAN (#10)
+  ([c8840f0](https://github.com/seanthimons/boosterpak/tree/c8840f0c6e909a022056ba89538c935b860ba55f))
+
+#### Other changes
+
+- bump version to 0.7.0 \[skip ci\]
+  ([23b8c8a](https://github.com/seanthimons/boosterpak/tree/23b8c8add8f9e8151f5c0824390112a7637a85c1))
+
+Full set of changes:
+[`v0.6.5...v0.7.0`](https://github.com/seanthimons/boosterpak/compare/v0.6.5...v0.7.0)
+
 ## v0.6.5 (2026-07-20)
 
 #### New features
@@ -26,6 +41,11 @@
 
 - align GitHub Actions across R package repos (#7)
   ([b90466d](https://github.com/seanthimons/boosterpak/tree/b90466d3532460e17ff01ef24c559dd5c922d0c2))
+
+#### Docs
+
+- update NEWS.md for v0.6.5 \[skip ci\]
+  ([b586d96](https://github.com/seanthimons/boosterpak/tree/b586d9671ffe5fae844c2b809c127c356a902207))
 
 #### Other changes
 
