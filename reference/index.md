@@ -4,6 +4,8 @@
 
 - [`init()`](https://seanthimons.github.io/boosterpak/reference/init.md)
   : Initialize a boosterpak project
+- [`deinit()`](https://seanthimons.github.io/boosterpak/reference/deinit.md)
+  : Safely deinitialize a boosterpak project
 - [`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
   : Synchronize a boosterpak project
 - [`write_attach()`](https://seanthimons.github.io/boosterpak/reference/write_attach.md)
