@@ -33,6 +33,7 @@ reference:
   - title: Project workflow
     contents:
       - init
+      - deinit
       - sync
       - write_attach
       - status

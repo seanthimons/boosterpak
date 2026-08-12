@@ -131,7 +131,7 @@ test_that("init persists PPM repository setup before renv activation", {
   lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
   marker <- match(boosterpak:::rprofile_repository_marker(), lines)
   renv_line <- grep('source\\("renv/activate\\.R"\\)', lines)
-  hook_line <- match(boosterpak:::rprofile_line(), lines)
+  hook_line <- match(boosterpak:::rprofile_startup_begin_marker(), lines)
 
   expect_equal(marker, renv_line - 3L)
   expect_equal(
