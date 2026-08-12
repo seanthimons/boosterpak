@@ -125,6 +125,58 @@ helper functions, and, when `auto_snapshot = true`, writes
 `boosters/attach.R` and snapshots with `renv`. Use `hydrate = FALSE` to skip
 local reuse for stricter first-run installs.
 
+## Safely deinitialize a project
+
+Call `deinit()` without component arguments in an interactive session to see a
+single picker containing only components that have something to clean up. All
+actionable components are preselected. After selection, `deinit()` displays the
+exact project paths and `.Rprofile` changes and asks for one final confirmation.
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::deinit()
+```
+
+Automation must opt out of prompts with `force = TRUE`. Supplying any component
+argument skips the picker and honors all five logical selectors:
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::deinit(
+  renv = TRUE,
+  boosters = TRUE,
+  rprofile = TRUE,
+  lockfile = TRUE,
+  air = TRUE,
+  force = TRUE
+)
+```
+
+The selectors are independent, so partial cleanup is explicit. For example,
+the following removes only the lockfile after confirmation:
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::deinit(
+  renv = FALSE,
+  boosters = FALSE,
+  rprofile = FALSE,
+  lockfile = TRUE,
+  air = FALSE
+)
+```
+
+The cleanup is conservative. `.Rprofile` itself and unrelated user lines are
+always retained. A renv activation line is removed only when both `renv` and
+`rprofile` are selected and the activation is a recognized whole-line
+expression. Edited or ownership-unknown `air.toml` files, malformed managed
+startup markers, user/global packs, active user libraries, and session options
+are preserved. If the removed renv library is active, restart R before
+continuing. Repeating the same cleanup is an unprompted no-op.
+
 ## Use an active library without a project renv
 
 For an existing live project that should keep using its current R libraries,

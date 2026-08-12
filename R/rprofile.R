@@ -118,7 +118,7 @@ remove_rprofile_install_policy_block <- function(lines) {
   option_names <- names(boosterpak_install_policy_options())
   option_pattern <- sprintf(
     "^options\\((%s)\\s*=",
-    paste(gsub(".", "\\\\.", option_names, fixed = TRUE), collapse = "|")
+    paste(gsub(".", "\\.", option_names, fixed = TRUE), collapse = "|")
   )
   for (idx in marker_idx) {
     keep[[idx]] <- FALSE
@@ -159,6 +159,83 @@ remove_rprofile_repository_block <- function(lines) {
     }
   }
   lines[keep]
+}
+
+#' Remove boosterpak-managed lines from an R profile
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @param renv Whether to remove whole-line renv activation expressions.
+#' @return A list containing transformed `lines`, a `changed` flag, and a
+#'   `malformed_startup` flag.
+#' @noRd
+remove_rprofile_managed_lines <- function(lines, renv = TRUE) {
+  original <- lines
+  startup <- remove_rprofile_startup_blocks(lines)
+  lines <- startup$lines
+  lines <- lines[!lines %in% c(rprofile_line(), legacy_rprofile_line())]
+  lines <- remove_rprofile_boosterpak_setup_blocks(lines)
+  if (isTRUE(renv)) {
+    lines <- lines[!is_rprofile_renv_activation(lines)]
+  }
+  list(
+    lines = lines,
+    changed = !identical(lines, original),
+    malformed_startup = startup$malformed
+  )
+}
+
+#' Remove valid marker-delimited boosterpak startup blocks
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @return A list containing transformed `lines` and a `malformed` flag.
+#' @noRd
+remove_rprofile_startup_blocks <- function(lines) {
+  begin <- rprofile_startup_begin_marker()
+  end <- rprofile_startup_end_marker()
+  keep <- rep(TRUE, length(lines))
+  open <- NA_integer_
+  nested <- FALSE
+  malformed <- FALSE
+
+  for (idx in seq_along(lines)) {
+    if (identical(lines[[idx]], begin)) {
+      if (is.na(open)) {
+        open <- idx
+        nested <- FALSE
+      } else {
+        nested <- TRUE
+        malformed <- TRUE
+      }
+    } else if (identical(lines[[idx]], end)) {
+      if (is.na(open)) {
+        malformed <- TRUE
+      } else {
+        if (!nested) {
+          keep[open:idx] <- FALSE
+        }
+        open <- NA_integer_
+        nested <- FALSE
+      }
+    }
+  }
+  if (!is.na(open)) {
+    malformed <- TRUE
+  }
+
+  list(lines = lines[keep], malformed = malformed)
+}
+
+#' Identify whole-line renv activation expressions
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @return A logical vector.
+#' @noRd
+is_rprofile_renv_activation <- function(lines) {
+  grepl(
+    "^\\s*source\\(\\s*([\"'])renv/activate\\.R\\1\\s*\\)\\s*(?:#.*)?$",
+    lines,
+    perl = TRUE
+  )
 }
 
 #' Insert lines before renv activation

@@ -34,6 +34,39 @@ boosterpak::init(renv = "yes", rprofile = "yes")
 boosterpak::sync()
 ```
 
+## Safely Deinitialize a Project
+
+Run `boosterpak::deinit()` interactively to choose from the project components
+that currently have something to clean up. The console picker preselects every
+actionable component, then a final confirmation shows the exact paths and
+`.Rprofile` changes before anything is modified.
+
+For automation, select components explicitly and use `force = TRUE`:
+
+``` r
+boosterpak::deinit(
+  renv = TRUE,
+  boosters = TRUE,
+  rprofile = TRUE,
+  lockfile = TRUE,
+  air = TRUE,
+  force = TRUE
+)
+```
+
+Selectors are independent. For example,
+`deinit(boosters = FALSE, renv = FALSE, lockfile = TRUE)` removes only
+`renv.lock` after confirmation. Removing `renv/` while setting
+`rprofile = FALSE` deliberately retains its activation line and reports that
+choice.
+
+`deinit()` never deletes `.Rprofile`; it removes only recognized boosterpak
+managed content and, when selected with `renv = TRUE`, a whole-line renv
+activation expression. It preserves malformed managed markers, unrelated user
+code, user/global packs, session options and libraries, and any edited or
+ownership-unknown `air.toml`. Non-interactive destructive calls require
+`force = TRUE`, while a genuine no-op returns without prompting.
+
 ## Use an Active Library Without a Project renv
 
 For a live project that should keep using its existing R libraries, initialize without creating a project-local `renv` environment:
