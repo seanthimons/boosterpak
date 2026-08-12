@@ -119,6 +119,34 @@ legacy_rprofile_line <- function() {
   'if (dir.exists("boosters")) invisible(lapply(list.files("boosters", "^fn_.*\\\\.R$", full.names = TRUE), source))'
 }
 
+#' Build the managed startup block begin marker
+#'
+#' @return The exact begin marker used in `.Rprofile`.
+#' @noRd
+rprofile_startup_begin_marker <- function() {
+  "# BEGIN boosterpak managed startup"
+}
+
+#' Build the managed startup block end marker
+#'
+#' @return The exact end marker used in `.Rprofile`.
+#' @noRd
+rprofile_startup_end_marker <- function() {
+  "# END boosterpak managed startup"
+}
+
+#' Build the managed startup block
+#'
+#' @return The exact managed startup block written to `.Rprofile`.
+#' @noRd
+rprofile_startup_block <- function() {
+  c(
+    rprofile_startup_begin_marker(),
+    sprintf("try(%s)", rprofile_line()),
+    rprofile_startup_end_marker()
+  )
+}
+
 #' Get the installed boosterpak version
 #'
 #' @return The installed package version as a string.

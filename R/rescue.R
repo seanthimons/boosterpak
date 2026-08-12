@@ -363,7 +363,9 @@
     lines <- insert_before_renv_activation(lines, repository_lines)
   }
 
-  lines <- insert_after_renv_activation(lines, rprofile_line())
+  if (!has_rprofile_startup_block(lines)) {
+    lines <- insert_after_renv_activation(lines, rprofile_startup_block())
+  }
   list(lines = lines, changed = !identical(original, lines))
 }
 

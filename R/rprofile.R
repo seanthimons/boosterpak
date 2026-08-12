@@ -5,7 +5,25 @@
 #' @noRd
 has_rprofile_line <- function(root = ".") {
   path <- file.path(root, ".Rprofile")
-  file.exists(path) && any(readLines(path, warn = FALSE) == rprofile_line())
+  file.exists(path) && has_rprofile_startup_block(readLines(path, warn = FALSE))
+}
+
+#' Check for an exact managed startup block
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @return A single logical value.
+#' @noRd
+has_rprofile_startup_block <- function(lines) {
+  block <- rprofile_startup_block()
+  starts <- which(lines == block[[1]])
+  any(vapply(
+    starts,
+    function(start) {
+      end <- start + length(block) - 1L
+      end <= length(lines) && identical(lines[start:end], block)
+    },
+    logical(1)
+  ))
 }
 
 #' Ensure the boosterpak startup setup
@@ -23,13 +41,14 @@ ensure_rprofile_line <- function(
 ) {
   rprofile <- match.arg(rprofile)
   path <- file.path(root, ".Rprofile")
-  line <- rprofile_line()
+  block <- rprofile_startup_block()
   existing <- if (file.exists(path)) readLines(path, warn = FALSE) else character()
 
-  legacy <- legacy_rprofile_line()
+  historical <- c(legacy_rprofile_line(), rprofile_line())
   setup_missing <- length(repository_lines) > 0 &&
     !all(repository_lines %in% existing)
-  hook_missing <- !line %in% existing || legacy %in% existing
+  hook_missing <- !has_rprofile_startup_block(existing) ||
+    any(historical %in% existing)
 
   if (!setup_missing && !hook_missing) {
     return(invisible(FALSE))
@@ -44,14 +63,14 @@ ensure_rprofile_line <- function(
       cli::cli_abort(c(
         "{.file .Rprofile} does not contain the recommended boosterpak startup setup.",
         "i" = "Use {.code rprofile = 'yes'} to add it or {.code rprofile = 'no'} to skip repository setup and package/helper auto-sourcing.",
-        ">" = paste(c(repository_lines, line), collapse = "\n")
+        ">" = paste(c(repository_lines, block), collapse = "\n")
       ), call = NULL)
     }
     answer <- utils::menu(
       c("Yes (recommended)", "No"),
       title = paste(
         "Add this boosterpak startup setup to .Rprofile?",
-        paste(c(repository_lines, line), collapse = "\n"),
+        paste(c(repository_lines, block), collapse = "\n"),
         sep = "\n"
       )
     )
@@ -60,14 +79,14 @@ ensure_rprofile_line <- function(
     }
   }
 
-  existing <- existing[existing != legacy]
+  existing <- existing[!existing %in% historical]
   updated <- existing
   if (setup_missing) {
     updated <- remove_rprofile_boosterpak_setup_blocks(updated)
     updated <- insert_before_renv_activation(updated, repository_lines)
   }
-  if (!line %in% updated) {
-    updated <- insert_after_renv_activation(updated, line)
+  if (!has_rprofile_startup_block(updated)) {
+    updated <- insert_after_renv_activation(updated, block)
   }
   writeLines(updated, path, useBytes = TRUE)
   invisible(TRUE)

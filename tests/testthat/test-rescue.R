@@ -85,7 +85,7 @@ test_that("rescue repairs legacy Rprofile hook around renv activation", {
   policy <- match(boosterpak:::rprofile_install_policy_marker(), lines)
   marker <- match(boosterpak:::rprofile_repository_marker(), lines)
   renv_line <- grep('source\\("renv/activate\\.R"\\)', lines)
-  hook_line <- match(boosterpak:::rprofile_line(), lines)
+  hook_line <- match(boosterpak:::rprofile_startup_begin_marker(), lines)
 
   expect_false(boosterpak:::legacy_rprofile_line() %in% lines)
   expect_true(policy < marker)
