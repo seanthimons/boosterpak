@@ -2,10 +2,27 @@
 
 # boosterpak NEWS
 
+## v0.8.0 (2026-08-12)
+
+#### New features
+
+- add safe project deinitialization (#11)
+  ([7392407](https://github.com/seanthimons/boosterpak/tree/7392407be0e1851f64176a1a4b407b8de1792b10))
+
+#### Other changes
+
+- bump version to 0.8.0 \[skip ci\]
+  ([68f36c6](https://github.com/seanthimons/boosterpak/tree/68f36c6a912fc065722cbe17bd1dd93a40a181a6))
+
+Full set of changes:
+[`v0.7.0...v0.8.0`](https://github.com/seanthimons/boosterpak/compare/v0.7.0...v0.8.0)
+
 ## v0.7.0 (2026-07-21)
 
 #### Docs
 
+- update NEWS.md for v0.7.0 \[skip ci\]
+  ([ab0edef](https://github.com/seanthimons/boosterpak/tree/ab0edef5b4ec75b71962d6ef016313e91e5d2ad3))
 - document package internals for CRAN (#10)
   ([c8840f0](https://github.com/seanthimons/boosterpak/tree/c8840f0c6e909a022056ba89538c935b860ba55f))
 
