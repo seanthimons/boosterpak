@@ -190,6 +190,41 @@ Pack mutation is additive. Removing a pack updates `boosters.toml` and can run s
 
 With the default `library = "renv"` strategy, `add_pack()` and `sync(mode = "apply")` use `hydrate = TRUE`, so ordinary CRAN-style package names can be copied from renv-discoverable local libraries before `pak` downloads anything. Source-specific declarations, such as GitHub remotes in `[sources]`, skip hydration and install through their declared spec. Use `hydrate = FALSE` for stricter first-run installs that should go straight to `pak`. The `library = "active"` strategy installs directly into the selected active library and ignores hydration.
 
+## Add One-Off Packages Alongside Packs
+
+`boosterpak` manages packs. For individual packages that don't belong to any pack, use `pak` or `renv` directly:
+
+``` r
+pak::pkg_install("concert")
+```
+
+After installing, snapshot so `renv.lock` records the new package:
+
+``` r
+renv::snapshot()
+```
+
+Subsequent `boosterpak::sync()` and `boosterpak::add_pack()` calls preserve every package already recorded in `renv.lock`, so one-off installs are not lost when packs are added or synchronized later. The typical sequence for a new project is:
+
+``` r
+boosterpak::init(renv = "yes", rprofile = "yes")
+boosterpak::add_pack("eda")
+
+# one-off package, then snapshot it into the lockfile
+pak::pkg_install("concert")
+renv::snapshot()
+
+# future pack additions preserve concert in renv.lock
+boosterpak::add_pack("databases")
+```
+
+Packages installed directly are not attached at startup by `boosters/attach.R`. To attach them, add the package name to `[attach].declared` in `boosters.toml`:
+
+``` toml
+[attach]
+declared = ["concert"]
+```
+
 ## Capture and Reuse Packs
 
 ``` r

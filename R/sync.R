@@ -42,7 +42,7 @@ sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbo
     identical(library, "renv") &&
       isTRUE(config$settings$auto_snapshot %||% TRUE)
   ) {
-    call_renv_snapshot(root, packages)
+    call_renv_snapshot(root, union(packages, lockfile_packages(root)))
   }
 
   if (should_emit(verbose)) {
@@ -79,6 +79,22 @@ sync_restore <- function(root, verbose = NULL) {
     cli::cli_alert_success("Restored from {.file renv.lock}.")
   }
   invisible(packages)
+}
+
+#' Read Package Names from the Project Lockfile
+#'
+#' @param root Project root.
+#' @return Character vector of package names recorded in `renv.lock`, or
+#'   `character(0)` if the lockfile is absent or unreadable.
+#' @noRd
+lockfile_packages <- function(root = ".") {
+  path <- file.path(root, "renv.lock")
+  if (!file.exists(path)) return(character(0))
+  lock <- tryCatch(jsonlite::read_json(path), error = function(err) NULL)
+  if (is.null(lock) || is.null(lock$Packages)) {
+    return(character(0))
+  }
+  names(lock$Packages)
 }
 
 #' Warn about declared packages missing from a lockfile

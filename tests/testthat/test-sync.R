@@ -57,7 +57,37 @@ test_that("sync snapshots declared packages explicitly", {
 
   sync(root = root, verbose = FALSE)
 
-  expect_setequal(snapshot_packages, c("pak", "renv", "boosterpak", "cli"))
+  expect_true(all(c("pak", "renv", "boosterpak", "cli") %in% snapshot_packages))
+})
+
+test_that("sync preserves lockfile packages not declared by boosterpak", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  jsonlite::write_json(
+    list(
+      R = list(Version = "4.5.1"),
+      Packages = list(concert = list(Package = "concert", Version = "1.0.0"))
+    ),
+    file.path(root, "renv.lock"),
+    auto_unbox = TRUE
+  )
+  snapshot_packages <- NULL
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".", ...) character(),
+    install_via = function(specs, root = ".", ...) TRUE,
+    call_renv_snapshot = function(root = ".", packages = NULL) {
+      snapshot_packages <<- packages
+    },
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+
+  expect_true("concert" %in% snapshot_packages)
+  expect_true(all(c("pak", "renv", "boosterpak", "cli") %in% snapshot_packages))
 })
 
 test_that("sync hydrates missing plain-name packages before pak install", {
