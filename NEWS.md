@@ -7,12 +7,19 @@
 #### Bug fixes
 
 - preserve lockfile packages during sync snapshot
-  ([a4f3a6d](https://github.com/seanthimons/boosterpak/tree/a4f3a6d))
+  ([a4f3a6d](https://github.com/seanthimons/boosterpak/tree/a4f3a6d7ba7c5e40913b23dd21495a0743e37604))
+
+#### Docs
+
+- update NEWS.md for v0.9.0 \[skip ci\]
+  ([5b347fa](https://github.com/seanthimons/boosterpak/tree/5b347fa411e7b84b0063077e96faad17c08420a3))
+- explain external renv libraries
+  ([933899c](https://github.com/seanthimons/boosterpak/tree/933899c9b3afed1800c73fcfe4716fc6c2c0c073))
 
 #### Other changes
 
 - bump version to 0.9.0 \[skip ci\]
-  ([a4a4157](https://github.com/seanthimons/boosterpak/tree/a4a4157))
+  ([a4a4157](https://github.com/seanthimons/boosterpak/tree/a4a41571c99c8c99bcb9ecb97503bb5a5c0db835))
 
 Full set of changes:
 [`v0.8.0...v0.9.0`](https://github.com/seanthimons/boosterpak/compare/v0.8.0...v0.9.0)
@@ -23,6 +30,11 @@ Full set of changes:
 
 - add safe project deinitialization (#11)
   ([7392407](https://github.com/seanthimons/boosterpak/tree/7392407be0e1851f64176a1a4b407b8de1792b10))
+
+#### Docs
+
+- update NEWS.md for v0.8.0 \[skip ci\]
+  ([62db299](https://github.com/seanthimons/boosterpak/tree/62db299bc28608b8da594bf69297c9d8f0c0a47a))
 
 #### Other changes
 
