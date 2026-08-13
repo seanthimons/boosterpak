@@ -2,6 +2,21 @@
 
 # boosterpak NEWS
 
+## v0.9.0 (2026-08-13)
+
+#### Bug fixes
+
+- preserve lockfile packages during sync snapshot
+  ([a4f3a6d](https://github.com/seanthimons/boosterpak/tree/a4f3a6d))
+
+#### Other changes
+
+- bump version to 0.9.0 \[skip ci\]
+  ([a4a4157](https://github.com/seanthimons/boosterpak/tree/a4a4157))
+
+Full set of changes:
+[`v0.8.0...v0.9.0`](https://github.com/seanthimons/boosterpak/compare/v0.8.0...v0.9.0)
+
 ## v0.8.0 (2026-08-12)
 
 #### New features
