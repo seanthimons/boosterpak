@@ -36,6 +36,39 @@ pak::pkg_install("seanthimons/boosterpak")
 
 ## 3. Initialize the project
 
+For a project stored in OneDrive or another synchronized folder, keep
+its device-specific package library outside the project. Open the
+user-level `.Renviron` file:
+
+``` r
+
+file.edit(path.expand("~/.Renviron"))
+```
+
+Add this line on Windows, then fully restart R:
+
+``` text
+RENV_PATHS_LIBRARY_ROOT="${LOCALAPPDATA}/R/cache/R/renv/library"
+```
+
+Confirm the path before initialization:
+
+``` r
+
+renv::paths$library(project = ".")
+```
+
+`renv` adds project-, platform-, and R-version-specific directories
+beneath that root. The package library therefore stays local to the
+device, while the small `renv/` bootstrap directory and `renv.lock`
+remain with the project so it can be restored elsewhere. Keep
+`library = "renv"` in `boosters.toml`; no boosterpak-specific path
+setting is required. Do not relocate the bootstrap directory with
+`RENV_PATHS_RENV`, because boosterpak expects `renv/activate.R` inside
+the project. See the [`renv` path
+documentation](https://rstudio.github.io/renv/reference/paths.html) for
+other platforms and path controls.
+
 ``` r
 
 boosterpak::init(renv = "yes", rprofile = "yes")
@@ -99,6 +132,14 @@ user code, user/global packs, session options and libraries, and any
 edited or ownership-unknown `air.toml`. Non-interactive destructive
 calls require `force = TRUE`, while a genuine no-op returns without
 prompting.
+
+When `RENV_PATHS_LIBRARY_ROOT` places the package library outside the
+project, the `renv` selector still removes only the project-local
+`renv/` bootstrap directory. It deliberately leaves the external package
+library untouched. If the project renv is active,
+[`deinit()`](https://seanthimons.github.io/boosterpak/reference/deinit.md)
+reports `restart_required = TRUE` and warns you to restart R; it does
+not rewrite the current session’s library paths.
 
 ## Use an Active Library Without a Project renv
 
