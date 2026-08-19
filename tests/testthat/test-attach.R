@@ -116,6 +116,29 @@ test_that("sync writes attach file before snapshot", {
   expect_equal(grep("^library", readLines(boosterpak:::attach_file(root), warn = FALSE), value = TRUE), "library(cli)")
 })
 
+test_that("sync sources the generated attach file", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  sourced <- FALSE
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".", ...) character(),
+    install_via = function(specs, root = ".", ...) TRUE,
+    source_attach = function(root = ".", verbose = NULL) {
+      sourced <<- TRUE
+      invisible(TRUE)
+    },
+    call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+
+  expect_true(sourced)
+})
+
 test_that("sync removes managed attach file when attach is disabled", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)

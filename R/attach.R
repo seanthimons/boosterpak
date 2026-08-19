@@ -149,6 +149,30 @@ write_attach <- function(root = ".", verbose = NULL) {
   invisible(normalizePath(path, winslash = "/", mustWork = FALSE))
 }
 
+#' Source the Managed Attachment File
+#'
+#' Sources `boosters/attach.R` so declared packages are available immediately
+#' in the current R session.
+#'
+#' @param root Project root.
+#' @param verbose Whether to print routine summaries.
+#' @return `TRUE` invisibly when an attachment file was sourced, otherwise
+#'   `FALSE` invisibly.
+#' @noRd
+source_attach <- function(root = ".", verbose = NULL) {
+  check_verbose(verbose)
+  path <- attach_file(root)
+  if (!file.exists(path)) {
+    return(invisible(FALSE))
+  }
+
+  sys.source(path, envir = globalenv())
+  if (should_emit(verbose)) {
+    cli::cli_alert_success("Sourced {.file boosters/attach.R} in the current R session.")
+  }
+  invisible(TRUE)
+}
+
 #' Build the Managed Attachment File
 #'
 #' @param packages Character vector of package names to attach.
