@@ -18,8 +18,9 @@ sync(
 
 - mode:
 
-  `"apply"` installs packages declared by `boosters.toml` and writes
-  `boosters/attach.R`; `"restore"` restores from `renv.lock`.
+  `"apply"` installs packages declared by `boosters.toml`, then writes
+  and sources `boosters/attach.R` in the current R session; `"restore"`
+  restores from `renv.lock`.
 
 - root:
 
