@@ -185,6 +185,7 @@ test_that("sync does not hydrate source-specific package specs", {
     install_via = function(specs, root = ".", ...) {
       installed <<- specs
     },
+    source_attach = function(root = ".", verbose = NULL) invisible(TRUE),
     call_renv_snapshot = function(root = ".", packages = NULL) TRUE,
     .package = "boosterpak"
   )
@@ -253,6 +254,7 @@ test_that("active-library sync installs without renv and skips renv operations",
     hydrate_via_renv = function(packages, root = ".") {
       hydrated <<- TRUE
     },
+    source_attach = function(root = ".", verbose = NULL) invisible(TRUE),
     call_renv_snapshot = function(root = ".", packages = NULL) {
       snapshotted <<- TRUE
     },
