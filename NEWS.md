@@ -2,6 +2,26 @@
 
 # boosterpak NEWS
 
+## v0.9.1 (2026-08-31)
+
+#### Bug fixes
+
+- repair missing package dependencies before snapshot (#15)
+  ([a990a9a](https://github.com/seanthimons/boosterpak/tree/a990a9a20ac11c885566b4c9a7f46f3020476198))
+
+#### Docs
+
+- fix clone restore flowchart
+  ([5af1807](https://github.com/seanthimons/boosterpak/tree/5af18073c30db89a4e8b01a1fe48f26ae7d15c06))
+
+#### Other changes
+
+- set version to 0.9.1 \[skip ci\]
+  ([f687769](https://github.com/seanthimons/boosterpak/tree/f6877699ac0475d2889f7e64901acb07bb761b32))
+
+Full set of changes:
+[`v0.9.0...v0.9.1`](https://github.com/seanthimons/boosterpak/compare/v0.9.0...v0.9.1)
+
 ## v0.9.0 (2026-08-13)
 
 #### Bug fixes
@@ -11,6 +31,8 @@
 
 #### Docs
 
+- update NEWS.md for v0.9.0 \[skip ci\]
+  ([94e7d1f](https://github.com/seanthimons/boosterpak/tree/94e7d1f8162d19868f5914bc0e996ba4bab75f2e))
 - update NEWS.md for v0.9.0 \[skip ci\]
   ([5b347fa](https://github.com/seanthimons/boosterpak/tree/5b347fa411e7b84b0063077e96faad17c08420a3))
 - explain external renv libraries
