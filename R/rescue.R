@@ -647,6 +647,7 @@
   report <- .rescue_add_path(report, file.path(root, "renv.lock"))
   snapshotted <- tryCatch(
     {
+      ensure_dependency_closure(packages, root)
       call_renv_snapshot(root, packages = packages, update = TRUE)
       TRUE
     },
