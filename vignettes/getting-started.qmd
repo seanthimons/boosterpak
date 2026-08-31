@@ -35,7 +35,7 @@ reused without separating "packages" from customized `boosters/fn_*.R` files.
 
 ```mermaid
 flowchart TD
-  A([Start or clone project]) --> B(["Run init()"])
+  A([Start new project]) --> B(["Run init()"])
   B --> C([Declare reusable capability])
   C --> D(["Run add_pack()"])
   C --> E(["Run add_function()"])
@@ -63,6 +63,8 @@ flowchart TD
 In practice, initialize once, add pack and function capability intent over time,
 run `sync()` whenever the project should match that intent, then save and promote
 a pack when the setup is worth reusing.
+For an already initialized repo clone, skip `init()` and use the restore path:
+`renv::restore()`, restart R, then `boosterpak::sync(mode = "restore")`.
 
 A pack is deliberately typed and reviewable. Today that means packages, optional
 `[sources]`, optional `attach`, optional copied helper functions, and optional

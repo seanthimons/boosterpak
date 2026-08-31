@@ -127,7 +127,7 @@ The `renv` package remains an installation dependency because lockfile restore s
 
 ```mermaid
 flowchart TD
-  A([Start or clone project]) --> B(["Run init()"])
+  A([Start new project]) --> B(["Run init()"])
   B --> C([Declare reusable capability])
   C --> D(["Run add_pack()"])
   C --> E(["Run add_function()"])
@@ -153,6 +153,7 @@ flowchart TD
 ```
 
 The usual loop is to initialize once, add packs and helper functions as project capability intent, run `sync()`, then capture a useful baseline with `save_pack()`. Additive installs hydrate plain-name packages from local/user libraries before downloading, install any remaining packages with `pak`, and write `boosters/attach.R` for startup `library()` calls. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
+For an already initialized repo clone, do not re-run `init()`; follow the restore path with `renv::restore()`, restart R, then `boosterpak::sync(mode = "restore")`.
 
 A pack is deliberately typed and reviewable. Today that means packages, optional `[sources]`, optional `attach`, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.
 
