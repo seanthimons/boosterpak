@@ -180,7 +180,7 @@ the separate renv lockfile workflow.
 
 ``` mermaid
 flowchart TD
-  A([Start or clone project]) --> B(["Run init()"])
+  A([Start new project]) --> B(["Run init()"])
   B --> C([Declare reusable capability])
   C --> D(["Run add_pack()"])
   C --> E(["Run add_function()"])
@@ -216,7 +216,12 @@ before downloading, install any remaining packages with `pak`, and write
 [`library()`](https://rdrr.io/r/base/library.html) calls. Package-only
 packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied
 helper files use `boosters/packs/<name>/<name>.toml` plus
-`boosters/packs/<name>/functions/`.
+`boosters/packs/<name>/functions/`. For an already initialized repo
+clone, do not re-run
+[`init()`](https://seanthimons.github.io/boosterpak/reference/init.md);
+follow the restore path with
+[`renv::restore()`](https://rstudio.github.io/renv/reference/restore.html),
+restart R, then `boosterpak::sync(mode = "restore")`.
 
 A pack is deliberately typed and reviewable. Today that means packages,
 optional `[sources]`, optional `attach`, optional copied helper

@@ -85,7 +85,7 @@
 <section class="level2"><h2 id="typical-workflow">Typical workflow<a class="anchor" aria-label="anchor" href="#typical-workflow"></a>
 </h2>
 <pre class="mermaid"><code>flowchart TD
-  A([Start or clone project]) --&gt; B(["Run init()"])
+  A([Start new project]) --&gt; B(["Run init()"])
   B --&gt; C([Declare reusable capability])
   C --&gt; D(["Run add_pack()"])
   C --&gt; E(["Run add_function()"])
@@ -108,7 +108,7 @@
   classDef packageAction fill:#f6f8fa,stroke:#6e7781,color:#24292f;
   class A,B,C,D,E,F,K,L,N,O userAction;
   class G,H,A1,I,J,M packageAction;</code></pre>
-<p>In practice, initialize once, add pack and function capability intent over time, run <code><a href="../reference/sync.html">sync()</a></code> whenever the project should match that intent, then save and promote a pack when the setup is worth reusing.</p>
+<p>In practice, initialize once, add pack and function capability intent over time, run <code><a href="../reference/sync.html">sync()</a></code> whenever the project should match that intent, then save and promote a pack when the setup is worth reusing. For an already initialized repo clone, skip <code><a href="../reference/init.html">init()</a></code> and use the restore path: <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code>, restart R, then <code>boosterpak::sync(mode = "restore")</code>.</p>
 <p>A pack is deliberately typed and reviewable. Today that means packages, optional <code>[sources]</code>, optional <code>attach</code>, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.</p>
 </section><section class="level2"><h2 id="install-pak">1. Install pak<a class="anchor" aria-label="anchor" href="#install-pak"></a>
 </h2>

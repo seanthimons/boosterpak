@@ -28,7 +28,7 @@ helper files, so a useful project setup can be reused without separating
 
 ``` mermaid
 flowchart TD
-  A([Start or clone project]) --> B(["Run init()"])
+  A([Start new project]) --> B(["Run init()"])
   B --> C([Declare reusable capability])
   C --> D(["Run add_pack()"])
   C --> E(["Run add_function()"])
@@ -57,7 +57,12 @@ In practice, initialize once, add pack and function capability intent
 over time, run
 [`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)
 whenever the project should match that intent, then save and promote a
-pack when the setup is worth reusing.
+pack when the setup is worth reusing. For an already initialized repo
+clone, skip
+[`init()`](https://seanthimons.github.io/boosterpak/reference/init.md)
+and use the restore path:
+[`renv::restore()`](https://rstudio.github.io/renv/reference/restore.html),
+restart R, then `boosterpak::sync(mode = "restore")`.
 
 A pack is deliberately typed and reviewable. Today that means packages,
 optional `[sources]`, optional `attach`, optional copied helper
