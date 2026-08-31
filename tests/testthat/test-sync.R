@@ -90,6 +90,32 @@ test_that("sync preserves lockfile packages not declared by boosterpak", {
   expect_true(all(c("pak", "renv", "boosterpak", "cli") %in% snapshot_packages))
 })
 
+test_that("sync repairs missing hard dependencies before snapshot", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  repaired <- NULL
+  snapshotted <- NULL
+
+  local_mocked_bindings(
+    ensure_project_renv = function(root = ".") TRUE,
+    missing_packages = function(packages, root = ".", ...) character(),
+    install_via = function(specs, root = ".", ...) TRUE,
+    ensure_dependency_closure = function(packages, root = ".", library = "renv") {
+      repaired <<- list(packages = packages, library = library)
+    },
+    call_renv_snapshot = function(root = ".", packages = NULL) {
+      snapshotted <<- packages
+    },
+    .package = "boosterpak"
+  )
+
+  sync(root = root, verbose = FALSE)
+
+  expect_equal(repaired$library, "renv")
+  expect_equal(repaired$packages, snapshotted)
+})
+
 test_that("sync hydrates missing plain-name packages before pak install", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
@@ -348,4 +374,25 @@ test_that("missing package detection checks the selected active library", {
   )
 
   expect_equal(missing, "boosterpak")
+})
+
+test_that("hard dependency detection finds missing imports from installed descriptions", {
+  db <- matrix(
+    c("pkgB, pkgC (>= 1.0)", NA, NA, NA, NA, NA),
+    nrow = 2,
+    byrow = TRUE,
+    dimnames = list(
+      c("pkgA", "pkgC"),
+      c("Depends", "Imports", "LinkingTo")
+    )
+  )
+
+  local_mocked_bindings(
+    installed_package_db = function(root = ".", library = "renv") db,
+    .package = "boosterpak"
+  )
+
+  missing <- boosterpak:::missing_hard_dependencies("pkgA")
+
+  expect_equal(missing, "pkgB")
 })

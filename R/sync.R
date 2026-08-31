@@ -44,7 +44,9 @@ sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbo
     identical(library, "renv") &&
       isTRUE(config$settings$auto_snapshot %||% TRUE)
   ) {
-    call_renv_snapshot(root, union(packages, lockfile_packages(root)))
+    snapshot_packages <- union(packages, lockfile_packages(root))
+    ensure_dependency_closure(snapshot_packages, root, library)
+    call_renv_snapshot(root, snapshot_packages)
   }
 
   if (should_emit(verbose)) {

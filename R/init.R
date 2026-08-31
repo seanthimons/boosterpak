@@ -305,6 +305,7 @@ bootstrap_project_renv <- function(root, config) {
   install_via(unname(install_specs[missing]), root)
 
   if (isTRUE(config$settings$auto_snapshot %||% TRUE)) {
+    ensure_dependency_closure(package_names, root)
     call_renv_snapshot(root, package_names)
   }
 

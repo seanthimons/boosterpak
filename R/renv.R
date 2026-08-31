@@ -154,6 +154,95 @@ call_renv_snapshot <- function(root = ".", packages = NULL, update = FALSE) {
   )
 }
 
+#' Read installed package metadata for dependency checks
+#'
+#' @param root Project root.
+#' @param library Package library strategy, either `"renv"` or `"active"`.
+#' @return A matrix like [utils::installed.packages()].
+#' @noRd
+installed_package_db <- function(root = ".", library = "renv") {
+  lib <- package_library(root, library)
+  lib_loc <- unique(c(lib, .Library, .Library.site))
+  utils::installed.packages(
+    lib.loc = lib_loc[file.exists(lib_loc)],
+    fields = c("Depends", "Imports", "LinkingTo")
+  )
+}
+
+#' Find missing hard dependencies for installed packages
+#'
+#' @param packages Character vector of package names to validate.
+#' @param root Project root.
+#' @param library Package library strategy, either `"renv"` or `"active"`.
+#' @return Character vector of missing hard dependency package names.
+#' @noRd
+missing_hard_dependencies <- function(packages, root = ".", library = "renv") {
+  if (length(packages) == 0) {
+    return(character())
+  }
+  db <- installed_package_db(root, library)
+  present <- intersect(packages, rownames(db))
+  if (length(present) == 0) {
+    return(character())
+  }
+  seen <- character()
+  queue <- present
+  missing <- character()
+
+  while (length(queue) > 0) {
+    package <- queue[[1]]
+    queue <- queue[-1]
+    if (package %in% seen || !package %in% rownames(db)) {
+      next
+    }
+    seen <- c(seen, package)
+    deps <- parse_hard_dependencies(db[package, c("Depends", "Imports", "LinkingTo")])
+    missing <- union(missing, setdiff(deps, rownames(db)))
+    queue <- c(queue, intersect(deps, rownames(db)))
+  }
+
+  missing
+}
+
+#' Parse hard dependency package names from DESCRIPTION fields
+#'
+#' @param fields Character vector of DESCRIPTION fields.
+#' @return Character vector of package names excluding `R`.
+#' @noRd
+parse_hard_dependencies <- function(fields) {
+  fields <- fields[!is.na(fields) & nzchar(fields)]
+  if (length(fields) == 0) {
+    return(character())
+  }
+  deps <- trimws(unlist(strsplit(fields, ",", fixed = TRUE), use.names = FALSE))
+  deps <- sub("\\s*\\(.*$", "", deps)
+  deps <- deps[nzchar(deps) & deps != "R"]
+  unique(deps)
+}
+
+#' Ensure installed packages have a complete hard dependency closure
+#'
+#' @param packages Character vector of package names to validate.
+#' @param root Project root.
+#' @param library Package library strategy, either `"renv"` or `"active"`.
+#' @return Newly installed dependency package names, invisibly.
+#' @noRd
+ensure_dependency_closure <- function(packages, root = ".", library = "renv") {
+  missing <- missing_hard_dependencies(packages, root, library)
+  if (length(missing) == 0) {
+    return(invisible(character()))
+  }
+  install_via(missing, root, library)
+  remaining <- missing_hard_dependencies(packages, root, library)
+  if (length(remaining) > 0) {
+    cli::cli_abort(
+      "Required package dependencies are still missing after install: {remaining}.",
+      call = NULL
+    )
+  }
+  invisible(missing)
+}
+
 #' Restore the Project Renv Library
 #'
 #' @param root Project root.
