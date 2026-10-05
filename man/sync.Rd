@@ -13,9 +13,9 @@ sync(
 )
 }
 \arguments{
-\item{mode}{\code{"apply"} installs packages declared by \code{boosters.toml}, then
-writes and sources \code{boosters/attach.R} in the current R session;
-\code{"restore"} restores from \code{renv.lock}.}
+\item{mode}{\code{"apply"} installs packages declared by \code{boosters.toml} and
+writes and sources \code{boosters/attach.R} in the current R session; \code{"restore"}
+restores from \code{renv.lock}.}
 
 \item{root}{Project root.}
 
