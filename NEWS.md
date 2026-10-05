@@ -2,6 +2,21 @@
 
 # boosterpak NEWS
 
+## v0.9.2 (2026-10-05)
+
+#### Bug fixes
+
+- use manylinux PPM binaries on Linux (#23)
+  ([c7d3d59](https://github.com/seanthimons/boosterpak/tree/c7d3d5992924cad02809b5f1e8f460104f13cec8))
+
+#### Other changes
+
+- bump version to 0.9.2 \[skip ci\]
+  ([774e48f](https://github.com/seanthimons/boosterpak/tree/774e48f61bc5487c2554b45bda72cd5a09307000))
+
+Full set of changes:
+[`v0.9.1...v0.9.2`](https://github.com/seanthimons/boosterpak/compare/v0.9.1...v0.9.2)
+
 ## v0.9.1 (2026-08-31)
 
 #### Bug fixes
@@ -11,6 +26,8 @@
 
 #### Docs
 
+- update NEWS.md for v0.9.1 \[skip ci\]
+  ([e23540d](https://github.com/seanthimons/boosterpak/tree/e23540dd4d323f1c138835ff82d1cbe64fa5ea96))
 - fix clone restore flowchart
   ([5af1807](https://github.com/seanthimons/boosterpak/tree/5af18073c30db89a4e8b01a1fe48f26ae7d15c06))
 
