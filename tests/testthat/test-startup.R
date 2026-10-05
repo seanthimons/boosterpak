@@ -133,7 +133,7 @@ test_that("init persists PPM repository setup before renv activation", {
   renv_line <- grep('source\\("renv/activate\\.R"\\)', lines)
   hook_line <- match(boosterpak:::rprofile_startup_begin_marker(), lines)
 
-  expect_equal(marker, renv_line - 3L)
+  expect_equal(marker, renv_line - 4L)
   expect_equal(
     lines[[marker + 1L]],
     'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/latest"))'
@@ -142,6 +142,7 @@ test_that("init persists PPM repository setup before renv activation", {
     lines[[marker + 2L]],
     'options(renv.config.repos.override = c(CRAN = "https://packagemanager.posit.co/cran/latest"))'
   )
+  expect_equal(lines[[marker + 3L]], boosterpak:::rprofile_ppm_linux_binary_line())
   expect_equal(hook_line, renv_line + 1L)
 })
 
@@ -348,4 +349,85 @@ test_that("init emits cli alert when configuring repositories", {
     init(root = root, renv = "no", rprofile = "no", verbose = TRUE),
     "Posit Package Manager"
   )
+})
+
+test_that("init uses manylinux binaries on Linux but persists generic repos", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  withr::local_options(list(
+    repos = c(CRAN = "@CRAN@", Internal = "https://example.test/repo"),
+    renv.config.repos.override = NULL,
+    HTTPUserAgent = "custom",
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+  root <- withr::local_tempdir()
+
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+
+  linux <- "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest"
+  expected <- c(CRAN = linux, Internal = "https://example.test/repo")
+  expect_equal(getOption("repos"), expected)
+  expect_equal(getOption("renv.config.repos.override"), expected)
+  expect_match(getOption("HTTPUserAgent"), "^R/[0-9.]+ R \\(")
+
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  marker <- match(boosterpak:::rprofile_repository_marker(), lines)
+  expect_false(any(grepl("__linux__", lines[marker + 1:2], fixed = TRUE)))
+
+  # The persisted block replays the same rewrite in a fresh Linux session.
+  skip_if_not(identical(R.version$os, "linux-gnu"))
+  options(repos = NULL, renv.config.repos.override = NULL)
+  eval(parse(text = lines[marker + 1:3]), baseenv())
+  expect_equal(getOption("repos"), expected)
+  expect_equal(getOption("renv.config.repos.override"), expected)
+})
+
+test_that("init upgrades an existing generic PPM .Rprofile on Linux", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  generic <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  withr::local_options(list(
+    repos = generic,
+    renv.config.repos.override = generic,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+  root <- withr::local_tempdir()
+  old_block <- boosterpak:::rprofile_repository_lines(generic)[1:3]
+  user_line <- "# user Linux block"
+  writeLines(
+    c(old_block, user_line, 'source("renv/activate.R")'),
+    file.path(root, ".Rprofile")
+  )
+
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  expect_equal(sum(lines == boosterpak:::rprofile_repository_marker()), 1L)
+  expect_equal(sum(lines == boosterpak:::rprofile_ppm_linux_binary_line()), 1L)
+  expect_true(user_line %in% lines)
+})
+
+test_that("Linux binary rewrite leaves custom and distro PPM URLs alone", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  repos <- c(
+    CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+    Snap = "https://packagemanager.posit.co/cran/2026-01-02",
+    Internal = "https://example.test/cran/latest"
+  )
+  withr::local_options(list(repos = repos, renv.config.repos.override = NULL))
+
+  boosterpak:::use_ppm_linux_binaries()
+
+  expect_equal(
+    getOption("repos"),
+    c(
+      CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+      Snap = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/2026-01-02",
+      Internal = "https://example.test/cran/latest"
+    )
+  )
+  expect_null(getOption("renv.config.repos.override"))
 })

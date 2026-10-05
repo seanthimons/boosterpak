@@ -156,6 +156,13 @@ remove_rprofile_repository_block <- function(lines) {
         grepl("^options\\(renv\\.config\\.repos\\.override\\s*=", trimws(lines[[cursor]]))
     ) {
       keep[[cursor]] <- FALSE
+      cursor <- cursor + 1L
+    }
+    if (
+      cursor <= length(lines) &&
+        startsWith(trimws(lines[[cursor]]), 'if (identical(R.version$os, "linux-gnu")) options(repos = sub(')
+    ) {
+      keep[[cursor]] <- FALSE
     }
   }
   lines[keep]

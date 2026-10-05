@@ -157,6 +157,7 @@
   if (isTRUE(dry_run)) {
     old_repos <- getOption("repos")
     old_renv_repos <- getOption("renv.config.repos.override")
+    old_user_agent <- getOption("HTTPUserAgent")
     old_install_policy <- lapply(
       names(boosterpak_install_policy_options()),
       getOption
@@ -167,6 +168,7 @@
     lines <- boosterpak_rprofile_setup_lines(changes, install_policy_changes)
     options(repos = old_repos)
     options(renv.config.repos.override = old_renv_repos)
+    options(HTTPUserAgent = old_user_agent)
     options(old_install_policy)
   } else {
     changes <- configure_boosterpak_repositories(verbose = FALSE)

@@ -9,6 +9,93 @@ posit_package_manager_repo <- function() {
   )
 }
 
+#' Check for a glibc Linux R Build
+#'
+#' @return `TRUE` when R runs on glibc Linux, where Posit Package Manager's
+#'   manylinux binaries apply.
+#' @noRd
+is_glibc_linux <- function() {
+  identical(R.version$os, "linux-gnu")
+}
+
+#' Build the Linux Binary Repository Options Call
+#'
+#' The generic Posit Package Manager URL only serves Linux binaries on distros
+#' it recognizes, so on glibc Linux the `cran/<snapshot>` URLs are rewritten to
+#' the manylinux binary URL and the R user agent Package Manager requires is
+#' set. The persisted repository URLs stay generic so a shared `.Rprofile`
+#' works on every platform.
+#'
+#' @param include_renv Whether to rewrite the renv repository override.
+#' @return A character scalar containing an R `options()` call.
+#' @noRd
+ppm_linux_binary_options_code <- function(include_renv = TRUE) {
+  # ponytail: manylinux_2_28 for every glibc distro; per-distro URLs (as pak
+  # picks) would need Package Manager's platform list at startup.
+  rewrite <- function(option) {
+    sprintf(
+      'sub("%s", "%s", getOption("%s"))',
+      escape_r_string(
+        "^(https://packagemanager\\.(posit|rstudio)\\.co/cran)/(latest|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
+      ),
+      escape_r_string("\\1/__linux__/manylinux_2_28/\\3"),
+      option
+    )
+  }
+  args <- c(
+    sprintf("repos = %s", rewrite("repos")),
+    if (isTRUE(include_renv)) {
+      sprintf(
+        "renv.config.repos.override = %s",
+        rewrite("renv.config.repos.override")
+      )
+    },
+    paste0(
+      'HTTPUserAgent = sprintf("R/%s R (%s)", getRversion(), ',
+      "paste(getRversion(), R.version$platform, R.version$arch, R.version$os))"
+    )
+  )
+  sprintf("options(%s)", paste(args, collapse = ", "))
+}
+
+#' Build the Linux Binary Repository R Profile Line
+#'
+#' @param include_renv Whether to rewrite the renv repository override.
+#' @return A character scalar containing the guarded `.Rprofile` line.
+#' @noRd
+rprofile_ppm_linux_binary_line <- function(include_renv = TRUE) {
+  paste0(
+    'if (identical(R.version$os, "linux-gnu")) ',
+    ppm_linux_binary_options_code(include_renv)
+  )
+}
+
+#' Use Posit Package Manager Linux Binaries in the Current Session
+#'
+#' @return `TRUE` invisibly when options were applied, otherwise `FALSE`.
+#' @noRd
+use_ppm_linux_binaries <- function() {
+  if (!is_glibc_linux() || !uses_posit_package_manager(getOption("repos"))) {
+    return(invisible(FALSE))
+  }
+  include_renv <- !is.null(getOption("renv.config.repos.override"))
+  eval(str2lang(ppm_linux_binary_options_code(include_renv)), baseenv())
+  invisible(TRUE)
+}
+
+#' Convert Linux Binary Repository URLs to Generic URLs
+#'
+#' @param repos A character vector of repository values.
+#' @return `repos` with manylinux Posit Package Manager URLs made generic.
+#' @noRd
+portable_ppm_repos <- function(repos) {
+  sub(
+    "^(https://packagemanager\\.(posit|rstudio)\\.co/cran)/__linux__/manylinux_2_28/",
+    "\\1/",
+    repos
+  )
+}
+
 #' Check Whether to Configure Repositories
 #'
 #' @return `TRUE` if boosterpak should configure package repositories.
@@ -296,6 +383,7 @@ rprofile_repos_value <- function(repos) {
 #' @return A character vector of repository setup lines.
 #' @noRd
 rprofile_repository_lines <- function(repos, include_renv = TRUE) {
+  repos <- portable_ppm_repos(repos)
   lines <- c(
     rprofile_repository_marker(),
     sprintf("options(repos = c(%s))", rprofile_repos_value(repos))
@@ -309,7 +397,7 @@ rprofile_repository_lines <- function(repos, include_renv = TRUE) {
       )
     )
   }
-  lines
+  c(lines, rprofile_ppm_linux_binary_line(include_renv))
 }
 
 #' Build Install Policy Lines for the Current Session
@@ -395,6 +483,8 @@ configure_boosterpak_repositories <- function(verbose = TRUE) {
     options(renv.config.repos.override = getOption("repos"))
     changed <- c(changed, "renv")
   }
+
+  use_ppm_linux_binaries()
 
   if (isTRUE(verbose) && length(changed) > 0) {
     message <- c(
