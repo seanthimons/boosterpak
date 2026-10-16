@@ -386,6 +386,14 @@ test_that("check_binary_repos sees binaries on Package Manager", {
   expect_false(source$binary)
 })
 
+# A valid file URL has three slashes before a Windows drive letter
+# (file:///C:/...) and two before a Unix root path (file:///tmp/... as
+# "file://" + "/tmp/...").
+file_url <- function(path) {
+  path <- normalizePath(path, winslash = "/", mustWork = FALSE)
+  paste0("file://", if (startsWith(path, "/")) "" else "/", path)
+}
+
 test_that("fetch_package_version reads a repository package index", {
   repo <- withr::local_tempdir()
   contrib <- file.path(repo, "src", "contrib")
@@ -394,7 +402,7 @@ test_that("fetch_package_version reads a repository package index", {
     c("Package: cli", "Version: 3.6.6", "", "Package: other", "Version: 1.0"),
     file.path(contrib, "PACKAGES")
   )
-  contriburl <- paste0("file://", contrib)
+  contriburl <- file_url(contrib)
 
   found <- boosterpak:::fetch_package_version(contriburl, "cli")
   expect_equal(found$version, "3.6.6")
@@ -405,7 +413,7 @@ test_that("fetch_package_version reads a repository package index", {
   expect_null(missing$error)
 
   unreadable <- boosterpak:::fetch_package_version(
-    paste0("file://", file.path(repo, "nowhere")),
+    file_url(file.path(repo, "nowhere")),
     "cli"
   )
   expect_true(is.na(unreadable$version))
