@@ -37,6 +37,7 @@ reference:
       - sync
       - write_attach
       - status
+      - check_binary_repos
   - title: Packs
     contents:
       - add_pack
