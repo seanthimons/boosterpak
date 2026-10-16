@@ -679,3 +679,107 @@ test_that("deinit removes a v0.9.2 and a current Linux line", {
     expect_equal(result$lines, c("before <- TRUE", "after <- TRUE"))
   }
 })
+
+ppm_user_agent_header <- function() {
+  sprintf(
+    '--header "User-Agent: R (%s)"',
+    paste(getRversion(), R.version$platform, R.version$arch, R.version$os)
+  )
+}
+
+local_ppm_download_options <- function(method, extra, .env = parent.frame()) {
+  local_ppm_hosts(.env = .env)
+  withr::local_options(
+    list(
+      repos = c(CRAN = "https://p3m.dev/cran/latest"),
+      renv.config.repos.override = NULL,
+      HTTPUserAgent = "custom",
+      download.file.method = method,
+      download.file.extra = extra
+    ),
+    .local_envir = .env
+  )
+}
+
+test_that("curl and wget get the R user agent header", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+
+  for (method in c("curl", "wget")) {
+    local_ppm_download_options(method, extra = NULL)
+    boosterpak:::use_ppm_linux_binaries()
+    expect_equal(getOption("download.file.extra"), ppm_user_agent_header())
+  }
+})
+
+test_that("an existing download.file.extra is appended to, not replaced", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+
+  for (method in c("curl", "wget")) {
+    local_ppm_download_options(method, extra = "-fsSL")
+    boosterpak:::use_ppm_linux_binaries()
+    expect_equal(
+      getOption("download.file.extra"),
+      paste("-fsSL", ppm_user_agent_header())
+    )
+  }
+})
+
+test_that("the user agent header is added once and never overrides one", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+
+  local_ppm_download_options("curl", extra = NULL)
+  boosterpak:::use_ppm_linux_binaries()
+  boosterpak:::use_ppm_linux_binaries()
+  expect_equal(getOption("download.file.extra"), ppm_user_agent_header())
+
+  custom <- '-fsSL --header "user-agent: custom-agent"'
+  local_ppm_download_options("curl", extra = custom)
+  boosterpak:::use_ppm_linux_binaries()
+  expect_equal(getOption("download.file.extra"), custom)
+})
+
+test_that("other download methods leave download.file.extra alone", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+
+  for (method in list(NULL, "libcurl", "internal", "auto")) {
+    for (extra in list(NULL, "-fsSL")) {
+      local_ppm_download_options(method, extra = extra)
+      boosterpak:::use_ppm_linux_binaries()
+      expect_identical(getOption("download.file.extra"), extra)
+    }
+  }
+})
+
+test_that("download.file.extra is untouched off glibc Linux or without PPM", {
+  local_ppm_download_options("curl", extra = NULL)
+  boosterpak:::use_ppm_linux_binaries()
+  expect_null(getOption("download.file.extra"))
+
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  withr::local_options(repos = c(CRAN = "https://example.test/cran/latest"))
+  boosterpak:::use_ppm_linux_binaries()
+  expect_null(getOption("download.file.extra"))
+})
+
+test_that("the generated Linux line sets the header for curl and wget", {
+  skip_if_not(identical(R.version$os, "linux-gnu"))
+  line <- boosterpak:::rprofile_ppm_linux_binary_line()
+
+  for (extra in list(NULL, "-fsSL")) {
+    for (method in c("curl", "wget")) {
+      local_ppm_download_options(method, extra = extra)
+      eval(parse(text = line), baseenv())
+      expect_equal(
+        getOption("download.file.extra"),
+        paste(c(extra, ppm_user_agent_header()), collapse = " ")
+      )
+    }
+  }
+
+  local_ppm_download_options("libcurl", extra = "-fsSL")
+  eval(parse(text = line), baseenv())
+  expect_equal(getOption("download.file.extra"), "-fsSL")
+  local_ppm_download_options(NULL, extra = NULL)
+  eval(parse(text = line), baseenv())
+  expect_null(getOption("download.file.extra"))
+})

@@ -158,6 +158,7 @@
     old_repos <- getOption("repos")
     old_renv_repos <- getOption("renv.config.repos.override")
     old_user_agent <- getOption("HTTPUserAgent")
+    old_download_extra <- getOption("download.file.extra")
     old_install_policy <- lapply(
       names(boosterpak_install_policy_options()),
       getOption
@@ -169,6 +170,7 @@
     options(repos = old_repos)
     options(renv.config.repos.override = old_renv_repos)
     options(HTTPUserAgent = old_user_agent)
+    options(download.file.extra = old_download_extra)
     options(old_install_policy)
   } else {
     changes <- configure_boosterpak_repositories(verbose = FALSE)

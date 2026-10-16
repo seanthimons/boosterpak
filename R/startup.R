@@ -162,12 +162,45 @@ ppm_linux_binary_options_code <- function(include_renv = TRUE) {
         rewrite("renv.config.repos.override")
       )
     },
-    paste0(
-      'HTTPUserAgent = sprintf("R/%s R (%s)", getRversion(), ',
-      "paste(getRversion(), R.version$platform, R.version$arch, R.version$os))"
-    )
+    sprintf(
+      'HTTPUserAgent = sprintf("R/%%s R (%%s)", getRversion(), %s)',
+      ppm_platform_code()
+    ),
+    ppm_download_extra_code()
   )
   sprintf("options(%s)", paste(args, collapse = ", "))
+}
+
+#' Build the R Platform String Code
+#'
+#' @return R code evaluating to the platform description Package Manager
+#'   expects in the `User-Agent` header.
+#' @noRd
+ppm_platform_code <- function() {
+  "paste(getRversion(), R.version$platform, R.version$arch, R.version$os)"
+}
+
+#' Build the `download.file.extra` Option Code
+#'
+#' The `curl` and `wget` download methods ignore `HTTPUserAgent`, so Package
+#' Manager only sees the R user agent if it is passed as a header. The header
+#' is appended to any existing `download.file.extra` value and skipped when a
+#' user agent is already set, so it is never duplicated or overwritten. For
+#' every other download method the option keeps its current value.
+#'
+#' @return A character scalar containing the `download.file.extra` argument for
+#'   an R `options()` call.
+#' @noRd
+ppm_download_extra_code <- function() {
+  paste0(
+    'download.file.extra = if (isTRUE(getOption("download.file.method") ',
+    '%in% c("curl", "wget")) && !any(grepl("user-agent", ',
+    'getOption("download.file.extra"), ignore.case = TRUE))) ',
+    'paste(c(getOption("download.file.extra"), ',
+    "sprintf('--header \"User-Agent: R (%s)\"', ",
+    ppm_platform_code(),
+    ')), collapse = " ") else getOption("download.file.extra")'
+  )
 }
 
 #' Build the Linux Binary Repository R Profile Line

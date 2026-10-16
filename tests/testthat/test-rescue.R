@@ -346,3 +346,60 @@ test_that("rescue replaces a v0.9.2 Linux binary line", {
   expect_equal(sum(lines == boosterpak:::rprofile_repository_marker()), 1L)
   expect_true("before <- TRUE" %in% lines)
 })
+
+test_that("rescue dry run restores download options on Linux", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  local_ppm_hosts()
+  repos <- c(CRAN = "https://cran.rstudio.com/")
+
+  for (extra in list(NULL, "-fsSL")) {
+    withr::local_options(list(
+      repos = repos,
+      renv.config.repos.override = NULL,
+      HTTPUserAgent = "custom",
+      download.file.method = "curl",
+      download.file.extra = extra,
+      boosterpak.configure_repositories = TRUE,
+      boosterpak.default_cran_mirrors = character(),
+      boosterpak.configure_install_policy = FALSE
+    ))
+    withr::local_envvar(
+      RENV_CONFIG_REPOS_OVERRIDE = NA,
+      BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+    )
+    root <- withr::local_tempdir()
+    boosterpak:::write_default_config(root)
+
+    boosterpak:::.rescue(root = root, dry_run = TRUE, verbose = FALSE)
+
+    expect_equal(getOption("repos"), repos)
+    expect_null(getOption("renv.config.repos.override"))
+    expect_equal(getOption("HTTPUserAgent"), "custom")
+    expect_identical(getOption("download.file.extra"), extra)
+  }
+})
+
+test_that("rescue applies the download header for real runs on Linux", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  local_ppm_hosts()
+  withr::local_options(list(
+    repos = c(CRAN = "https://cran.rstudio.com/"),
+    renv.config.repos.override = NULL,
+    HTTPUserAgent = "custom",
+    download.file.method = "wget",
+    download.file.extra = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.default_cran_mirrors = character(),
+    boosterpak.configure_install_policy = FALSE
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA
+  )
+  root <- withr::local_tempdir()
+  boosterpak:::write_default_config(root)
+
+  boosterpak:::.rescue(root = root, verbose = FALSE)
+
+  expect_match(getOption("download.file.extra"), "User-Agent: R \\(")
+})
