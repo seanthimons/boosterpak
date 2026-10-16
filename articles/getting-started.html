@@ -70,7 +70,7 @@
 
 
 
-      <small class="dont-index">Source: <a href="https://github.com/seanthimons/boosterpak/blob/v0.9.2/vignettes/getting-started.qmd" class="external-link"><code>vignettes/getting-started.qmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/seanthimons/boosterpak/blob/main/vignettes/getting-started.qmd" class="external-link"><code>vignettes/getting-started.qmd</code></a></small>
       <div class="d-none name"><code></code></div>
     </div>
 
@@ -138,6 +138,7 @@
 </ul>
 <p>The generated <code>boosters.toml</code> includes <code>boosterpak</code> itself in <code>[extras].declared</code>, so the package needed to run <code><a href="../reference/sync.html">sync()</a></code> is also captured in project intent and the project lockfile. With <code>renv = "yes"</code>, <code><a href="../reference/init.html">init()</a></code> bootstraps only <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> into the project library and creates the initial lockfile when <code>auto_snapshot = true</code>.</p>
 <p>In non-interactive sessions, use explicit <code>renv</code> and <code>rprofile</code> arguments. The default <code>"ask"</code> mode never silently changes <code>.Rprofile</code> when user confirmation would be required.</p>
+<p>On glibc Linux, <code><a href="../reference/init.html">init()</a></code> also configures Posit’s portable Linux binaries, so distributions that Package Manager does not list, such as Fedora, install binaries instead of compiling from source. See “Linux binary packages” below.</p>
 </section><section class="level2"><h2 id="sync-the-project">4. Sync the project<a class="anchor" aria-label="anchor" href="#sync-the-project"></a>
 </h2>
 <div class="cell">
@@ -145,16 +146,47 @@
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/sync.html">sync</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Apply mode is additive. With the default renv-library strategy, it hydrates plain-name missing packages from renv-discoverable local libraries, installs anything still missing with <code>pak</code>, materializes missing bundled or installed helper functions, and, when <code>auto_snapshot = true</code>, writes <code>boosters/attach.R</code> and snapshots with <code>renv</code>. Use <code>hydrate = FALSE</code> to skip local reuse for stricter first-run installs.</p>
+</section><section class="level2"><h2 id="linux-binary-packages">Linux binary packages<a class="anchor" aria-label="anchor" href="#linux-binary-packages"></a>
+</h2>
+<p>CRAN publishes only source packages for Linux. Posit Package Manager builds Linux binaries from them, but serves them from distribution-specific URLs such as <code>https://packagemanager.posit.co/cran/__linux__/jammy/latest</code>, which exist only for the distributions Package Manager lists. The generic URL (<code>https://packagemanager.posit.co/cran/latest</code>) serves source, so on other glibc distributions, for example Fedora, every package installs from source.</p>
+<p>Posit’s <a href="https://posit.co/blog/introducing-portable-linux-r-binary-packages" class="external-link">portable Linux binaries</a> (<code>manylinux_2_28</code>) use one binary build for all glibc distributions. On glibc Linux, boosterpak rewrites every Package Manager repository URL in <code>repos</code> (and in <code>renv.config.repos.override</code>) that has this form:</p>
+<pre class="text"><code>https://packagemanager.posit.co/cran/latest
+  -&gt; https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest</code></pre>
+<p>Package Manager only serves binaries from <code>__linux__</code> URLs to clients that identify as R, so boosterpak also sets <code>options(HTTPUserAgent = ...)</code>. For the <code>"curl"</code> and <code>"wget"</code> download methods, which ignore <code>HTTPUserAgent</code>, it appends the matching <code>User-Agent</code> header to <code>options(download.file.extra)</code> and keeps any value already there.</p>
+<p>The <code>.Rprofile</code> repository lines keep the generic URL, so one <code>.Rprofile</code> works on Windows, macOS, and Linux. A guarded line after them performs the rewrite on glibc Linux only, at startup. Distribution-specific URLs such as <code>.../cran/__linux__/noble/latest</code> are left alone. Rerun <code><a href="../reference/init.html">init()</a></code> or <code>.rescue()</code> to replace the line written by an earlier boosterpak version.</p>
+<p><strong>When it applies.</strong></p>
+<ul>
+<li>R runs on glibc Linux, meaning <code>R.version$os</code> is <code>"linux-gnu"</code>. That is the only thing boosterpak checks. musl systems such as Alpine report <code>"linux-musl"</code> and are skipped.</li>
+<li>The binaries themselves are built on RHEL 8 for x86_64 and ARM64 and need glibc 2.28 or newer (check with <code>ldd --version</code>). boosterpak does not test for this, so on an older or unusual system use the opt-out below.</li>
+<li>The repository URL is <code>&lt;host&gt;/&lt;repo&gt;/latest</code> or <code>&lt;host&gt;/&lt;repo&gt;/&lt;YYYY-MM-DD&gt;</code>, with no trailing slash, on <code>packagemanager.posit.co</code>, <code>packagemanager.rstudio.com</code>, or <code>p3m.dev</code>.</li>
+<li>For a self-hosted Package Manager, boosterpak also recognizes the host of <code>BOOSTERPAK_PPM_REPO</code> and hosts listed in <code>BOOSTERPAK_PPM_HOSTS</code> or <code>options(boosterpak.ppm_hosts = c(...))</code>. The server needs <code>manylinux_2_28</code> enabled, or installs fail with 404 errors.</li>
+</ul>
+<p><strong>Things to know.</strong></p>
+<ul>
+<li>Portable Linux binaries are a public preview from Posit.</li>
+<li>Binaries bundle their system libraries. Each package carries an <code>sbom.cdx.json</code> and a <code>Built/SystemLibs</code> field in its <code>DESCRIPTION</code>. An installed package does not update its bundled libraries, so reinstall a package from a snapshot that contains the rebuilt binary to pick up a security fix.</li>
+<li>When Package Manager has no binary for a package, it serves source without an error.</li>
+<li>
+<code>download.file.extra</code> is only set when <code>download.file.method</code> is already <code>"curl"</code> or <code>"wget"</code> as the managed line runs. A user agent passed through curl’s <code>-A</code> or wget’s <code>-U</code> is not detected.</li>
+<li>Package Manager serves packages through a redirect that R’s <code>"curl"</code> method does not follow on its own, so installs fail unless <code>download.file.extra</code> includes <code>-L</code>. Posit recommends <code>-fsSL</code>. boosterpak adds only the user agent header, never curl flags. Set your own flags earlier in <code>.Rprofile</code> than the managed block and boosterpak appends the header after them; a later assignment replaces the header.</li>
+</ul>
+<p><strong>Check that binaries are served.</strong></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/check_binary_repos.html">check_binary_repos</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+</div>
+<p><code><a href="../reference/check_binary_repos.html">check_binary_repos()</a></code> requests one small package from each Package Manager repository, using the session’s user agent, and reports the <code>X-Package-Type</code> and <code>X-Package-Binary-Tag</code> headers. It warns for any repository serving source, and when <code>download.file.method</code> is <code>"curl"</code> without <code>-L</code> in <code>download.file.extra</code>, because curl installs would then fail even though the check passes. In an install log, a binary appears as <code>* installing *binary* package 'cli' ...</code>.</p>
+<p><strong>Opt out.</strong> Set <code>BOOSTERPAK_CONFIGURE_REPOSITORIES=false</code>, for example in <code>~/.Renviron</code>, to stop boosterpak from changing repository settings. The managed <code>.Rprofile</code> line checks it too, so projects that already contain the line stop rewriting without edits. Repository lines already in <code>.Rprofile</code> keep pointing at the generic Package Manager URL, so distributions Package Manager does not list compile from source again. <code>options(boosterpak.configure_repositories = FALSE)</code> only stops boosterpak’s own repository configuration in the R session; it does not affect a line already in <code>.Rprofile</code>, and the environment variable wins if both are set. Rerunning <code>.rescue()</code> while opted out removes the managed repository lines from <code>.Rprofile</code>, because boosterpak then has no repository setup to write back. <code><a href="../reference/init.html">init()</a></code> does the same on a project whose install-policy lines are missing.</p>
 </section><section class="level2"><h2 id="safely-deinitialize-a-project">Safely deinitialize a project<a class="anchor" aria-label="anchor" href="#safely-deinitialize-a-project"></a>
 </h2>
 <p>Call <code><a href="../reference/deinit.html">deinit()</a></code> without component arguments in an interactive session to see a single picker containing only components that have something to clean up. All actionable components are preselected. After selection, <code><a href="../reference/deinit.html">deinit()</a></code> displays the exact project paths and <code>.Rprofile</code> changes and asks for one final confirmation.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/deinit.html">deinit</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Automation must opt out of prompts with <code>force = TRUE</code>. Supplying any component argument skips the picker and honors all five logical selectors:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/deinit.html">deinit</a></span><span class="op">(</span></span>
 <span>  renv <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  boosters <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -166,7 +198,7 @@
 </div>
 <p>The selectors are independent, so partial cleanup is explicit. For example, the following removes only the lockfile after confirmation:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/deinit.html">deinit</a></span><span class="op">(</span></span>
 <span>  renv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  boosters <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -180,46 +212,46 @@
 </h2>
 <p>For an existing live project that should keep using its current R libraries, initialize without creating a project-local <code>renv</code> environment:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/init.html">init</a></span><span class="op">(</span>renv <span class="op">=</span> <span class="st">"no"</span>, rprofile <span class="op">=</span> <span class="st">"yes"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Then edit the generated setting in <code>boosters.toml</code>:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">[settings]</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="dt">library</span> <span class="op">=</span> <span class="st">"active"</span></span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">[settings]</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="dt">library</span> <span class="op">=</span> <span class="st">"active"</span></span></code></pre></div>
 <p><code><a href="../reference/sync.html">boosterpak::sync()</a></code> and eager pack mutations now detect and install packages in the first writable entry of <code><a href="https://rdrr.io/r/base/libPaths.html" class="external-link">.libPaths()</a></code>. Source-specific install specs, helper functions, and startup attachment work normally. Active-library apply mode skips hydration and snapshotting and does not create <code>renv/</code> or <code>renv.lock</code>. The same behavior can be selected for one call with <code>boosterpak::sync(library = "active")</code>.</p>
 <p>The <code>renv</code> package remains an installation dependency because boosterpak also supports lockfile restoration, but active-library mode does not create or load a project-local renv environment. <code>sync(mode = "restore")</code> remains the separate renv lockfile workflow.</p>
 </section><section class="level2"><h2 id="add-a-pack">Add a Pack<a class="anchor" aria-label="anchor" href="#add-a-pack"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/add_pack.html">add_pack</a></span><span class="op">(</span><span class="st">"example"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>The <code>example</code> pack installs <code>cli</code>. <code><a href="../reference/add_pack.html">add_pack()</a></code> preserves unrelated comments and sections in <code>boosters.toml</code> while updating <code>[packs].declared</code>. For the analysis baseline of <code>fs</code>, <code>here</code>, <code>janitor</code>, <code>rio</code>, core tidyverse packages, <code>scales</code>, <code>glue</code>, <code>digest</code>, <code>skimr</code>, and bundled helper functions, add the <code>eda</code> pack explicitly:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/add_pack.html">add_pack</a></span><span class="op">(</span><span class="st">"eda"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>If the pack carries helper functions, <code><a href="../reference/add_pack.html">add_pack()</a></code> also copies the bundled <code>fn_*.R</code> files into <code>boosters/</code> and refuses to overwrite existing function files unless <code>overwrite_functions = TRUE</code>.</p>
 <p>Packs can mix ordinary CRAN package names with package-specific source specs. Declare every package in <code>packages</code>, then use <code>[sources]</code> only for packages that should install from another source:</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">"plotting"</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Plotting packages from CRAN and GitHub."</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"ggplot2"</span><span class="op">,</span> <span class="st">"patchwork"</span><span class="op">,</span> <span class="st">"ggtext"</span><span class="op">]</span></span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[sources]</span></span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">"plotting"</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Plotting packages from CRAN and GitHub."</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"ggplot2"</span><span class="op">,</span> <span class="st">"patchwork"</span><span class="op">,</span> <span class="st">"ggtext"</span><span class="op">]</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="kw">[sources]</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code></pre></div>
 <p>Here, <code>ggplot2</code> and <code>patchwork</code> can hydrate or install by package name, while <code>ggtext</code> skips hydration and uses the GitHub source spec.</p>
 <p>Package attachment is a startup layer, not installation intent. Missing <code>attach</code> means a pack attaches its direct <code>packages</code>; use <code>attach = true</code> for that explicit default, <code>attach = false</code> to install without startup attachment, or <code>attach = ["pkg1", "pkg2"]</code> to attach a subset. The top-level <code>[attach]</code> table supports <code>enabled</code>, <code>declared</code>, and <code>exclude</code>. Workflow packages from <code>core</code> and <code>[extras]</code>, including <code>pak</code>, <code>renv</code>, and <code>boosterpak</code>, are installed but not attached unless explicitly listed in <code>[attach].declared</code>.</p>
 </section><section class="level2"><h2 id="add-a-helper-function">Add a Helper Function<a class="anchor" aria-label="anchor" href="#add-a-helper-function"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/add_function.html">add_function</a></span><span class="op">(</span><span class="st">"ni"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Helper functions are materialized as <code>boosters/fn_*.R</code> files and tracked in <code>[functions].installed</code>. They are ordinary project files, so you can edit them after materialization. <code><a href="../reference/sync.html">sync()</a></code> restores missing installed helper files, but it does not overwrite local edits.</p>
 </section><section class="level2"><h2 id="capture-and-reuse">Capture and Reuse<a class="anchor" aria-label="anchor" href="#capture-and-reuse"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/save_pack.html">save_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/promote_pack.html">promote_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span></code></pre></div>
 </div>
@@ -239,7 +271,7 @@
 </section><section class="level2"><h2 id="restore-exact-versions">Restore Exact Versions<a class="anchor" aria-label="anchor" href="#restore-exact-versions"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/sync.html">sync</a></span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"restore"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p>Restore mode is lockfile-exact: it restores through <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code> and does not hydrate.</p>
@@ -250,11 +282,12 @@
 </section><section class="level2"><h2 id="inspect">Inspect<a class="anchor" aria-label="anchor" href="#inspect"></a>
 </h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/status.html">status</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/list_packs.html">list_packs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 <p><code><a href="../reference/status.html">status()</a></code> reports whether the project config exists and validates, what packs and packages resolve, whether project-local <code>renv</code> appears active, whether <code>renv.lock</code> exists, whether <code>boosters/attach.R</code> exists, and whether <code>.Rprofile</code> contains the startup hook.</p>
+<p><code><a href="../reference/status.html">status()</a></code> does not use the network. To confirm that Package Manager serves binaries rather than source, run <code><a href="../reference/check_binary_repos.html">boosterpak::check_binary_repos()</a></code>; see “Linux binary packages” above.</p>
 </section><script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);

@@ -82,7 +82,11 @@ mirrors to use Posit Package Manager for faster binary installs when
 available, including `@CRAN@`, common CRAN cloud mirrors, and mirrors
 listed in `options(boosterpak.default_cran_mirrors = c(...))` or
 `BOOSTERPAK_DEFAULT_CRAN_MIRRORS`; matching `.Rprofile` repository setup
-is written when `rprofile = "yes"`. The startup setup also enables the
+is written when `rprofile = "yes"`. On glibc Linux, that setup also
+switches to Posit’s portable Linux binaries so distributions Package
+Manager does not list, such as Fedora, install binaries instead of
+compiling from source; see [Linux Binary
+Packages](#linux-binary-packages). The startup setup also enables the
 `renv` pak backend and asks R package installs to avoid compiling from
 source when binaries are available. With `renv = "yes"`, it bootstraps
 `renv`, `pak`, and `boosterpak` into the project library and snapshots
@@ -94,6 +98,144 @@ those workflow packages before any restart is needed.
 
 boosterpak::sync()
 ```
+
+## Linux Binary Packages
+
+CRAN publishes only source packages for Linux. Posit Package Manager
+builds Linux binaries from them, but serves them from
+distribution-specific URLs such as
+`https://packagemanager.posit.co/cran/__linux__/jammy/latest`, which
+exist only for the distributions Package Manager lists. The generic URL
+(`https://packagemanager.posit.co/cran/latest`) serves source, so on
+other glibc distributions, for example Fedora, every package installs
+from source.
+
+Posit’s [portable Linux
+binaries](https://posit.co/blog/introducing-portable-linux-r-binary-packages)
+(`manylinux_2_28`) fix that with one binary build for all glibc
+distributions. On glibc Linux, boosterpak rewrites every Package Manager
+repository URL in `repos` (and in `renv.config.repos.override`) that has
+this form:
+
+``` text
+https://packagemanager.posit.co/cran/latest
+  -> https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest
+```
+
+Package Manager only serves binaries from `__linux__` URLs to clients
+that identify as R, so boosterpak also sets
+`options(HTTPUserAgent = ...)`. If you use the `"curl"` or `"wget"`
+download method, which ignore `HTTPUserAgent`, it also appends the
+matching `User-Agent` header to `options(download.file.extra)`. An
+existing `download.file.extra` is kept, and a header that is already
+there is not duplicated.
+
+### What is written where
+
+- The `.Rprofile` repository lines keep the generic URL, so one
+  `.Rprofile` still works on Windows, macOS, and Linux, and non-Linux
+  machines keep using the generic URL.
+- A guarded line after them performs the rewrite on glibc Linux only,
+  when R starts. It uses base R, because it runs before boosterpak
+  loads.
+- Distribution-specific URLs, such as `.../cran/__linux__/noble/latest`,
+  and repositories that are not Package Manager repositories are left
+  alone.
+- [`init()`](https://seanthimons.github.io/boosterpak/reference/init.md)
+  and `.rescue()` replace the line written by earlier boosterpak
+  versions, so existing projects upgrade by rerunning either one.
+
+### When it applies
+
+- R runs on glibc Linux, meaning `R.version$os` is `"linux-gnu"`. That
+  is the only thing boosterpak checks. musl systems such as Alpine
+  report `"linux-musl"` and are skipped.
+- The binaries themselves are built on RHEL 8 for x86_64 and ARM64 and
+  need glibc 2.28 or newer (check with `ldd --version`). boosterpak does
+  not test for this, so on an older or unusual system set
+  `BOOSTERPAK_CONFIGURE_REPOSITORIES=false` (see “Opt out”).
+- A repository URL looks like `<host>/<repo>/latest` or
+  `<host>/<repo>/<YYYY-MM-DD>`, with no trailing slash, on a recognized
+  host: `packagemanager.posit.co`, `packagemanager.rstudio.com`, or
+  `p3m.dev`.
+- For a self-hosted Package Manager, boosterpak also recognizes the host
+  of `BOOSTERPAK_PPM_REPO` and any hosts in `BOOSTERPAK_PPM_HOSTS`
+  (separated by commas, semicolons, or spaces) or
+  `options(boosterpak.ppm_hosts = c(...))`. The server must have
+  `manylinux_2_28` enabled, or installs fail with 404 errors. The host
+  list is written into the `.Rprofile` line when it is generated, so a
+  team should agree on one list, for example in the project’s
+  `.Renviron`, to avoid regenerating a different line for each person.
+
+### Things to know
+
+- Portable Linux binaries are a public preview from Posit.
+- Binaries bundle the system libraries they need. Each package carries a
+  software bill of materials (`sbom.cdx.json`) and a `Built/SystemLibs`
+  field in its `DESCRIPTION`. An installed package does not update its
+  bundled libraries, so to pick up a security fix in one of them,
+  reinstall the package from a repository snapshot that contains the
+  rebuilt binary.
+- When Package Manager has no binary for a package, it serves the source
+  package without an error.
+- `download.file.extra` is only set if `download.file.method` is already
+  `"curl"` or `"wget"` when the managed line runs, so set the method
+  earlier in `.Rprofile` or in `Rprofile.site`. A user agent passed
+  through curl’s `-A` or wget’s `-U` is not detected, so keep it out of
+  `download.file.extra`.
+- Package Manager serves packages through a redirect, and R’s `"curl"`
+  method does not follow redirects on its own (it needs `-L`), so it
+  saves the redirect page instead of the package and installs fail.
+  Posit recommends `options(download.file.extra = "-fsSL")` for
+  `"curl"`. boosterpak adds only the user agent header, never curl
+  flags. Set your own flags earlier in `.Rprofile` than the managed
+  block, and boosterpak appends the header after them. A later
+  assignment replaces the header.
+
+### Check that binaries are served
+
+``` r
+
+boosterpak::check_binary_repos()
+```
+
+[`check_binary_repos()`](https://seanthimons.github.io/boosterpak/reference/check_binary_repos.md)
+requests one small package (`cli` by default) from each Package Manager
+repository, with the session’s user agent, and reports the
+`X-Package-Type` and `X-Package-Binary-Tag` headers. It warns for any
+repository that serves source and suggests the likely fix. It also warns
+when `download.file.method` is `"curl"` and `download.file.extra` has no
+`-L`: the check uses libcurl, which follows redirects, so it can pass
+while curl installs fail. It needs network access and runs on Linux
+only.
+
+During an install, a binary shows up in the log as
+`* installing *binary* package 'cli' ...`, while a source install says
+`* installing *source* package 'cli' ...`.
+
+### Opt out
+
+Set `BOOSTERPAK_CONFIGURE_REPOSITORIES=false` (for example in
+`~/.Renviron`) to stop boosterpak from changing repository settings. The
+managed `.Rprofile` line also checks it, so the Linux rewrite stops in
+projects that already contain the line, without editing them. Repository
+lines already in `.Rprofile` keep pointing at the generic Package
+Manager URL, so distributions Package Manager does not list go back to
+compiling from source.
+
+`options(boosterpak.configure_repositories = FALSE)` stops boosterpak’s
+own repository configuration in the R session, which runs in
+[`init()`](https://seanthimons.github.io/boosterpak/reference/init.md),
+`.rescue()`, and the `renv` restore and bootstrap steps. It does not
+affect a line that is already in `.Rprofile`. If both are set, the
+environment variable wins.
+
+Rerunning `.rescue()` while opted out removes the managed repository
+lines from `.Rprofile`, because boosterpak then has no repository setup
+to write back.
+[`init()`](https://seanthimons.github.io/boosterpak/reference/init.md)
+does the same on a project whose install-policy lines are missing. Keep
+the lines by not rerunning them while opted out.
 
 ## Safely Deinitialize a Project
 
@@ -426,8 +568,10 @@ boosterpak:::.rescue()
 `.rescue()` repairs existing boosterpak projects only; it expects
 `boosters.toml` to already exist. It rewrites the managed startup setup
 before `renv/activate.R`, reapplies the Posit Package Manager repository
-policy, enables the `renv` pak backend, and avoids source compilation
-prompts where binary packages are available.
+policy (including the [Linux binary rewrite](#linux-binary-packages),
+and replacing the managed line written by earlier versions), enables the
+`renv` pak backend, and avoids source compilation prompts where binary
+packages are available.
 
 ## Troubleshooting 0.5 Init Projects
 
@@ -449,7 +593,11 @@ boosterpak::list_packs()
 reports config validity, declared and resolved packs, package counts,
 missing direct packages, attach package count and file presence,
 function drift or missing materialized files, pack catalog counts,
-`renv` state, lockfile presence, and the `.Rprofile` hook.
+`renv` state, lockfile presence, and the `.Rprofile` hook. It does not
+use the network. To confirm that Package Manager is serving binaries
+rather than source, run
+[`boosterpak::check_binary_repos()`](https://seanthimons.github.io/boosterpak/reference/check_binary_repos.md);
+see [Linux Binary Packages](#linux-binary-packages).
 
 Current development includes function materialization, pack
 capture/promotion, and broader project status reporting; pruning remains

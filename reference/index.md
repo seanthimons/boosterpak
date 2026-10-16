@@ -12,6 +12,8 @@
   : Write startup package attachment calls
 - [`status()`](https://seanthimons.github.io/boosterpak/reference/status.md)
   : Report boosterpak project status
+- [`check_binary_repos()`](https://seanthimons.github.io/boosterpak/reference/check_binary_repos.md)
+  : Check Whether Package Manager Serves Binary Packages
 
 ## Packs
 
