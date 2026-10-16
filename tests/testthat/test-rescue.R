@@ -317,3 +317,32 @@ test_that("rescue does not use interactive cli repository messages", {
   expect_false(captured_verbose)
   expect_equal(result$changes, "repos")
 })
+
+test_that("rescue replaces a v0.9.2 Linux binary line", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  local_ppm_hosts()
+  generic <- c(CRAN = "https://p3m.dev/cran/latest")
+  withr::local_options(list(
+    repos = generic,
+    renv.config.repos.override = generic,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+  root <- withr::local_tempdir()
+  boosterpak:::write_default_config(root)
+  old_block <- boosterpak:::rprofile_repository_lines(generic)
+  old_block[length(old_block)] <- v092_ppm_linux_line()
+  writeLines(
+    c("before <- TRUE", old_block, 'source("renv/activate.R")'),
+    file.path(root, ".Rprofile")
+  )
+
+  boosterpak:::.rescue(root = root, verbose = FALSE)
+
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  expect_false(v092_ppm_linux_line() %in% lines)
+  expect_true(boosterpak:::rprofile_ppm_linux_binary_line() %in% lines)
+  expect_equal(sum(lines == boosterpak:::rprofile_repository_marker()), 1L)
+  expect_true("before <- TRUE" %in% lines)
+})

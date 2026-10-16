@@ -158,14 +158,27 @@ remove_rprofile_repository_block <- function(lines) {
       keep[[cursor]] <- FALSE
       cursor <- cursor + 1L
     }
-    if (
-      cursor <= length(lines) &&
-        startsWith(trimws(lines[[cursor]]), 'if (identical(R.version$os, "linux-gnu")) options(repos = sub(')
-    ) {
+    if (cursor <= length(lines) && is_rprofile_ppm_linux_line(lines[[cursor]])) {
       keep[[cursor]] <- FALSE
     }
   }
   lines[keep]
+}
+
+#' Identify the managed Linux binary repository line
+#'
+#' Recognizes every form boosterpak has written: the original
+#' `if (identical(R.version$os, "linux-gnu")) options(repos = sub(` line and
+#' the later form that also checks `BOOSTERPAK_CONFIGURE_REPOSITORIES`.
+#'
+#' @param line A single `.Rprofile` line.
+#' @return A single logical value.
+#' @noRd
+is_rprofile_ppm_linux_line <- function(line) {
+  grepl(
+    '^if \\(identical\\(R\\.version\\$os, "linux-gnu"\\).*\\) options\\(repos = sub\\(',
+    trimws(line)
+  )
 }
 
 #' Remove boosterpak-managed lines from an R profile

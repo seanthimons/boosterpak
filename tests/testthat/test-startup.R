@@ -431,3 +431,251 @@ test_that("Linux binary rewrite leaves custom and distro PPM URLs alone", {
   )
   expect_null(getOption("renv.config.repos.override"))
 })
+
+test_that("Linux binary rewrite covers p3m.dev and any repository name", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  local_ppm_hosts()
+  repos <- c(
+    CRAN = "https://p3m.dev/cran/latest",
+    Team = "https://p3m.dev/team-cran/2026-01-02",
+    Old = "https://packagemanager.rstudio.com/cran/latest"
+  )
+  withr::local_options(list(
+    repos = repos, renv.config.repos.override = NULL,
+    HTTPUserAgent = "custom"
+  ))
+
+  boosterpak:::use_ppm_linux_binaries()
+
+  expect_equal(
+    getOption("repos"),
+    c(
+      CRAN = "https://p3m.dev/cran/__linux__/manylinux_2_28/latest",
+      Team = "https://p3m.dev/team-cran/__linux__/manylinux_2_28/2026-01-02",
+      Old = "https://packagemanager.rstudio.com/cran/__linux__/manylinux_2_28/latest"
+    )
+  )
+})
+
+test_that("self-hosted Package Manager hosts are opt-in", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  repos <- c(
+    CRAN = "https://ppm.corp.test:8443/internal/latest",
+    Other = "https://other.corp.test/internal/latest"
+  )
+  withr::local_options(list(
+    repos = repos,
+    renv.config.repos.override = NULL,
+    HTTPUserAgent = "custom"
+  ))
+
+  local_ppm_hosts()
+  expect_false(boosterpak:::uses_posit_package_manager(repos))
+  boosterpak:::use_ppm_linux_binaries()
+  expect_equal(getOption("repos"), repos)
+
+  local_ppm_hosts(repo = "https://ppm.corp.test:8443/internal/latest")
+  expect_true(boosterpak:::uses_posit_package_manager(repos))
+  boosterpak:::use_ppm_linux_binaries()
+  expect_equal(
+    getOption("repos"),
+    c(
+      CRAN = "https://ppm.corp.test:8443/internal/__linux__/manylinux_2_28/latest",
+      Other = "https://other.corp.test/internal/latest"
+    )
+  )
+})
+
+test_that("extra hosts come from the option and environment variable", {
+  local_ppm_hosts(
+    hosts = c("Option.Corp.Test", "https://urlform.corp.test/cran/latest"),
+    env_hosts = "env-a.corp.test; env-b.corp.test:8080,env-c.corp.test"
+  )
+
+  expect_setequal(
+    boosterpak:::ppm_extra_hosts(),
+    c(
+      "option.corp.test",
+      "urlform.corp.test",
+      "env-a.corp.test",
+      "env-b.corp.test:8080",
+      "env-c.corp.test"
+    )
+  )
+  expect_true(boosterpak:::uses_posit_package_manager(
+    "https://env-b.corp.test:8080/cran/latest"
+  ))
+  expect_false(boosterpak:::uses_posit_package_manager(
+    "https://env-b.corp.test/cran/latest"
+  ))
+})
+
+test_that("invalid host entries are ignored with one warning", {
+  local_ppm_hosts(hosts = c("not a host!", "good.corp.test"))
+
+  expect_warning(
+    hosts <- boosterpak:::ppm_extra_hosts(),
+    "invalid Package Manager host"
+  )
+  expect_equal(hosts, "good.corp.test")
+  expect_no_warning(boosterpak:::ppm_extra_hosts())
+})
+
+test_that("host matching is anchored and case-insensitive", {
+  local_ppm_hosts()
+
+  expect_true(boosterpak:::uses_posit_package_manager(
+    "HTTPS://P3M.DEV/cran/latest"
+  ))
+  expect_true(boosterpak:::uses_posit_package_manager("https://p3m.dev"))
+  expect_false(boosterpak:::uses_posit_package_manager(c(
+    "https://p3m.dev.evil.test/cran/latest",
+    "https://notp3m.dev/cran/latest",
+    "https://example.test/p3m.dev/cran/latest"
+  )))
+})
+
+test_that("portable_ppm_repos reverses the rewrite for every host form", {
+  local_ppm_hosts(hosts = "ppm.corp.test:8443")
+  generic <- c(
+    CRAN = "https://p3m.dev/cran/latest",
+    Team = "https://ppm.corp.test:8443/team-cran/2026-01-02",
+    Posit = "https://packagemanager.posit.co/cran/2026-01-02",
+    Other = "https://example.test/cran/latest"
+  )
+  linux <- sub(
+    boosterpak:::ppm_snapshot_pattern(),
+    "\\1/__linux__/manylinux_2_28/\\3",
+    generic
+  )
+
+  expect_false(identical(linux, generic))
+  expect_equal(boosterpak:::portable_ppm_repos(linux), generic)
+  expect_equal(boosterpak:::portable_ppm_repos(generic), generic)
+})
+
+test_that("persisted repository lines stay generic for every host form", {
+  local_ppm_hosts(repo = "https://ppm.corp.test/team-cran/latest")
+  linux <- c(
+    CRAN = "https://p3m.dev/cran/__linux__/manylinux_2_28/latest",
+    Team = "https://ppm.corp.test/team-cran/__linux__/manylinux_2_28/latest"
+  )
+
+  lines <- boosterpak:::rprofile_repository_lines(linux)
+
+  expect_false(any(grepl("__linux__", lines[2:3], fixed = TRUE)))
+  expect_match(lines[[2]], "https://p3m.dev/cran/latest", fixed = TRUE)
+  expect_match(
+    lines[[2]],
+    "https://ppm.corp.test/team-cran/latest",
+    fixed = TRUE
+  )
+})
+
+test_that("the generated Linux line is self-contained", {
+  skip_if_not(identical(R.version$os, "linux-gnu"))
+  local_ppm_hosts(repo = "https://ppm.corp.test:8443/team-cran/latest")
+  line <- boosterpak:::rprofile_ppm_linux_binary_line()
+  repos <- c(
+    CRAN = "https://p3m.dev/cran/latest",
+    Team = "https://ppm.corp.test:8443/team-cran/2026-01-02",
+    Other = "https://example.test/cran/latest"
+  )
+  expected <- c(
+    CRAN = "https://p3m.dev/cran/__linux__/manylinux_2_28/latest",
+    Team = "https://ppm.corp.test:8443/team-cran/__linux__/manylinux_2_28/2026-01-02",
+    Other = "https://example.test/cran/latest"
+  )
+  withr::local_options(list(
+    repos = repos,
+    renv.config.repos.override = repos,
+    HTTPUserAgent = "custom"
+  ))
+  # A fresh session has neither boosterpak's helpers nor its host settings, so
+  # the line must carry the hosts it was generated with.
+  local_ppm_hosts()
+
+  expect_false(grepl("boosterpak", gsub("BOOSTERPAK_[A-Z_]+", "", line)))
+  eval(parse(text = line), baseenv())
+  expect_equal(getOption("repos"), expected)
+  expect_equal(getOption("renv.config.repos.override"), expected)
+})
+
+test_that("BOOSTERPAK_CONFIGURE_REPOSITORIES=false disables an existing line", {
+  skip_if_not(identical(R.version$os, "linux-gnu"))
+  local_ppm_hosts()
+  line <- boosterpak:::rprofile_ppm_linux_binary_line()
+  repos <- c(CRAN = "https://p3m.dev/cran/latest")
+  withr::local_options(list(
+    repos = repos,
+    renv.config.repos.override = repos,
+    HTTPUserAgent = "custom"
+  ))
+
+  for (value in c("false", "FALSE", "0", "no", "off")) {
+    withr::local_envvar(BOOSTERPAK_CONFIGURE_REPOSITORIES = value)
+    eval(parse(text = line), baseenv())
+    expect_equal(getOption("repos"), repos)
+    expect_equal(getOption("HTTPUserAgent"), "custom")
+  }
+
+  withr::local_envvar(BOOSTERPAK_CONFIGURE_REPOSITORIES = "true")
+  eval(parse(text = line), baseenv())
+  expect_match(getOption("repos")[["CRAN"]], "manylinux_2_28", fixed = TRUE)
+})
+
+test_that("init upgrades a v0.9.2 .Rprofile line to the current form", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  local_ppm_hosts()
+  generic <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  withr::local_options(list(
+    repos = generic,
+    renv.config.repos.override = generic,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+
+  for (include_renv in c(TRUE, FALSE)) {
+    root <- withr::local_tempdir()
+    user_line <- "# user Linux block"
+    old_block <- boosterpak:::rprofile_repository_lines(generic)
+    old_block[length(old_block)] <- v092_ppm_linux_line(include_renv)
+    if (!include_renv) {
+      old_block <- old_block[-3]
+    }
+    writeLines(
+      c(old_block, user_line, 'source("renv/activate.R")'),
+      file.path(root, ".Rprofile")
+    )
+
+    init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+    first <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+    init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+    lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+
+    expect_equal(lines, first)
+    expect_false(v092_ppm_linux_line(include_renv) %in% lines)
+    expect_equal(sum(lines == boosterpak:::rprofile_repository_marker()), 1L)
+    expect_equal(
+      sum(vapply(lines, boosterpak:::is_rprofile_ppm_linux_line, logical(1))),
+      1L
+    )
+    expect_true(user_line %in% lines)
+  }
+})
+
+test_that("deinit removes a v0.9.2 and a current Linux line", {
+  generic <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  old <- boosterpak:::rprofile_repository_lines(generic)
+  old[length(old)] <- v092_ppm_linux_line()
+  current <- boosterpak:::rprofile_repository_lines(generic)
+
+  for (block in list(old, current)) {
+    result <- boosterpak:::remove_rprofile_managed_lines(
+      c("before <- TRUE", block, "after <- TRUE"),
+      renv = FALSE
+    )
+    expect_equal(result$lines, c("before <- TRUE", "after <- TRUE"))
+  }
+})
