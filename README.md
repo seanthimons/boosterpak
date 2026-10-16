@@ -153,8 +153,10 @@ boosterpak::check_binary_repos()
 `check_binary_repos()` requests one small package (`cli` by default) from each
 Package Manager repository, with the session's user agent, and reports the
 `X-Package-Type` and `X-Package-Binary-Tag` headers. It warns for any repository
-that serves source and suggests the likely fix. It needs network access and
-runs on Linux only.
+that serves source and suggests the likely fix. It also warns when
+`download.file.method` is `"curl"` and `download.file.extra` has no `-L`: the
+check uses libcurl, which follows redirects, so it can pass while curl installs
+fail. It needs network access and runs on Linux only.
 
 During an install, a binary shows up in the log as
 `* installing *binary* package 'cli' ...`, while a source install says

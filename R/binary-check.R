@@ -10,6 +10,12 @@
 #' `HTTPUserAgent`, and reports the `X-Package-Type` and `X-Package-Binary-Tag`
 #' response headers. It warns for every repository that serves source.
 #'
+#' It also warns when `download.file.method` is `"curl"` and
+#' `download.file.extra` has no `-L`. Package Manager serves packages through a
+#' redirect that R's `"curl"` method does not follow on its own, so installs
+#' would save the redirect page instead of the package, even though this check
+#' passes: it uses libcurl directly and follows redirects.
+#'
 #' The check follows the Linux binary layout, where the repository URL itself
 #' selects binaries, so it only runs on Linux; on other platforms it returns an
 #' empty data frame. It needs network access: it downloads the repository's
@@ -66,6 +72,14 @@ check_binary_repos <- function(
     return(invisible(result))
   }
 
+  if (curl_lacks_redirect_flag()) {
+    cli::cli_warn(c(
+      "{.code download.file.method} is {.val curl} but {.code download.file.extra} has no {.code -L}, so installs from Package Manager save its redirect page instead of the package.",
+      "i" = "Posit recommends {.code options(download.file.extra = \"-fsSL\")} for curl. Set it earlier in {.file .Rprofile} than the boosterpak block, which appends its user agent header after your flags.",
+      "i" = "This check uses libcurl, which follows redirects, so it can pass while curl downloads fail."
+    ))
+  }
+
   repo_names <- names(repos) %||% rep("", length(repos))
   repo_names[is.na(repo_names)] <- ""
   rows <- Map(
@@ -82,6 +96,31 @@ check_binary_repos <- function(
 #' @noRd
 is_linux <- function() {
   startsWith(R.version$os, "linux")
+}
+
+#' Check Whether the Curl Method Is Missing the Redirect Flag
+#'
+#' Package Manager answers package requests with a redirect, which R's `"curl"`
+#' download method only follows when `download.file.extra` has `-L`.
+#'
+#' @param method The download method.
+#' @param extra The extra arguments passed to the download program.
+#' @return `TRUE` when `method` is `"curl"` and `extra` has neither a short
+#'   flag cluster containing `L` (such as `-L` or `-fsSL`) nor `--location`.
+#' @noRd
+curl_lacks_redirect_flag <- function(
+  method = getOption("download.file.method"),
+  extra = getOption("download.file.extra")
+) {
+  if (!identical(method, "curl")) {
+    return(FALSE)
+  }
+  extra <- paste(extra, collapse = " ")
+  !grepl(
+    "(^|\\s)(--location(-trusted)?|-[A-Za-z0-9]*L[A-Za-z0-9]*)(?=\\s|$)",
+    extra,
+    perl = TRUE
+  )
 }
 
 #' Create an Empty Binary Check Result

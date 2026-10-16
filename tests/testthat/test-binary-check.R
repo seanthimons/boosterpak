@@ -1,3 +1,13 @@
+# The curl redirect warning reads these options, so pin them to keep tests
+# independent of the session running them.
+local_default_download_options <- function(.env = parent.frame()) {
+  withr::local_options(
+    download.file.method = NULL,
+    download.file.extra = NULL,
+    .local_envir = .env
+  )
+}
+
 mock_binary_check <- function(
   type = "binary",
   tag = "4.6-manylinux_2_28",
@@ -5,6 +15,7 @@ mock_binary_check <- function(
   version = "3.6.6",
   .env = parent.frame()
 ) {
+  local_default_download_options(.env)
   headers <- c(`x-package-type` = type, `x-package-binary-tag` = tag)
   local_mocked_bindings(
     is_linux = function() TRUE,
@@ -131,8 +142,91 @@ test_that("check_binary_repos tolerates a missing package", {
   )
 })
 
+test_that("curl_lacks_redirect_flag finds the redirect flag in any form", {
+  lacks <- boosterpak:::curl_lacks_redirect_flag
+  ua <- '--header "User-Agent: R (4.6.1 x86_64-pc-linux-gnu x86_64 linux-gnu)"'
+
+  # curl without a redirect flag
+  expect_true(lacks("curl", NULL))
+  expect_true(lacks("curl", character()))
+  expect_true(lacks("curl", "-fsS"))
+  expect_true(lacks("curl", ua))
+  expect_true(lacks("curl", c("-sS", ua)))
+  expect_true(lacks("curl", "--limit-rate 1M"))
+  expect_true(lacks("curl", '-w "%{http_code}"'))
+
+  # curl with one
+  expect_false(lacks("curl", "-L"))
+  expect_false(lacks("curl", "-fsSL"))
+  expect_false(lacks("curl", "-4L"))
+  expect_false(lacks("curl", paste("-fsSL", ua)))
+  expect_false(lacks("curl", c("-sS", "-L", ua)))
+  expect_false(lacks("curl", "--location"))
+  expect_false(lacks("curl", "--location-trusted --fail"))
+  expect_false(lacks("curl", paste(ua, "-L")))
+
+  # other methods never need it
+  expect_false(lacks(NULL, NULL))
+  expect_false(lacks("libcurl", NULL))
+  expect_false(lacks("wget", NULL))
+  expect_false(lacks("internal", "-fsS"))
+})
+
+test_that("check_binary_repos warns when curl cannot follow redirects", {
+  mock_binary_check()
+  local_ppm_hosts()
+  withr::local_options(
+    download.file.method = "curl",
+    download.file.extra = "-fsS"
+  )
+
+  expect_warning(
+    result <- check_binary_repos(ppm_repos(), verbose = FALSE),
+    "has no .-L."
+  )
+  # The check itself still ran and passed, which is why the warning exists.
+  expect_true(result$binary)
+  expect_warning(
+    check_binary_repos(ppm_repos(), verbose = FALSE),
+    "redirect page"
+  )
+})
+
+test_that("check_binary_repos stays quiet when redirects are followed", {
+  mock_binary_check()
+  local_ppm_hosts()
+
+  for (setup in list(
+    list(method = "curl", extra = "-fsSL"),
+    list(method = "curl", extra = "--location"),
+    list(method = "wget", extra = NULL),
+    list(method = "libcurl", extra = NULL),
+    list(method = NULL, extra = NULL)
+  )) {
+    withr::local_options(
+      download.file.method = setup$method,
+      download.file.extra = setup$extra
+    )
+    expect_no_warning(check_binary_repos(ppm_repos(), verbose = FALSE))
+  }
+})
+
+test_that("the curl redirect warning needs a Package Manager repository", {
+  mock_binary_check()
+  local_ppm_hosts()
+  withr::local_options(
+    download.file.method = "curl",
+    download.file.extra = NULL
+  )
+
+  expect_no_warning(
+    check_binary_repos(c(CRAN = "https://example.test/repo"), verbose = FALSE)
+  )
+})
+
 test_that("check_binary_repos warns about an unreadable package index", {
   local_ppm_hosts()
+  local_default_download_options()
   local_mocked_bindings(
     is_linux = function() TRUE,
     fetch_package_version = function(contriburl, package) {
@@ -269,6 +363,7 @@ test_that("check_binary_repos sees binaries on Package Manager", {
   skip_if_not_installed("curl")
   skip_if_offline("p3m.dev")
   local_ppm_hosts()
+  local_default_download_options()
   withr::local_options(HTTPUserAgent = sprintf(
     "R/%s R (%s)",
     getRversion(),

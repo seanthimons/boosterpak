@@ -39,6 +39,12 @@ Posit Package Manager repository in \code{repos}, using the current session's
 \code{HTTPUserAgent}, and reports the \code{X-Package-Type} and \code{X-Package-Binary-Tag}
 response headers. It warns for every repository that serves source.
 
+It also warns when \code{download.file.method} is \code{"curl"} and
+\code{download.file.extra} has no \code{-L}. Package Manager serves packages through a
+redirect that R's \code{"curl"} method does not follow on its own, so installs
+would save the redirect page instead of the package, even though this check
+passes: it uses libcurl directly and follows redirects.
+
 The check follows the Linux binary layout, where the repository URL itself
 selects binaries, so it only runs on Linux; on other platforms it returns an
 empty data frame. It needs network access: it downloads the repository's
