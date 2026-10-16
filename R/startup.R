@@ -18,11 +18,125 @@ is_glibc_linux <- function() {
   identical(R.version$os, "linux-gnu")
 }
 
+#' Get the Default Posit Package Manager Hosts
+#'
+#' @return A character vector of public Posit Package Manager host names.
+#' @noRd
+ppm_default_hosts <- function() {
+  c("packagemanager.posit.co", "packagemanager.rstudio.com", "p3m.dev")
+}
+
+#' Normalize a Package Manager Host
+#'
+#' @param x A character vector of hosts or URLs.
+#' @return `x` lowercased, with any scheme, credentials, and path removed.
+#'   Entries that are not a host name with an optional port become `NA`.
+#' @noRd
+normalize_ppm_host <- function(x) {
+  x <- tolower(trimws(x))
+  x <- sub("^[a-z][a-z0-9+.-]*://", "", x)
+  x <- sub("[/?#].*$", "", x)
+  x <- sub("^.*@", "", x)
+  x[!grepl("^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]+)?$", x)] <- NA_character_
+  x
+}
+
+# Invalid host entries already reported, so each warns once per session.
+ppm_state <- new.env(parent = emptyenv())
+
+#' Get Additional Package Manager Hosts
+#'
+#' Combines the host of `BOOSTERPAK_PPM_REPO` with the hosts listed in
+#' `options(boosterpak.ppm_hosts = c(...))` and `BOOSTERPAK_PPM_HOSTS`
+#' (separated by commas, semicolons, or whitespace).
+#'
+#' @return A character vector of normalized host names.
+#' @noRd
+ppm_extra_hosts <- function() {
+  listed <- c(
+    getOption("boosterpak.ppm_hosts", character()),
+    strsplit(Sys.getenv("BOOSTERPAK_PPM_HOSTS", unset = ""), "[,;[:space:]]+")[[1]]
+  )
+  listed <- as.character(listed)
+  listed <- listed[!is.na(listed) & nzchar(listed)]
+  hosts <- normalize_ppm_host(listed)
+  invalid <- setdiff(listed[is.na(hosts)], ppm_state$warned)
+  if (length(invalid) > 0) {
+    ppm_state$warned <- c(ppm_state$warned, invalid)
+    cli::cli_warn(c(
+      "Ignoring invalid Package Manager host{?s}: {.val {invalid}}.",
+      "i" = "Use host names such as {.val ppm.example.com} or {.val ppm.example.com:8080}."
+    ))
+  }
+  repo_host <- normalize_ppm_host(Sys.getenv("BOOSTERPAK_PPM_REPO", unset = ""))
+  hosts <- c(hosts, repo_host)
+  unique(hosts[!is.na(hosts)])
+}
+
+#' Get All Recognized Package Manager Hosts
+#'
+#' @return A character vector of public and user-configured host names.
+#' @noRd
+ppm_hosts <- function() {
+  unique(c(ppm_default_hosts(), ppm_extra_hosts()))
+}
+
+#' Build the Package Manager Host Pattern
+#'
+#' Every host is a literal, so the pattern is a flat alternation with no
+#' capture groups. The generated `.Rprofile` line inlines the result because it
+#' runs before boosterpak loads.
+#'
+#' @return A regular expression alternation matching any recognized host.
+#' @noRd
+ppm_host_pattern <- function() {
+  paste(escape_regex(ppm_hosts()), collapse = "|")
+}
+
+#' Check Whether Repositories Are Package Manager Repositories
+#'
+#' @param repos A character vector of repository URLs.
+#' @return A logical vector the length of `repos`.
+#' @noRd
+is_ppm_repo <- function(repos) {
+  grepl(
+    sprintf("^https?://(%s)(/|$)", ppm_host_pattern()),
+    unname(repos),
+    ignore.case = TRUE
+  )
+}
+
+#' Build the Package Manager Snapshot URL Pattern
+#'
+#' Matches `<host>/<repo>/<latest|YYYY-MM-DD>`. Distro-specific URLs such as
+#' `<host>/cran/__linux__/noble/latest` have more path segments and do not
+#' match. Group 1 is the repository URL and group 3 is the snapshot.
+#'
+#' @return A regular expression.
+#' @noRd
+ppm_snapshot_pattern <- function() {
+  sprintf(
+    "^(https?://(%s)/[^/]+)/(latest|[0-9]{4}-[0-9]{2}-[0-9]{2})$",
+    ppm_host_pattern()
+  )
+}
+
+#' Build the Package Manager Binary URL Pattern
+#'
+#' @return A regular expression matching the manylinux repository prefix.
+#' @noRd
+ppm_manylinux_pattern <- function() {
+  sprintf(
+    "^(https?://(%s)/[^/]+)/__linux__/manylinux_2_28/",
+    ppm_host_pattern()
+  )
+}
+
 #' Build the Linux Binary Repository Options Call
 #'
 #' The generic Posit Package Manager URL only serves Linux binaries on distros
-#' it recognizes, so on glibc Linux the `cran/<snapshot>` URLs are rewritten to
-#' the manylinux binary URL and the R user agent Package Manager requires is
+#' it recognizes, so on glibc Linux the `<repo>/<snapshot>` URLs are rewritten
+#' to the manylinux binary URL and the R user agent Package Manager requires is
 #' set. The persisted repository URLs stay generic so a shared `.Rprofile`
 #' works on every platform.
 #'
@@ -34,10 +148,8 @@ ppm_linux_binary_options_code <- function(include_renv = TRUE) {
   # picks) would need Package Manager's platform list at startup.
   rewrite <- function(option) {
     sprintf(
-      'sub("%s", "%s", getOption("%s"))',
-      escape_r_string(
-        "^(https://packagemanager\\.(posit|rstudio)\\.co/cran)/(latest|[0-9]{4}-[0-9]{2}-[0-9]{2})$"
-      ),
+      'sub("%s", "%s", getOption("%s"), ignore.case = TRUE)',
+      escape_r_string(ppm_snapshot_pattern()),
       escape_r_string("\\1/__linux__/manylinux_2_28/\\3"),
       option
     )
@@ -50,22 +162,61 @@ ppm_linux_binary_options_code <- function(include_renv = TRUE) {
         rewrite("renv.config.repos.override")
       )
     },
-    paste0(
-      'HTTPUserAgent = sprintf("R/%s R (%s)", getRversion(), ',
-      "paste(getRversion(), R.version$platform, R.version$arch, R.version$os))"
-    )
+    sprintf(
+      'HTTPUserAgent = sprintf("R/%%s R (%%s)", getRversion(), %s)',
+      ppm_platform_code()
+    ),
+    ppm_download_extra_code()
   )
   sprintf("options(%s)", paste(args, collapse = ", "))
 }
 
+#' Build the R Platform String Code
+#'
+#' @return R code evaluating to the platform description Package Manager
+#'   expects in the `User-Agent` header.
+#' @noRd
+ppm_platform_code <- function() {
+  "paste(getRversion(), R.version$platform, R.version$arch, R.version$os)"
+}
+
+#' Build the `download.file.extra` Option Code
+#'
+#' The `curl` and `wget` download methods ignore `HTTPUserAgent`, so Package
+#' Manager only sees the R user agent if it is passed as a header. The header
+#' is appended to any existing `download.file.extra` value and skipped when a
+#' user agent is already set, so it is never duplicated or overwritten. For
+#' every other download method the option keeps its current value.
+#'
+#' @return A character scalar containing the `download.file.extra` argument for
+#'   an R `options()` call.
+#' @noRd
+ppm_download_extra_code <- function() {
+  paste0(
+    'download.file.extra = if (isTRUE(getOption("download.file.method") ',
+    '%in% c("curl", "wget")) && !any(grepl("user-agent", ',
+    'getOption("download.file.extra"), ignore.case = TRUE))) ',
+    'paste(c(getOption("download.file.extra"), ',
+    "sprintf('--header \"User-Agent: R (%s)\"', ",
+    ppm_platform_code(),
+    ')), collapse = " ") else getOption("download.file.extra")'
+  )
+}
+
 #' Build the Linux Binary Repository R Profile Line
+#'
+#' The line is guarded to glibc Linux and honors
+#' `BOOSTERPAK_CONFIGURE_REPOSITORIES=false`, so the opt-out also works for
+#' projects whose `.Rprofile` already contains it.
 #'
 #' @param include_renv Whether to rewrite the renv repository override.
 #' @return A character scalar containing the guarded `.Rprofile` line.
 #' @noRd
 rprofile_ppm_linux_binary_line <- function(include_renv = TRUE) {
   paste0(
-    'if (identical(R.version$os, "linux-gnu")) ',
+    'if (identical(R.version$os, "linux-gnu") && ',
+    '!tolower(Sys.getenv("BOOSTERPAK_CONFIGURE_REPOSITORIES", "true")) ',
+    '%in% c("0", "false", "no", "off")) ',
     ppm_linux_binary_options_code(include_renv)
   )
 }
@@ -89,11 +240,7 @@ use_ppm_linux_binaries <- function() {
 #' @return `repos` with manylinux Posit Package Manager URLs made generic.
 #' @noRd
 portable_ppm_repos <- function(repos) {
-  sub(
-    "^(https://packagemanager\\.(posit|rstudio)\\.co/cran)/__linux__/manylinux_2_28/",
-    "\\1/",
-    repos
-  )
+  sub(ppm_manylinux_pattern(), "\\1/", repos, ignore.case = TRUE)
 }
 
 #' Check Whether to Configure Repositories
@@ -251,10 +398,7 @@ uses_posit_package_manager <- function(repos) {
   if (is.null(repos) || length(repos) == 0) {
     return(FALSE)
   }
-  any(
-    grepl("packagemanager\\.(posit|rstudio)\\.co", unname(repos)),
-    na.rm = TRUE
-  )
+  any(is_ppm_repo(repos), na.rm = TRUE)
 }
 
 #' Check for Missing Repository Names
@@ -285,6 +429,15 @@ renv_repos_override_is_unset <- function() {
 escape_r_string <- function(x) {
   x <- gsub("\\\\", "\\\\\\\\", x)
   gsub('"', '\\"', x, fixed = TRUE)
+}
+
+#' Escape Text for a Regular Expression
+#'
+#' @param x Character vector to escape.
+#' @return `x` with every regular expression metacharacter escaped.
+#' @noRd
+escape_regex <- function(x) {
+  gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", x)
 }
 
 #' Format a Repository Name for an R Profile
