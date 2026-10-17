@@ -4,6 +4,8 @@
 
 - [`init()`](https://seanthimons.github.io/boosterpak/reference/init.md)
   : Initialize a boosterpak project
+- [`upgrade_project()`](https://seanthimons.github.io/boosterpak/reference/upgrade_project.md)
+  : Upgrade an existing boosterpak project
 - [`deinit()`](https://seanthimons.github.io/boosterpak/reference/deinit.md)
   : Safely deinitialize a boosterpak project
 - [`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md)

@@ -49,8 +49,10 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/building-a-pack.html">Building your own pack</a></li>
+    <li><a class="dropdown-item" href="../articles/choosing-a-setup.html">Choosing a setup: boosterpak and the other R environment managers</a></li>
     <li><a class="dropdown-item" href="../articles/getting-started.html">Getting started with boosterpak</a></li>
     <li><a class="dropdown-item" href="../articles/restoring-a-project.html">Restoring a project on a new machine</a></li>
+    <li><a class="dropdown-item" href="../articles/upgrading-a-project.html">Upgrading an existing project</a></li>
   </ul>
 </li>
       </ul>
@@ -117,7 +119,7 @@
 </ul></section><section class="level2"><h2 id="install-r-and-open-the-project">1. Install R and open the project<a class="anchor" aria-label="anchor" href="#install-r-and-open-the-project"></a>
 </h2>
 <p>Install R on the new machine, ideally the version recorded in the <code>"R"</code> field of <code>renv.lock</code>. Then start R in the cloned project directory. The committed <code>.Rprofile</code> sources <code>renv/activate.R</code>, which bootstraps renv into an empty project library automatically.</p>
-<p>The first startup may print errors from the boosterpak hook: <code>.Rprofile</code> sources <code>boosters/attach.R</code>, whose <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls refer to packages that are not installed yet. These errors disappear after restore and are harmless to the restore itself — but an error in <code>.Rprofile</code> stops the rest of the file from running, so any custom settings placed after the boosterpak hook will not apply until the packages are restored.</p>
+<p>The first startup may print a message from the boosterpak hook. <code>.Rprofile</code> sources <code>boosters/attach.R</code>, which attaches each package it lists. Packages that are not installed yet are counted in one message, such as <code>boosterpak: 3 attach packages not available or failed to load (a, b, c). Run renv::restore() if they are not installed.</code> The message goes away after restore. It does not block the restore. The hook runs inside <code><a href="https://rdrr.io/r/base/try.html" class="external-link">try()</a></code>, so an error in it does not stop the rest of <code>.Rprofile</code>, and the helper files still load.</p>
 </section><section class="level2"><h2 id="restore-the-library-from-the-lockfile">2. Restore the library from the lockfile<a class="anchor" aria-label="anchor" href="#restore-the-library-from-the-lockfile"></a>
 </h2>
 <p><code>boosterpak</code> itself is not installed on this machine yet, so nothing boosterpak-shaped can run first. Restore through renv, which installs everything in the lockfile, including <code>boosterpak</code>. <code><a href="../reference/init.html">init()</a></code> snapshots <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> into the lockfile (unless <code>settings.auto_snapshot</code> is disabled) precisely so that a clone can bootstrap this way.</p>
@@ -140,8 +142,65 @@
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/status.html">status</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/check_functions.html">check_functions</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
-<p><code><a href="../reference/status.html">status()</a></code> reports config validity, resolved packs and packages, missing direct packages, attach state, function drift, renv state, lockfile presence, and the <code>.Rprofile</code> hook. <code><a href="../reference/check_functions.html">check_functions()</a></code> compares materialized helper files against their pack sources.</p>
-</section><section class="level2"><h2 id="what-does-not-re-run-in-a-clone">What does not re-run in a clone<a class="anchor" aria-label="anchor" href="#what-does-not-re-run-in-a-clone"></a>
+<p><code><a href="../reference/status.html">status()</a></code> reports config validity, resolved packs and packages, missing direct packages, the attached packages with the pack behind each one, function drift, renv state, lockfile presence, and the <code>.Rprofile</code> hook. It also warns when the <code>boosters_version</code> record is behind the installed boosterpak. <code><a href="../reference/check_functions.html">check_functions()</a></code> compares materialized helper files against their pack sources.</p>
+</section><section class="level2"><h2 id="pinned-versions-vs-snapshots">Pinned versions vs snapshots<a class="anchor" aria-label="anchor" href="#pinned-versions-vs-snapshots"></a>
+</h2>
+<p>A restore installs the versions recorded in <code>renv.lock</code>, not the newest versions. On Linux, Package Manager serves a binary only for a version that is in the snapshot the repository URL points at. A pin that is older or newer than the version in that snapshot can still compile from source, even when <code><a href="../reference/check_binary_repos.html">check_binary_repos()</a></code> reports that binaries are served.</p>
+<p>Compare the lockfile with the repositories it records:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/check_binary_repos.html">check_binary_repos</a></span><span class="op">(</span>lockfile <span class="op">=</span> <span class="st">"renv.lock"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<p>This downloads each repository’s package index once and compares every pin with it. It installs nothing. It needs network access and only runs on Linux; on other platforms it returns an empty result. Pins from repositories that are not Package Manager repositories are not compared. When some pins are not available as binary, the warning gives the counts and lists the worst offenders first, compiled packages first. It ends with three options: relax the pins, point the lockfile repository at a dated snapshot, or accept compiling.</p>
+<p>To check dated snapshots before you change anything, name the dates:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="../reference/check_binary_repos.html">check_binary_repos</a></span><span class="op">(</span>lockfile <span class="op">=</span> <span class="st">"renv.lock"</span>, snapshot_dates <span class="op">=</span> <span class="st">"2026-10-14"</span><span class="op">)</span></span></code></pre></div>
+</div>
+<p>Only the dates you name are requested. In an interactive session, or with <code>verbose = TRUE</code>, the output reports, for each date, how many pins are available as binary. The same counts are always in the <code>snapshots</code> element of the <code>"lockfile"</code> attribute of the result.</p>
+<p>The three options trade off differently:</p>
+<ul>
+<li>
+<strong>Relax the pins.</strong> Run <code><a href="https://rstudio.github.io/renv/reference/update.html" class="external-link">renv::update()</a></code> for the packages that compile, then snapshot. The lockfile then records versions the project has not been tested with, so run your checks and commit the new lockfile as a deliberate change.</li>
+<li>
+<strong>Use a dated snapshot.</strong> A snapshot serves the versions that were current on its date, so it matches a pin only when that version was current then. The repository URL in <code>renv.lock</code> changes for every package, not only the ones that compile. Check the dates with <code>snapshot_dates</code> first. The steps change both repository lines in <code>.Rprofile</code>; they are in the README under “Pinned versions and snapshots”.</li>
+<li>
+<strong>Accept compiling.</strong> Packages install from source. That needs a compiler toolchain (Rtools on Windows, the Xcode command line tools on macOS, or a C, C++, and Fortran compiler on Linux) and takes longer. On Windows and macOS, boosterpak’s install-policy lines in <code>.Rprofile</code> set <code>install.packages.compile.from.source</code> to <code>"never"</code>. The lines are written on every platform, but R reads that option only for <code><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages()</a></code> with <code>type = "both"</code>, on platforms that install binary packages. On Windows and macOS that means <code>"never"</code> stops <code><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages()</a></code> from compiling a source package when no binary is available. On Linux the option has no effect. Changing it means editing those lines by hand. boosterpak may rewrite them on a later <code><a href="../reference/init.html">init()</a></code> or <code><a href="../reference/upgrade_project.html">upgrade_project()</a></code>, so check <code>.Rprofile</code> after you run either one.</li>
+</ul></section><section class="level2"><h2 id="github-rate-limits">GitHub rate limits<a class="anchor" aria-label="anchor" href="#github-rate-limits"></a>
+</h2>
+<p>Some packages install from GitHub: boosterpak itself, when it is missing from the project library and was installed from GitHub, and packs with a GitHub entry in <code>[sources]</code>. GitHub limits anonymous API requests. When <code><a href="../reference/init.html">init()</a></code> or <code><a href="../reference/sync.html">sync()</a></code> installs with <code>pak</code> and GitHub answers with a rate limit, boosterpak stops with the install error followed by a hint that begins <code>GitHub rate limit reached.</code> and explains how to supply a token. <code><a href="../reference/upgrade_project.html">upgrade_project()</a></code> does not stop. It reports a <code>WARNING: workflow package install skipped</code> line with the hint appended, and it writes no <code>renv.lock</code>. A bare HTTP 403 or 429 from GitHub gets the same hint, with a first line that says GitHub may have rate-limited or refused the request. <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code> and <code>sync(mode = "restore")</code> do not add that hint. A rate limit there shows only renv’s error, so set the token before you restore.</p>
+<p>There are three ways to supply a token. Set one before the install, and pick one:</p>
+<ol type="1">
+<li>
+<p>For one command, from a shell where the GitHub CLI is logged in:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="va">GITHUB_PAT</span><span class="op">=</span><span class="va">$(</span><span class="ex">gh</span> auth token<span class="va">)</span> <span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'renv::restore()'</span></span></code></pre></div>
+</li>
+<li>
+<p>In your user-level <code>~/.Renviron</code>, outside any project. <code>GITHUB_TOKEN</code> also works. Restart R after you edit the file.</p>
+<pre class="text"><code>GITHUB_PAT=&lt;your token&gt;</code></pre>
+</li>
+<li>
+<p>In the git credential store, with the <code>gitcreds</code> package installed:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">gitcreds</span><span class="fu">::</span><span class="fu"><a href="https://gitcreds.r-lib.org/reference/gitcreds_get.html" class="external-link">gitcreds_set</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+</div>
+</li>
+</ol>
+<p>Never commit a token. Keep it out of <code>boosters.toml</code>, <code>.Rprofile</code>, <code>renv.lock</code>, and every other file in the project, and do not paste it into an issue or a chat. boosterpak reports only whether <code>GITHUB_PAT</code> or <code>GITHUB_TOKEN</code> is set. It never prints the value.</p>
+</section><section class="level2"><h2 id="linux-notes">Linux notes<a class="anchor" aria-label="anchor" href="#linux-notes"></a>
+</h2>
+<section class="level3"><h3 id="the-loaded-before-renv-activated-warning">The “loaded before renv activated” warning<a class="anchor" aria-label="anchor" href="#the-loaded-before-renv-activated-warning"></a>
+</h3>
+<p>Some Linux distributions load R packages from a system-wide R profile, before the project’s <code>.Rprofile</code> activates renv. renv then prints this on every R start in the project:</p>
+<pre class="text"><code>The following package(s) were loaded before renv activated this project:
+- CoprManager [/usr/share/R/library/CoprManager]</code></pre>
+<p>On Fedora, for example, a system site profile loads <code>CoprManager</code>. The warning comes from renv’s check, not from boosterpak. For a package that the system profile loads, it is harmless, and you cannot change that load from inside the project.</p>
+<p>If the listed package is one you load yourself, for example in the project <code>.Rprofile</code> before renv activates, move that load after the activation line. That is a real problem, and the warning is pointing at it.</p>
+<p>To hide the warning in your own R sessions, set the variable in <code>~/.Renviron</code>, not in the project:</p>
+<pre class="text"><code><span><span class="va">RENV_CONFIG_NAMESPACES_CHECK</span><span class="op">=</span><span class="cn">FALSE</span></span></code></pre>
+<p>Restart R after you edit the file. A setting in <code>~/.Renviron</code> stays out of git, so it is not committed, and it does not apply to other people who clone the project. boosterpak does not set this variable in the managed <code>.Rprofile</code> block. The warning is useful when a package is loaded by mistake, so it stays on by default.</p>
+</section></section><section class="level2"><h2 id="what-does-not-re-run-in-a-clone">What does not re-run in a clone<a class="anchor" aria-label="anchor" href="#what-does-not-re-run-in-a-clone"></a>
 </h2>
 <ul>
 <li>
@@ -151,7 +210,7 @@
 </h2>
 <p>Projects initialized with boosterpak 0.5, or with <code>settings.auto_snapshot = false</code>, may not have <code>boosterpak</code> in <code>renv.lock</code>, so <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code> leaves it uninstalled. Bootstrap it once without relying on <code>boosterpak</code> being loadable:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"renv"</span><span class="op">)</span></span>
 <span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/install.html" class="external-link">install</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"pak"</span>, <span class="st">"seanthimons/boosterpak"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">snapshot</a></span><span class="op">(</span></span>
@@ -162,6 +221,7 @@
 </div>
 <p><code>update = TRUE</code> matters: without it, <code>renv::snapshot(packages = ...)</code> rewrites the lockfile to contain only the listed packages and their dependencies, dropping every other project package.</p>
 <p>Then restart R and run <code>boosterpak::sync(mode = "restore")</code>.</p>
+<p>If the project was last migrated with an older boosterpak, upgrade it after the restore, not before. boosterpak is not installed on the machine until <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code> completes, so <code><a href="../reference/upgrade_project.html">upgrade_project()</a></code> cannot run earlier. Restart R, run <code>boosterpak::upgrade_project(dry_run = TRUE)</code>, then <code><a href="../reference/upgrade_project.html">boosterpak::upgrade_project()</a></code>. See <code><a href="../articles/upgrading-a-project.html">vignette("upgrading-a-project", package = "boosterpak")</a></code>.</p>
 </section><script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);

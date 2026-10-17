@@ -49,8 +49,10 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="articles/building-a-pack.html">Building your own pack</a></li>
+    <li><a class="dropdown-item" href="articles/choosing-a-setup.html">Choosing a setup: boosterpak and the other R environment managers</a></li>
     <li><a class="dropdown-item" href="articles/getting-started.html">Getting started with boosterpak</a></li>
     <li><a class="dropdown-item" href="articles/restoring-a-project.html">Restoring a project on a new machine</a></li>
+    <li><a class="dropdown-item" href="articles/upgrading-a-project.html">Upgrading an existing project</a></li>
   </ul>
 </li>
       </ul>
@@ -96,7 +98,8 @@
 <p><code>renv</code> adds project-, platform-, and R-version-specific directories beneath that root. The package library therefore stays local to the device, while the small <code>renv/</code> bootstrap directory and <code>renv.lock</code> remain with the project so it can be restored elsewhere. Keep <code>library = "renv"</code> in <code>boosters.toml</code>; no boosterpak-specific path setting is required. Do not relocate the bootstrap directory with <code>RENV_PATHS_RENV</code>, because boosterpak expects <code>renv/activate.R</code> inside the project. See the <a href="https://rstudio.github.io/renv/reference/paths.html" class="external-link"><code>renv</code> path documentation</a> for other platforms and path controls.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/init.html">init</a></span><span class="op">(</span>renv <span class="op">=</span> <span class="st">"yes"</span>, rprofile <span class="op">=</span> <span class="st">"yes"</span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="reference/init.html">init()</a></code> writes <code>boosters.toml</code>, creates <code>boosters/packs/</code>, optionally writes <code>air.toml</code>, manages the recommended <code>.Rprofile</code> startup hook, and can initialize project-local <code>renv</code>. It also upgrades default-like CRAN mirrors to use Posit Package Manager for faster binary installs when available, including <code>@CRAN@</code>, common CRAN cloud mirrors, and mirrors listed in <code>options(boosterpak.default_cran_mirrors = c(...))</code> or <code>BOOSTERPAK_DEFAULT_CRAN_MIRRORS</code>; matching <code>.Rprofile</code> repository setup is written when <code>rprofile = "yes"</code>. On glibc Linux, that setup also switches to Posit’s portable Linux binaries so distributions Package Manager does not list, such as Fedora, install binaries instead of compiling from source; see <a href="#linux-binary-packages">Linux Binary Packages</a>. The startup setup also enables the <code>renv</code> pak backend and asks R package installs to avoid compiling from source when binaries are available. With <code>renv = "yes"</code>, it bootstraps <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> into the project library and snapshots those workflow packages before any restart is needed.</p>
+<p><code><a href="reference/init.html">init()</a></code> writes <code>boosters.toml</code>, creates <code>boosters/packs/</code>, optionally writes <code>air.toml</code>, manages the recommended <code>.Rprofile</code> startup hook, and can initialize project-local <code>renv</code>. It also upgrades default-like CRAN mirrors to use Posit Package Manager for faster binary installs when available, including <code>@CRAN@</code>, common CRAN cloud mirrors, and mirrors listed in <code>options(boosterpak.default_cran_mirrors = c(...))</code> or <code>BOOSTERPAK_DEFAULT_CRAN_MIRRORS</code>; matching <code>.Rprofile</code> repository setup is written when <code>rprofile = "yes"</code>. On glibc Linux, that setup also switches to Posit’s portable Linux binaries so distributions Package Manager does not list, such as Fedora, install binaries instead of compiling from source; see <a href="#linux-binary-packages">Linux Binary Packages</a>. The startup setup also enables the <code>renv</code> pak backend and sets <code>install.packages.compile.from.source = "never"</code>. The install-policy lines are written on every platform, but that compile option only takes effect where R installs binary packages by default, which is Windows and macOS; on Linux it has no effect. With <code>renv = "yes"</code>, <code><a href="reference/init.html">init()</a></code> bootstraps <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> into the project library and snapshots those workflow packages before any restart is needed.</p>
+<p>On a project that already has <code>boosters.toml</code>, <code><a href="reference/init.html">init()</a></code> does not overwrite it. Use <code><a href="reference/upgrade_project.html">upgrade_project()</a></code> to bring an existing project up to date; see <a href="#upgrading-an-existing-project">Upgrading an existing project</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="id_4-sync-the-project">4. Sync the project<a class="anchor" aria-label="anchor" href="#id_4-sync-the-project"></a>
@@ -105,7 +108,61 @@
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/sync.html">sync</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="linux-binary-packages">Linux Binary Packages<a class="anchor" aria-label="anchor" href="#linux-binary-packages"></a>
+<h2 id="upgrading-an-existing-project">Upgrading an existing project<a class="anchor" aria-label="anchor" href="#upgrading-an-existing-project"></a>
+</h2>
+<p>Projects created by an earlier boosterpak version need one upgrade run. Install the new boosterpak, restart R, confirm the version the session loads, preview the upgrade, then apply it:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pkg_install.html" class="external-link">pkg_install</a></span><span class="op">(</span><span class="st">"seanthimons/boosterpak"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">"boosterpak"</span><span class="op">)</span></span>
+<span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/upgrade_project.html">upgrade_project</a></span><span class="op">(</span>dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/upgrade_project.html">upgrade_project</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="reference/upgrade_project.html">upgrade_project()</a></code> installs missing packages and writes <code>renv.lock</code>. The dry run is the read-only step: it changes no files, installs nothing, and prints the planned actions, a lockfile preview, and the files a real run would touch. Interactive sessions print the report; in a script, pass <code>verbose = TRUE</code>.</p>
+<p>A real run touches these files:</p>
+<ul>
+<li>
+<code>.Rprofile</code>: the managed startup lines are repaired. Layouts from earlier versions, including the single unmarked hook line and older managed blocks, are replaced by the current managed block, and the repository lines are rewritten to match the current policy.</li>
+<li>
+<code>boosters/attach.R</code>: regenerated from <code>boosters.toml</code>.</li>
+<li>
+<code>boosters/packs/</code>: the built-in <code>core</code> pack and any missing declared pack files are copied in. Existing files are not overwritten.</li>
+<li>The project renv library: any of <code>renv</code>, <code>pak</code>, and <code>boosterpak</code> that are missing are installed.</li>
+<li>
+<code>renv.lock</code>: rewritten by a snapshot of those three packages and their dependencies. Use <code>upgrade_project(snapshot = FALSE)</code> to repair the files and install the missing packages without writing the lockfile.</li>
+<li>
+<code>renv/activate.R</code>: rewritten by renv only when the snapshot records a new renv version.</li>
+<li>
+<code>boosters.toml</code>: only the <code>[project].boosters_version</code> field, set to the installed boosterpak version. See <a href="#boosters_version">boosters_version</a>.</li>
+</ul>
+<p>If the project renv is not loaded yet, the upgrade loads it first and reapplies the boosterpak repository and install settings for the session.</p>
+<p>The lockfile preview shows the R version and the CRAN repository URL, old to new, and the workflow packages and dependencies whose locked version differs from the installed one. The preview is approximate; renv writes the final records. The snapshot records the R version that runs the upgrade, so run it from the R version the project should pin. Packages installed from Posit Package Manager binaries can carry <code>Repository: RSPM</code> and a <code>Platform</code> field. renv’s restore does not read <code>Platform</code>, and <code>RSPM</code> is only a preference: restore falls back to the repository URLs in <code>renv.lock</code>, which also serve Windows and macOS binaries.</p>
+<p>Review the result with <code>git diff</code> before committing. To undo a change you did not intend, restore the file with <code>git restore</code>. For a new untracked file that the report lists, such as <code>boosters/packs/core.toml</code>, check the path with <code>git clean -n -- &lt;path&gt;</code> and then remove it with <code>git clean -f -- &lt;path&gt;</code>; use only the paths the report lists. Packages installed into the project library stay there; they do not change your project files.</p>
+<div class="section level3">
+<h3 id="what-init-does-on-an-existing-project">What init() does on an existing project<a class="anchor" aria-label="anchor" href="#what-init-does-on-an-existing-project"></a>
+</h3>
+<p><code><a href="reference/init.html">init()</a></code> is for new projects. On an existing one it makes smaller changes and does not write the upgrade report:</p>
+<ul>
+<li>It leaves <code>boosters.toml</code> in place. It adds <code>boosterpak</code> to <code>[extras].declared</code> when that is a single generated line, and it removes the legacy <code>parallel_daemons = "auto"</code> setting.</li>
+<li>It writes <code>air.toml</code> only when it is missing and the air setting is on.</li>
+<li>It copies in missing pack files, and never overwrites an existing manifest.</li>
+<li>With <code>renv = "yes"</code>, it loads or creates the project renv, installs missing <code>pak</code>, <code>renv</code>, and <code>boosterpak</code>, and snapshots them unless <code>[settings].auto_snapshot</code> is <code>false</code>.</li>
+<li>It updates the managed <code>.Rprofile</code> lines. It records the installed boosterpak version in <code>boosters_version</code> only when that <code>.Rprofile</code> step ran, so <code>rprofile = "no"</code> leaves the record unchanged.</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="boosters_version">boosters_version<a class="anchor" aria-label="anchor" href="#boosters_version"></a>
+</h3>
+<p><code>[project].boosters_version</code> in <code>boosters.toml</code> records the boosterpak version that the project was last migrated with. Two commands write it:</p>
+<ul>
+<li>
+<code><a href="reference/init.html">init()</a></code>, once its <code>.Rprofile</code> step has run.</li>
+<li>
+<code><a href="reference/upgrade_project.html">upgrade_project()</a></code>, after a real run that reports no warnings. A dry run writes nothing. A run that stops with an error, or that reports a warning, leaves the record as it was. Most skipped steps are reported as <code>INFO</code> lines and do not stop the record, but a run that could not repair the workflow packages because renv is not installed reports a warning, so it does not record the version. Install renv and rerun.</li>
+</ul>
+<p><code><a href="reference/sync.html">sync()</a></code> does not change it. The record never moves to an older version, and it is a record, not a lock. <code><a href="reference/status.html">status()</a></code> warns when the record is older than the installed boosterpak. A missing record is reported as “no version recorded” without a warning, and <code>upgrade_needed</code> is still <code>TRUE</code>. A project created with <code>rprofile = "no"</code> has no record until an <code><a href="reference/init.html">init()</a></code> completes the <code>.Rprofile</code> step or a clean <code><a href="reference/upgrade_project.html">upgrade_project()</a></code> run writes it.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="linux-binary-packages">Linux binary packages<a class="anchor" aria-label="anchor" href="#linux-binary-packages"></a>
 </h2>
 <p>CRAN publishes only source packages for Linux. Posit Package Manager builds Linux binaries from them, but serves them from distribution-specific URLs such as <code>https://packagemanager.posit.co/cran/__linux__/jammy/latest</code>, which exist only for the distributions Package Manager lists. The generic URL (<code>https://packagemanager.posit.co/cran/latest</code>) serves source, so on other glibc distributions, for example Fedora, every package installs from source.</p>
 <p>Posit’s <a href="https://posit.co/blog/introducing-portable-linux-r-binary-packages" class="external-link">portable Linux binaries</a> (<code>manylinux_2_28</code>) fix that with one binary build for all glibc distributions. On glibc Linux, boosterpak rewrites every Package Manager repository URL in <code>repos</code> (and in <code>renv.config.repos.override</code>) that has this form:</p>
@@ -118,9 +175,14 @@
 <ul>
 <li>The <code>.Rprofile</code> repository lines keep the generic URL, so one <code>.Rprofile</code> still works on Windows, macOS, and Linux, and non-Linux machines keep using the generic URL.</li>
 <li>A guarded line after them performs the rewrite on glibc Linux only, when R starts. It uses base R, because it runs before boosterpak loads.</li>
+<li>A second copy of the guarded lines follows the <code>renv/activate.R</code> line. renv’s <code><a href="https://rstudio.github.io/renv/reference/load.html" class="external-link">renv::load()</a></code> resets the repositories to the lockfile URLs, which would undo the first rewrite, so the rewrite is re-applied after activation. Every session that activates the project, including each worker, gets the rewritten URLs. The re-applied lines are written only where the repository lines are, and they are marked so boosterpak can find and replace them. The first of them replaces a default CRAN mirror with the Package Manager URL, as described below. It runs only while renv’s Package Manager handling is on, which it checks with the internal <code>renv:::renv_ppm_enabled()</code>. With that handling off, <code><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">renv::snapshot()</a></code> does not strip the <code>__linux__</code> segment, so the line is skipped and the lockfile stays generic.</li>
 <li>Distribution-specific URLs, such as <code>.../cran/__linux__/noble/latest</code>, and repositories that are not Package Manager repositories are left alone.</li>
+<li>A <code>renv.lock</code> that still lists a default CRAN mirror, such as <code>https://cran.rstudio.com</code>, no longer keeps the session on that mirror. After <code><a href="https://rstudio.github.io/renv/reference/load.html" class="external-link">renv::load()</a></code> sets <code>repos</code> from the lockfile, the re-applied block checks the <code>CRAN</code> entry of <code>repos</code>, and of <code>renv.config.repos.override</code> where the project sets it. If the entry is one of the built-in default mirrors (<code>@CRAN@</code>, <code>https://cloud.r-project.org</code>, <code>https://cran.rstudio.com</code>, or <code>https://cran.r-project.org</code>, compared without regard to case or a trailing slash), the Package Manager URL that the session was configured with is put back. That is normally <code>https://packagemanager.posit.co/cran/latest</code>. <code><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages()</a></code> and <code>pak</code> then use Package Manager, which serves binaries where it has them. Custom mirrors and non-CRAN repositories are left alone. The restore applies only where the <code>.Rprofile</code> repository lines name a Package Manager URL, and it is skipped when <code>BOOSTERPAK_CONFIGURE_REPOSITORIES</code> turns repository setup off or when renv’s Package Manager handling is off. <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code> and <code><a href="https://rstudio.github.io/renv/reference/install.html" class="external-link">renv::install()</a></code> still use <code>renv.config.repos.override</code>.</li>
+<li>Unlike the Linux rewrite, the CRAN restore runs on every OS, so a lockfile does not flip between the mirror and the Package Manager URL when collaborators use different systems. This is a behaviour change for Windows and macOS sessions too: where the restore applies, a snapshot now records the generic Package Manager URL instead of the default mirror. Set <code>BOOSTERPAK_CONFIGURE_REPOSITORIES=false</code> to turn the restore off for a session.</li>
+<li>The marker comment above the re-applied block in <code>.Rprofile</code> still says “Linux”, although the CRAN restore line is active on every OS. An older boosterpak’s <code><a href="reference/deinit.html">deinit()</a></code> removes the marker and, at most, the Linux line right after it. On a file written by this version, it can leave the CRAN restore line and the Linux line behind, so delete them by hand or run this version’s <code><a href="reference/deinit.html">deinit()</a></code>.</li>
+<li>To put the Package Manager URL into the lockfile itself, run <code><a href="reference/upgrade_project.html">upgrade_project()</a></code>. On a real run with <code>snapshot = TRUE</code> it writes the URL unless repository configuration is disabled or a custom CRAN mirror is set; check the lockfile preview of a dry run first. You can also record a Package Manager repository yourself with <code>renv::snapshot(repos = ...)</code>.</li>
 <li>
-<code><a href="reference/init.html">init()</a></code> and <code>.rescue()</code> replace the line written by earlier boosterpak versions, so existing projects upgrade by rerunning either one.</li>
+<code><a href="reference/init.html">init()</a></code> and <code><a href="reference/upgrade_project.html">upgrade_project()</a></code> replace the repository lines written by earlier boosterpak versions, so existing projects upgrade by running either one.</li>
 </ul>
 </div>
 <div class="section level3">
@@ -148,25 +210,77 @@
 <div class="section level3">
 <h3 id="check-that-binaries-are-served">Check that binaries are served<a class="anchor" aria-label="anchor" href="#check-that-binaries-are-served"></a>
 </h3>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/check_binary_repos.html">check_binary_repos</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p><code><a href="reference/check_binary_repos.html">check_binary_repos()</a></code> requests one small package (<code>cli</code> by default) from each Package Manager repository, with the session’s user agent, and reports the <code>X-Package-Type</code> and <code>X-Package-Binary-Tag</code> headers. It warns for any repository that serves source and suggests the likely fix. It also warns when <code>download.file.method</code> is <code>"curl"</code> and <code>download.file.extra</code> has no <code>-L</code>: the check uses libcurl, which follows redirects, so it can pass while curl installs fail. It needs network access and runs on Linux only.</p>
 <p>During an install, a binary shows up in the log as <code>* installing *binary* package 'cli' ...</code>, while a source install says <code>* installing *source* package 'cli' ...</code>.</p>
 </div>
 <div class="section level3">
+<h3 id="pinned-versions-and-snapshots">Pinned versions and snapshots<a class="anchor" aria-label="anchor" href="#pinned-versions-and-snapshots"></a>
+</h3>
+<p>A project restores the versions recorded in <code>renv.lock</code>, not the newest ones. Package Manager serves a binary only for a version that exists in the snapshot the URL points at. A pinned version that the repository does not serve for that URL installs from source, even when the URL is correct. To check a lockfile:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/check_binary_repos.html">check_binary_repos</a></span><span class="op">(</span>lockfile <span class="op">=</span> <span class="st">"renv.lock"</span><span class="op">)</span></span></code></pre></div>
+<p>This downloads each repository’s package index once and installs nothing. It reports how many pins are available as binary and how many would compile, and it warns with the worst offenders, compiled packages first. It only checks repositories that are recorded in the lockfile and that are Package Manager repositories. Add <code>snapshot_dates = "2026-10-14"</code> to check whether a dated snapshot serves more of the pins. The per-date counts print in interactive sessions or with <code>verbose = TRUE</code>; they are always in the <code>snapshots</code> element of the <code>"lockfile"</code> attribute of the result.</p>
+<p>When pins are not available as binary, choose one of three options:</p>
+<ul>
+<li>
+<strong>Relax the pins.</strong> Run <code><a href="https://rstudio.github.io/renv/reference/update.html" class="external-link">renv::update()</a></code>, test the project, then run <code><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">renv::snapshot()</a></code>. The package versions in the project change, which can break code that depends on the old versions.</li>
+<li>
+<strong>Point the lockfile at a dated snapshot.</strong> Use this when a dated Package Manager URL serves the pinned versions. <code>snapshot_dates</code> above shows whether it does. In <code>.Rprofile</code>, change both repository lines that boosterpak writes, <code>options(repos = ...)</code> and <code>options(renv.config.repos.override = ...)</code>, so that each names the dated URL, such as <code>https://packagemanager.posit.co/cran/2026-10-14</code>. Restart R, run <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code>, then run <code><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">renv::snapshot()</a></code>. Both lines must change. <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code> reads the <code>renv.config.repos.override</code> option and not the lockfile, so a generic override would restore from the generic URL. <code><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">renv::snapshot()</a></code> records the <code>repos</code> option in <code>renv.lock</code>, so a generic <code>repos</code> would write the generic URL back. <code><a href="reference/init.html">init()</a></code> and <code><a href="reference/upgrade_project.html">upgrade_project()</a></code> rewrite both lines from the options in the running session, so after either one, check that both lines still name the dated URL. The project then depends on that date, so record the choice and review it when you update packages.</li>
+<li>
+<strong>Accept compiling.</strong> Install from source. Installs are slower, and the system needs compilers and headers for packages with C, C++, or Fortran code.</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="the-loaded-before-renv-activated-warning">The “loaded before renv activated” warning<a class="anchor" aria-label="anchor" href="#the-loaded-before-renv-activated-warning"></a>
+</h3>
+<p>Some systems print this message when a project starts:</p>
+<pre class="text"><code>The following package(s) were loaded before renv activated this project:</code></pre>
+<p>The message comes from renv, not from boosterpak. A system-wide R profile loads a package before the project’s <code>renv/activate.R</code> runs. On Fedora, for example, a CoprManager setup can do this. The warning is harmless when the packages are the ones you expect, and it does not mean the project is broken.</p>
+<p>To silence it, set <code>RENV_CONFIG_NAMESPACES_CHECK=FALSE</code> in your user-level <code>~/.Renviron</code> and restart R. The equivalent is <code>options(renv.config.namespaces.check = FALSE)</code> in your user-level <code>~/.Rprofile</code>. Use the user-level files rather than the project’s, so the setting does not travel with the project.</p>
+<p>boosterpak deliberately does not silence the warning in the project. The check also flags a package loaded from outside the project library, which can be a real inconsistency, and a project-level setting would hide that for everyone who opens the project.</p>
+</div>
+<div class="section level3">
 <h3 id="opt-out">Opt out<a class="anchor" aria-label="anchor" href="#opt-out"></a>
 </h3>
 <p>Set <code>BOOSTERPAK_CONFIGURE_REPOSITORIES=false</code> (for example in <code>~/.Renviron</code>) to stop boosterpak from changing repository settings. The managed <code>.Rprofile</code> line also checks it, so the Linux rewrite stops in projects that already contain the line, without editing them. Repository lines already in <code>.Rprofile</code> keep pointing at the generic Package Manager URL, so distributions Package Manager does not list go back to compiling from source.</p>
-<p><code>options(boosterpak.configure_repositories = FALSE)</code> stops boosterpak’s own repository configuration in the R session, which runs in <code><a href="reference/init.html">init()</a></code>, <code>.rescue()</code>, and the <code>renv</code> restore and bootstrap steps. It does not affect a line that is already in <code>.Rprofile</code>. If both are set, the environment variable wins.</p>
-<p>Rerunning <code>.rescue()</code> while opted out removes the managed repository lines from <code>.Rprofile</code>, because boosterpak then has no repository setup to write back. <code><a href="reference/init.html">init()</a></code> does the same on a project whose install-policy lines are missing. Keep the lines by not rerunning them while opted out.</p>
+<p><code>options(boosterpak.configure_repositories = FALSE)</code> stops boosterpak’s own repository configuration in the R session, which runs in <code><a href="reference/init.html">init()</a></code>, <code><a href="reference/upgrade_project.html">upgrade_project()</a></code>, and the <code>renv</code> restore and bootstrap steps. It does not affect a line that is already in <code>.Rprofile</code>. If both are set, the environment variable wins.</p>
+<p>With repository setup opted out but install-policy setup still on, <code><a href="reference/upgrade_project.html">upgrade_project()</a></code> removes the managed repository lines from <code>.Rprofile</code>, because boosterpak then has no repository setup to write back. The install-policy lines are kept. <code><a href="reference/init.html">init()</a></code> does the same when the install-policy lines are missing. If install-policy setup is opted out as well, neither command writes or removes setup lines. To keep the repository lines, do not run either command while opted out.</p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="safely-deinitialize-a-project">Safely Deinitialize a Project<a class="anchor" aria-label="anchor" href="#safely-deinitialize-a-project"></a>
+<h2 id="github-rate-limits">GitHub rate limits<a class="anchor" aria-label="anchor" href="#github-rate-limits"></a>
+</h2>
+<p>Installs from GitHub use the GitHub API. Anonymous requests share a rate limit of 60 requests per hour per IP address. The limit matters in two places:</p>
+<ul>
+<li>Installing boosterpak from GitHub. <code><a href="reference/init.html">init()</a></code>, <code><a href="reference/sync.html">sync()</a></code>, and <code><a href="reference/upgrade_project.html">upgrade_project()</a></code> install it only when it is missing from the project library.</li>
+<li>Packs that install from GitHub, such as the <code>github-example</code> pack, which installs <code>ComptoxR</code>, and <code>[sources]</code> entries like <code>wilkelab/ggtext</code>.</li>
+</ul>
+<p>When a rate limit stops an install, boosterpak appends a hint to the error. <code><a href="reference/init.html">init()</a></code> and <code><a href="reference/sync.html">sync()</a></code> stop with the error and the hint. <code><a href="reference/upgrade_project.html">upgrade_project()</a></code> does not stop: it reports the failed install as a <code>WARNING: workflow package install skipped</code> line with the hint appended. The rest of the run finishes, but it writes no <code>renv.lock</code> and does not record <code>boosters_version</code>. An HTTP 403 or 429 from GitHub that may be a rate limit gets the same hint, with the first line <code>GitHub may have rate-limited or refused the request.</code> The hint looks like this for an explicit rate limit, after the GitHub error text:</p>
+<pre class="text"><code>GitHub rate limit reached.
+Anonymous GitHub API requests share a limit of 60 requests per hour per IP address.
+No GitHub token is set (GITHUB_PAT or GITHUB_TOKEN).
+Set a token for the R session, then rerun. From a shell where the GitHub CLI is logged in:
+  export GITHUB_PAT=$(gh auth token)
+Or store one for your user account with gitcreds::gitcreds_set() or GITHUB_PAT in ~/.Renviron.</code></pre>
+<p>The hint reports only whether a token is already set. It never prints a token value. Supply a token in one of three ways:</p>
+<ul>
+<li>
+<strong>For one shell session.</strong> From a shell where the GitHub CLI is logged in, run <code>export GITHUB_PAT=$(gh auth token)</code>, or start R for one process with <code>GITHUB_PAT=$(gh auth token) R</code>.</li>
+<li>
+<strong>Stored for your user account.</strong> Run <code><a href="https://gitcreds.r-lib.org/reference/gitcreds_get.html" class="external-link">gitcreds::gitcreds_set()</a></code> once in R, and paste a token when asked. This needs the <code>gitcreds</code> package.</li>
+<li>
+<strong>In your user-level <code>~/.Renviron</code>.</strong> Add a line <code>GITHUB_PAT=</code> followed by the token, then restart R.</li>
+</ul>
+<p>Never commit a token. Keep it out of the project: not in <code>.Renviron</code>, <code>.Rprofile</code>, <code>boosters.toml</code>, scripts, or the README. A user-level file is the right place, because it is never part of the project’s version control.</p>
+</div>
+<div class="section level2">
+<h2 id="safely-deinitialize-a-project">Safely deinitialize a project<a class="anchor" aria-label="anchor" href="#safely-deinitialize-a-project"></a>
 </h2>
 <p>Run <code><a href="reference/deinit.html">boosterpak::deinit()</a></code> interactively to choose from the project components that currently have something to clean up. The console picker preselects every actionable component, then a final confirmation shows the exact paths and <code>.Rprofile</code> changes before anything is modified.</p>
 <p>For automation, select components explicitly and use <code>force = TRUE</code>:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/deinit.html">deinit</a></span><span class="op">(</span></span>
 <span>  renv <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  boosters <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -180,19 +294,19 @@
 <p>When <code>RENV_PATHS_LIBRARY_ROOT</code> places the package library outside the project, the <code>renv</code> selector still removes only the project-local <code>renv/</code> bootstrap directory. It deliberately leaves the external package library untouched. If the project renv is active, <code><a href="reference/deinit.html">deinit()</a></code> reports <code>restart_required = TRUE</code> and warns you to restart R; it does not rewrite the current session’s library paths.</p>
 </div>
 <div class="section level2">
-<h2 id="use-an-active-library-without-a-project-renv">Use an Active Library Without a Project renv<a class="anchor" aria-label="anchor" href="#use-an-active-library-without-a-project-renv"></a>
+<h2 id="use-an-active-library-without-a-project-renv">Use an active library without a project renv<a class="anchor" aria-label="anchor" href="#use-an-active-library-without-a-project-renv"></a>
 </h2>
 <p>For a live project that should keep using its existing R libraries, initialize without creating a project-local <code>renv</code> environment:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/init.html">init</a></span><span class="op">(</span>renv <span class="op">=</span> <span class="st">"no"</span>, rprofile <span class="op">=</span> <span class="st">"yes"</span><span class="op">)</span></span></code></pre></div>
 <p>Then select the persistent active-library strategy in <code>boosters.toml</code>:</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="kw">[settings]</span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="dt">library</span> <span class="op">=</span> <span class="st">"active"</span></span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a><span class="kw">[settings]</span></span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="dt">library</span> <span class="op">=</span> <span class="st">"active"</span></span></code></pre></div>
 <p><code><a href="reference/sync.html">boosterpak::sync()</a></code> and eager pack mutations will now detect and install packages in the first writable entry of <code><a href="https://rdrr.io/r/base/libPaths.html" class="external-link">.libPaths()</a></code>. Package source overrides, helper functions, and <code>boosters/attach.R</code> work normally. Active-library apply mode skips <code><a href="https://rstudio.github.io/renv/reference/hydrate.html" class="external-link">renv::hydrate()</a></code> and <code><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">renv::snapshot()</a></code>; it does not create <code>renv/</code> or <code>renv.lock</code>. For a one-off override without editing TOML, use <code>boosterpak::sync(library = "active")</code> or <code>boosterpak::add_pack("eda", library = "active")</code>.</p>
 <p>The <code>renv</code> package remains an installation dependency because lockfile restore support is part of <code>boosterpak</code>, but no project-local renv environment is activated in this mode. <code>sync(mode = "restore")</code> remains the separate renv lockfile workflow.</p>
 </div>
 <div class="section level2">
-<h2 id="typical-workflow">Typical Workflow<a class="anchor" aria-label="anchor" href="#typical-workflow"></a>
+<h2 id="typical-workflow">Typical workflow<a class="anchor" aria-label="anchor" href="#typical-workflow"></a>
 </h2>
 <pre class="mermaid"><code>flowchart TD
   A([Start new project]) --&gt; B(["Run init()"])
@@ -219,12 +333,12 @@
   class A,B,C,D,E,F,K,L,N,O userAction;
   class G,H,A1,I,J,M packageAction;</code></pre>
 <p>The usual loop is to initialize once, add packs and helper functions as project capability intent, run <code><a href="reference/sync.html">sync()</a></code>, then capture a useful baseline with <code><a href="reference/save_pack.html">save_pack()</a></code>. Additive installs hydrate plain-name packages from local/user libraries before downloading, install any remaining packages with <code>pak</code>, and write <code>boosters/attach.R</code> for startup <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls. Package-only packs stay flat at <code>boosters/packs/&lt;name&gt;.toml</code>; packs that carry copied helper files use <code>boosters/packs/&lt;name&gt;/&lt;name&gt;.toml</code> plus <code>boosters/packs/&lt;name&gt;/functions/</code>. For an already initialized repo clone, do not re-run <code><a href="reference/init.html">init()</a></code>; follow the restore path with <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code>, restart R, then <code>boosterpak::sync(mode = "restore")</code>.</p>
-<p>A pack is deliberately typed and reviewable. Today that means packages, optional <code>[sources]</code>, optional <code>attach</code>, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.</p>
+<p>A pack is deliberately typed and reviewable. Today that means packages, optional <code>[sources]</code>, optional <code>attach</code> and <code>attach_mode</code>, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.</p>
 </div>
 <div class="section level2">
-<h2 id="add-a-pack">Add a Pack<a class="anchor" aria-label="anchor" href="#add-a-pack"></a>
+<h2 id="add-a-pack">Add a pack<a class="anchor" aria-label="anchor" href="#add-a-pack"></a>
 </h2>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/add_pack.html">add_pack</a></span><span class="op">(</span><span class="st">"example"</span><span class="op">)</span></span></code></pre></div>
 <p>The built-in pack catalog contains:</p>
 <ul>
@@ -237,33 +351,34 @@
 <li>
 <code>example</code>: small documented example that installs <code>cli</code>.</li>
 <li>
-<code>scaffold-analysis</code>: installs <code>fs</code> and <code>here</code> and carries a helper for a compact analysis folder scaffold.</li>
+<code>scaffold-analysis</code>: installs <code>fs</code> and <code>here</code> and carries a helper for a compact analysis folder scaffold. Its packages attach only in interactive sessions (<code>attach_mode = "interactive"</code>).</li>
 <li>
 <code>github-example</code>: installs <code>ComptoxR</code> from <code>seanthimons/ComptoxR</code>.</li>
 </ul>
 <p>Packs can mix ordinary CRAN package names with source-specific install specs. Declare every package in <code>packages</code>, then add a <code>[sources]</code> entry only for packages that should come from somewhere else:</p>
-<div class="sourceCode" id="cb15"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">"plotting"</span></span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Plotting packages from CRAN and GitHub."</span></span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"ggplot2"</span><span class="op">,</span> <span class="st">"patchwork"</span><span class="op">,</span> <span class="st">"ggtext"</span><span class="op">]</span></span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a></span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="kw">[sources]</span></span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">"plotting"</span></span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Plotting packages from CRAN and GitHub."</span></span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"ggplot2"</span><span class="op">,</span> <span class="st">"patchwork"</span><span class="op">,</span> <span class="st">"ggtext"</span><span class="op">]</span></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a></span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a><span class="kw">[sources]</span></span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a><span class="dt">"ggtext"</span> <span class="op">=</span> <span class="st">"wilkelab/ggtext"</span></span></code></pre></div>
 <p>In this pack, <code>ggplot2</code> and <code>patchwork</code> install by package name, while <code>ggtext</code> uses the GitHub source spec.</p>
 <p>Attachment is separate from installation. Missing <code>attach</code> means a pack attaches its direct <code>packages</code>; packs can also use <code>attach = true</code>, <code>attach = false</code>, or <code>attach = ["pkg1", "pkg2"]</code>. The top-level <code>[attach]</code> table can add packages with <code>declared</code>, remove packages with <code>exclude</code>, or set <code>enabled = false</code> to remove the managed <code>boosters/attach.R</code> file. Workflow packages from <code>core</code> and <code>[extras]</code>, such as <code>pak</code>, <code>renv</code>, and <code>boosterpak</code>, are installed but not attached unless explicitly listed in <code>[attach].declared</code>.</p>
+<p>A pack can also set <code>attach_mode = "interactive"</code> (the default is <code>"always"</code>). Its packages still install, but they attach only when R is interactive, so worker processes and non-interactive runs skip them. Put the key above the first table header in the pack file (<code>[sources]</code>, <code>[settings]</code>, <code>[hooks]</code>). A key written below a table header belongs to that table, so boosterpak does not read it as a pack key. A package that another pack or <code>[attach].declared</code> also requests without the interactive mode still attaches on every start, and <code>[attach].exclude</code> still removes a package. Packages that a pack inherits through <code>extends</code> keep the mode of the pack that declares them. See “Startup cost and workers” below.</p>
 <p>Pack mutation is additive. Removing a pack updates <code>boosters.toml</code> and can run sync, but it does not uninstall packages.</p>
 <p>With the default <code>library = "renv"</code> strategy, <code><a href="reference/add_pack.html">add_pack()</a></code> and <code>sync(mode = "apply")</code> use <code>hydrate = TRUE</code>, so ordinary CRAN-style package names can be copied from renv-discoverable local libraries before <code>pak</code> downloads anything. Source-specific declarations, such as GitHub remotes in <code>[sources]</code>, skip hydration and install through their declared spec. Use <code>hydrate = FALSE</code> for stricter first-run installs that should go straight to <code>pak</code>. The <code>library = "active"</code> strategy installs directly into the selected active library and ignores hydration.</p>
 </div>
 <div class="section level2">
-<h2 id="add-one-off-packages-alongside-packs">Add One-Off Packages Alongside Packs<a class="anchor" aria-label="anchor" href="#add-one-off-packages-alongside-packs"></a>
+<h2 id="add-one-off-packages-alongside-packs">Add one-off packages alongside packs<a class="anchor" aria-label="anchor" href="#add-one-off-packages-alongside-packs"></a>
 </h2>
 <p><code>boosterpak</code> manages packs. For individual packages that don’t belong to any pack, use <code>pak</code> or <code>renv</code> directly:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pkg_install.html" class="external-link">pkg_install</a></span><span class="op">(</span><span class="st">"concert"</span><span class="op">)</span></span></code></pre></div>
 <p>After installing, snapshot so <code>renv.lock</code> records the new package:</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">snapshot</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>Subsequent <code><a href="reference/sync.html">boosterpak::sync()</a></code> and <code><a href="reference/add_pack.html">boosterpak::add_pack()</a></code> calls preserve every package already recorded in <code>renv.lock</code>, so one-off installs are not lost when packs are added or synchronized later. The typical sequence for a new project is:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/init.html">init</a></span><span class="op">(</span>renv <span class="op">=</span> <span class="st">"yes"</span>, rprofile <span class="op">=</span> <span class="st">"yes"</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/add_pack.html">add_pack</a></span><span class="op">(</span><span class="st">"eda"</span><span class="op">)</span></span>
 <span></span>
@@ -274,13 +389,34 @@
 <span><span class="co"># future pack additions preserve concert in renv.lock</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/add_pack.html">add_pack</a></span><span class="op">(</span><span class="st">"databases"</span><span class="op">)</span></span></code></pre></div>
 <p>Packages installed directly are not attached at startup by <code>boosters/attach.R</code>. To attach them, add the package name to <code>[attach].declared</code> in <code>boosters.toml</code>:</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a><span class="kw">[attach]</span></span>
-<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a><span class="dt">declared</span> <span class="op">=</span> <span class="op">[</span><span class="st">"concert"</span><span class="op">]</span></span></code></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="kw">[attach]</span></span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="dt">declared</span> <span class="op">=</span> <span class="op">[</span><span class="st">"concert"</span><span class="op">]</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="capture-and-reuse-packs">Capture and Reuse Packs<a class="anchor" aria-label="anchor" href="#capture-and-reuse-packs"></a>
+<h2 id="startup-cost-and-workers">Startup cost and workers<a class="anchor" aria-label="anchor" href="#startup-cost-and-workers"></a>
 </h2>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<p>The project’s <code>.Rprofile</code> runs whenever R starts in the project, and it sources <code>boosters/attach.R</code>. Worker processes count too. A targets pipeline that runs on crew starts its workers in the project directory, so each worker runs <code>.Rprofile</code> and attaches the packages in <code>attach.R</code> again at every spin-up. Every package attached adds to that cost.</p>
+<p>To see what is attached, run <code><a href="reference/status.html">boosterpak::status()</a></code>. It lists each attached package with the pack that requested it (or <code>[attach].declared</code>), and prints <code>attached on every R start (including workers): N packages</code>. Packages from interactive-only packs are not in that count. They follow it on their own line, as <code>M more only in interactive sessions</code>, with the pack behind each one. In the returned value, <code>attach_packages</code> and <code>attach_package_count</code> still cover every attached package. <code>attach_every_start_count</code> counts the ones that attach on every start, <code>attach_interactive_packages</code> names the interactive-only ones, and the <code>interactive</code> column of <code>attach_sources</code> marks them.</p>
+<p>To trim the list, use the narrowest option that does the job:</p>
+<ul>
+<li>
+<code>[attach] exclude = ["pkg"]</code> stops a package from being attached. It is still installed.</li>
+<li>In a pack, <code>attach = false</code> attaches nothing from that pack, and <code>attach = ["pkg1"]</code> attaches only the listed packages.</li>
+<li>In a pack, <code>attach_mode = "interactive"</code> keeps the pack’s packages installed and attaches them only when R is interactive. Workers and non-interactive runs skip them.</li>
+<li>
+<code>[attach] enabled = false</code> removes <code>boosters/attach.R</code> entirely. Packages are still installed, and the helper functions still load.</li>
+<li>
+<code>remove_pack("name")</code> removes a pack from <code>boosters.toml</code>, rewrites <code>boosters/attach.R</code>, and drops the pack’s <code>[settings.packs.&lt;name&gt;]</code> section when no remaining pack needs it. It does not uninstall anything. The packages stay in <code>renv.lock</code> and the project library, and the function prints the next steps: run <code><a href="https://rstudio.github.io/renv/reference/snapshot.html" class="external-link">renv::snapshot()</a></code> to drop them from the lockfile, and <code><a href="https://rstudio.github.io/renv/reference/remove.html" class="external-link">renv::remove()</a></code> to uninstall them.</li>
+</ul>
+<p>For a targets pipeline, list the packages the targets use in <code>tar_option_set(packages = ...)</code>. Each worker then loads those packages for its targets, whatever <code>attach.R</code> contains. That keeps the pipeline working when attach trimming removes a package. It does not stop <code>attach.R</code> from running on workers, so trim attach as well when startup time matters.</p>
+<p>Interactive-only packages are written to <code>attach.R</code> with the same guarded <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls, inside an <code>if (interactive())</code> block. <code><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive()</a></code> is <code>FALSE</code> in <code>Rscript</code>, in a Quarto or knitr render (including RStudio’s Render button), and in targets, crew, and callr workers. Code that calls a function from such a package without a namespace prefix therefore works at the console and fails when a document renders or a pipeline runs. Write <code>here::here()</code> or <code><a href="https://fs.r-lib.org/reference/path.html" class="external-link">fs::path()</a></code> in code that must run everywhere.</p>
+<p>The shipped <code>scaffold-analysis</code> pack uses <code>attach_mode = "interactive"</code>. Its helper calls only <code>fs::</code> functions, so workers do not need <code>fs</code> or <code>here</code> attached, and interactive sessions still get both. A project that already has its own copy of a pack keeps that copy, because <code><a href="reference/add_pack.html">add_pack()</a></code> and <code><a href="reference/sync.html">sync()</a></code> never overwrite files in <code>boosters/packs/</code>. A project created before this key existed therefore still attaches those packages on every start. To change that, add <code>attach_mode = "interactive"</code> above the first table header in the copy, or delete the copy and run <code><a href="reference/sync.html">boosterpak::sync()</a></code> to copy the current pack again. Older boosterpak versions ignore the key and attach every package on every start.</p>
+<p><code>attach.R</code> handles a missing package on its own. Each package is attached separately, so one that is not installed does not stop the others. boosterpak prints one summary line that names the missing packages and suggests <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code>. The <code>boosters/fn_*.R</code> helper files are sourced regardless, so they still load when an attached package is missing.</p>
+</div>
+<div class="section level2">
+<h2 id="capture-and-reuse-packs">Capture and reuse packs<a class="anchor" aria-label="anchor" href="#capture-and-reuse-packs"></a>
+</h2>
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/create_pack.html">create_pack</a></span><span class="op">(</span><span class="st">"analysis"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"dplyr"</span>, <span class="st">"rstudio/pointblank"</span><span class="op">)</span>, attach <span class="op">=</span> <span class="st">"all"</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/save_pack.html">save_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/promote_pack.html">promote_pack</a></span><span class="op">(</span><span class="st">"project_baseline"</span><span class="op">)</span></span></code></pre></div>
@@ -288,7 +424,7 @@
 <p><code><a href="reference/save_pack.html">save_pack()</a></code> writes a TOML snapshot of the currently resolved project packages and, by default, the helper functions listed in <code>[functions].installed</code>. Use <code>functions = "all"</code> to capture every <code>boosters/fn_*.R</code> file, <code>functions = "none"</code> for a flat package-only pack, <code>from = "core"</code> to fork one existing pack, or <code>scope = "user"</code> to write directly to the machine-wide user pack directory. <code><a href="reference/promote_pack.html">promote_pack()</a></code> and <code><a href="reference/demote_pack.html">demote_pack()</a></code> copy flat package-only packs as single files and nested function-bearing packs as whole directories.</p>
 </div>
 <div class="section level2">
-<h2 id="related-tools-and-boundaries">Related Tools and Boundaries<a class="anchor" aria-label="anchor" href="#related-tools-and-boundaries"></a>
+<h2 id="related-tools-and-boundaries">Related tools and boundaries<a class="anchor" aria-label="anchor" href="#related-tools-and-boundaries"></a>
 </h2>
 <p><code>boosterpak</code> is intentionally narrow:</p>
 <ul>
@@ -302,38 +438,93 @@
 <p>That boundary is the point. <code>boosterpak</code> uses TOML for its own pack and project config, but it is not trying to be a general project requirements format.</p>
 </div>
 <div class="section level2">
-<h2 id="restore-from-a-lockfile">Restore from a Lockfile<a class="anchor" aria-label="anchor" href="#restore-from-a-lockfile"></a>
+<h2 id="which-setup-should-i-use">Which setup should I use?<a class="anchor" aria-label="anchor" href="#which-setup-should-i-use"></a>
 </h2>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<p>Several R tools track packages, R versions, or whole environments, and they work at different levels. <code>boosterpak</code> is a layer on top of <code>renv</code> and <code>pak</code>, which it requires. <code>rv</code> and <code>uvr</code> each manage the project library and lockfile themselves, so they are alternatives to that layer: a project uses <code>boosterpak</code> with <code>renv</code>, or uses <code>rv</code> or <code>uvr</code>, not both. <code>rix</code> works at the level of the whole system environment rather than the project library, and <code>boosterpak</code> does not use it. <code>rig</code> switches R versions on a machine and has no interaction with <code>boosterpak</code>. The <a href="https://seanthimons.github.io/boosterpak/articles/choosing-a-setup.html">choosing-a-setup article</a> compares these tools with <code>boosterpak</code> in full.</p>
+<p>The rows for <a href="https://rstudio.github.io/renv/" class="external-link">renv</a>, <a href="https://docs.ropensci.org/rix/" class="external-link">rix</a>, rv, uvr, ir, and rig summarize Isabella Velásquez’s <a href="https://rworks.dev/posts/r-managers/" class="external-link">R Works post on {renv}, {rix}, rv, uvr, and ir</a>. The <code>boosterpak</code> row is the maintainers’ own assessment; the post does not mention <code>boosterpak</code>.</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr>
+<th>Tool</th>
+<th>Use it when</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><a href="https://rstudio.github.io/renv/" class="external-link">renv</a></td>
+<td>You want project-local packages with a lockfile, and you install packages the usual way, iteratively. It does not manage the R version.</td>
+</tr>
+<tr>
+<td><a href="https://docs.ropensci.org/rix/" class="external-link">rix</a></td>
+<td>You need a reproducible environment that includes R and system dependencies, and you are willing to learn Nix.</td>
+</tr>
+<tr>
+<td>rv</td>
+<td>You want the packages declared in a config file up front, and the whole dependency graph resolved before anything installs.</td>
+</tr>
+<tr>
+<td>uvr</td>
+<td>You want one tool that pins both the R version and the packages, in one lockfile.</td>
+</tr>
+<tr>
+<td>ir</td>
+<td>A single script or Quarto document should carry its own requirements, with no project directory.</td>
+</tr>
+<tr>
+<td>rig</td>
+<td>You need several R versions installed on one machine. The post notes that rig has since gained project-management features.</td>
+</tr>
+<tr>
+<td>
+<code>boosterpak</code> (maintainers’ assessment)</td>
+<td>You want reusable packs of packages, helper functions, attach choices, and setup conventions, applied to projects on top of <code>renv</code> and <code>pak</code>.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section level2">
+<h2 id="restore-from-a-lockfile">Restore from a lockfile<a class="anchor" aria-label="anchor" href="#restore-from-a-lockfile"></a>
+</h2>
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/sync.html">sync</a></span><span class="op">(</span>mode <span class="op">=</span> <span class="st">"restore"</span><span class="op">)</span></span></code></pre></div>
 <p><code>sync(mode = "apply")</code> treats <code>boosters.toml</code> as reusable setup intent and <code>renv.lock</code> as downstream output. It may hydrate from local libraries before installing the remaining declared packages with <code>pak</code>, then writes <code>boosters/attach.R</code> before snapshot. <code>sync(mode = "restore")</code> is the explicit path for exact lockfile restoration and does not hydrate. For restoring a freshly cloned project on a new machine, see the “Restoring a project on a new machine” vignette: run <code><a href="https://rstudio.github.io/renv/reference/restore.html" class="external-link">renv::restore()</a></code> first (on default settings it installs <code>boosterpak</code> itself from the lockfile), restart R, then <code>boosterpak::sync(mode = "restore")</code>.</p>
 </div>
 <div class="section level2">
-<h2 id="emergency-rescue">Emergency Rescue<a class="anchor" aria-label="anchor" href="#emergency-rescue"></a>
+<h2 id="emergency-rescue">Emergency rescue<a class="anchor" aria-label="anchor" href="#emergency-rescue"></a>
 </h2>
-<p>For an already-initialized boosterpak project with a broken <code>.Rprofile</code>, missing core pack files, or a lockfile that dropped <code>renv</code>, <code>pak</code>, or <code>boosterpak</code>, use the hidden repair helper:</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">:::</span><span class="fu">.rescue</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p>If <code>boosterpak</code> is absent from the project library, bootstrap enough tooling first, then run rescue:</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<p>For an already-initialized boosterpak project with a broken <code>.Rprofile</code>, missing core pack files, or a lockfile that dropped <code>renv</code>, <code>pak</code>, or <code>boosterpak</code>, run the same repair as <a href="#upgrading-an-existing-project">Upgrading an existing project</a>. Preview it first:</p>
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/upgrade_project.html">upgrade_project</a></span><span class="op">(</span>dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/upgrade_project.html">upgrade_project</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p>If <code>boosterpak</code> is absent from the project library, bootstrap enough tooling first, then run the upgrade:</p>
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"renv"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"renv"</span><span class="op">)</span></span>
 <span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/load.html" class="external-link">load</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">renv</span><span class="fu">::</span><span class="fu"><a href="https://rstudio.github.io/renv/reference/install.html" class="external-link">install</a></span><span class="op">(</span><span class="st">"seanthimons/boosterpak"</span><span class="op">)</span></span>
-<span><span class="fu">boosterpak</span><span class="fu">:::</span><span class="fu">.rescue</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p><code>.rescue()</code> repairs existing boosterpak projects only; it expects <code>boosters.toml</code> to already exist. It rewrites the managed startup setup before <code>renv/activate.R</code>, reapplies the Posit Package Manager repository policy (including the <a href="#linux-binary-packages">Linux binary rewrite</a>, and replacing the managed line written by earlier versions), enables the <code>renv</code> pak backend, and avoids source compilation prompts where binary packages are available.</p>
+<span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/upgrade_project.html">upgrade_project</a></span><span class="op">(</span>dry_run <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/upgrade_project.html">upgrade_project</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p><code><a href="reference/upgrade_project.html">upgrade_project()</a></code> repairs existing boosterpak projects only; it expects <code>boosters.toml</code> to already exist. It rewrites the managed startup setup, reapplies the Posit Package Manager repository policy (including the <a href="#linux-binary-packages">Linux binary rewrite</a>, and replacing the managed lines written by earlier versions), enables the <code>renv</code> pak backend, and installs missing workflow packages. Its internal helper, <code>boosterpak:::.rescue()</code>, does the same work; use <code><a href="reference/upgrade_project.html">upgrade_project()</a></code> instead of calling the helper directly.</p>
 </div>
 <div class="section level2">
-<h2 id="troubleshooting-05-init-projects">Troubleshooting 0.5 Init Projects<a class="anchor" aria-label="anchor" href="#troubleshooting-05-init-projects"></a>
+<h2 id="troubleshooting-05-init-projects">Troubleshooting 0.5 init projects<a class="anchor" aria-label="anchor" href="#troubleshooting-05-init-projects"></a>
 </h2>
 <p>If a project was initialized with boosterpak 0.5 and a restart made <code>boosterpak</code> unavailable inside <code>renv</code>, follow the bootstrap recipe under “Troubleshooting: boosterpak absent from the lockfile” in the “Restoring a project on a new machine” vignette (<code>vignettes/restoring-a-project.qmd</code>).</p>
 </div>
 <div class="section level2">
-<h2 id="inspect-status">Inspect Status<a class="anchor" aria-label="anchor" href="#inspect-status"></a>
+<h2 id="inspect-status">Inspect status<a class="anchor" aria-label="anchor" href="#inspect-status"></a>
 </h2>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/status.html">status</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu">boosterpak</span><span class="fu">::</span><span class="fu"><a href="reference/list_packs.html">list_packs</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="reference/status.html">status()</a></code> reports config validity, declared and resolved packs, package counts, missing direct packages, attach package count and file presence, function drift or missing materialized files, pack catalog counts, <code>renv</code> state, lockfile presence, and the <code>.Rprofile</code> hook. It does not use the network. To confirm that Package Manager is serving binaries rather than source, run <code><a href="reference/check_binary_repos.html">boosterpak::check_binary_repos()</a></code>; see <a href="#linux-binary-packages">Linux Binary Packages</a>.</p>
+<p><code><a href="reference/status.html">status()</a></code> reports config validity, declared and resolved packs, package counts, missing direct packages, the attached packages with the pack behind each one (and which of them attach only in interactive sessions), <code>boosters/attach.R</code> presence, function drift or missing materialized files, pack catalog counts, <code>renv</code> state, lockfile presence, and the <code>.Rprofile</code> hook. It also:</p>
+<ul>
+<li>warns when the installed boosterpak is newer than the <code>boosters_version</code> record. A missing record is reported as “no version recorded” without a warning. To act on a warning, run <code>upgrade_project(dry_run = TRUE)</code> first, then <code><a href="reference/upgrade_project.html">upgrade_project()</a></code>.</li>
+<li>prints a Linux hint to run <code>check_binary_repos(lockfile = "renv.lock")</code> when <code>renv.lock</code> exists.</li>
+<li>reports whether a GitHub token is visible, as <code>TRUE</code> or <code>FALSE</code> only, when the project declares GitHub sources. It never prints the token.</li>
+</ul>
+<p>It does not use the network. To confirm that Package Manager is serving binaries rather than source, run <code><a href="reference/check_binary_repos.html">boosterpak::check_binary_repos()</a></code>; see <a href="#linux-binary-packages">Linux binary packages</a>.</p>
 <p>Current development includes function materialization, pack capture/promotion, and broader project status reporting; pruning remains out of scope.</p>
 </div>
 </div>

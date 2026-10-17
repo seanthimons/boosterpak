@@ -29,6 +29,7 @@ name = "scaffold-analysis"
 description = "Create a compact analysis project folder scaffold."
 packages = ["fs", "here"]
 functions = ["scaffold_analysis"]
+attach_mode = "interactive"
 
 [hooks]
 on_add = ["scaffold_analysis"]
@@ -48,6 +49,20 @@ Optional fields:
 - `attach` — startup attachment intent: omit or `true` to attach the
   pack’s `packages`, `false` to install without attaching, or a
   character vector to attach a subset.
+- `attach_mode` — `"always"` (the default) or `"interactive"`. With
+  `"interactive"`, the pack’s attached packages load only when
+  [`interactive()`](https://rdrr.io/r/base/interactive.html) is true.
+  That is `FALSE` in `Rscript`, in Quarto and knitr renders (including
+  RStudio’s Render button), and in targets, crew, and callr workers.
+  Code that calls a function from such a package without a namespace
+  prefix therefore works at the console and fails on render, so use
+  `pkg::fn()` in helpers that must run everywhere. A package that
+  another pack or `[attach].declared` requests without the interactive
+  mode still attaches on every start. The key does not change what is
+  installed. Write it above the first table header (`[sources]`,
+  `[settings]`, `[hooks]`): below a table header it belongs to that
+  table, so boosterpak does not read it as a pack key. Older boosterpak
+  versions ignore the key and attach the packages on every start.
 - `extends` — names of other packs this pack builds on; their packages,
   functions, and hooks resolve transitively.
 - `functions` — helper functions the pack ships. Every listed name must
@@ -166,16 +181,21 @@ The rules mirror `on_add` hooks:
 - **Scaffolded once, never overwritten.** The section is appended only
   when its header is missing. Re-adding the pack,
   [`sync()`](https://seanthimons.github.io/boosterpak/reference/sync.md),
-  and every other boosterpak write leave your edits alone — all writers
-  that touch an existing `boosters.toml` either rewrite a single known
-  line or append, so custom sections survive by construction.
+  and every other boosterpak write leave your edits alone. The one
+  exception is
+  [`remove_pack()`](https://seanthimons.github.io/boosterpak/reference/remove_pack.md),
+  which deletes the section of a pack that leaves the resolved set (see
+  the last rule).
 - **First add only, but regardless of `sync`.** Unlike hooks,
   scaffolding also happens with `add_pack(name, sync = FALSE)`.
 - **Values are loosely typed** — strings, booleans, numbers, or string
   arrays. The consuming function validates what it reads.
 - **[`remove_pack()`](https://seanthimons.github.io/boosterpak/reference/remove_pack.md)
-  keeps the section**, the same way it keeps edited `fn_*.R` files.
-  Delete it by hand if you no longer want it.
+  deletes the section of a pack that leaves the resolved set**, together
+  with its values. A pack that another declared pack still extends stays
+  resolved, so its section is kept. Sections of packs that remain
+  resolved are never touched. The removal message names the sections it
+  deleted. Copy any values you still need before you remove the pack.
 
 ## Where packs live
 
@@ -191,8 +211,16 @@ Packs resolve from three scopes, first match wins:
 
 The usual authoring loop is: get a project working, `save_pack("name")`
 to capture its resolved packages and helper functions as a project pack,
-edit the generated manifest (add `attach`, `[sources]`, or `[hooks]` by
-hand), then `promote_pack("name")` when it is worth reusing elsewhere.
-See the [getting
+edit the generated manifest (add `attach`, `attach_mode`, `[sources]`,
+or `[hooks]` by hand), then `promote_pack("name")` when it is worth
+reusing elsewhere.
+[`save_pack()`](https://seanthimons.github.io/boosterpak/reference/save_pack.md)
+and
+[`create_pack()`](https://seanthimons.github.io/boosterpak/reference/create_pack.md)
+do not write `attach_mode`, so add it by hand;
+[`promote_pack()`](https://seanthimons.github.io/boosterpak/reference/promote_pack.md)
+and
+[`demote_pack()`](https://seanthimons.github.io/boosterpak/reference/demote_pack.md)
+copy the manifest as it is, so the key is kept. See the [getting
 started](https://seanthimons.github.io/boosterpak/articles/getting-started.md)
 vignette for that workflow end-to-end.

@@ -49,8 +49,10 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/building-a-pack.html">Building your own pack</a></li>
+    <li><a class="dropdown-item" href="../articles/choosing-a-setup.html">Choosing a setup: boosterpak and the other R environment managers</a></li>
     <li><a class="dropdown-item" href="../articles/getting-started.html">Getting started with boosterpak</a></li>
     <li><a class="dropdown-item" href="../articles/restoring-a-project.html">Restoring a project on a new machine</a></li>
+    <li><a class="dropdown-item" href="../articles/upgrading-a-project.html">Upgrading an existing project</a></li>
   </ul>
 </li>
       </ul>
@@ -94,9 +96,10 @@
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="dt">description</span> <span class="op">=</span> <span class="st">"Create a compact analysis project folder scaffold."</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="dt">packages</span> <span class="op">=</span> <span class="op">[</span><span class="st">"fs"</span><span class="op">,</span> <span class="st">"here"</span><span class="op">]</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="dt">functions</span> <span class="op">=</span> <span class="op">[</span><span class="st">"scaffold_analysis"</span><span class="op">]</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="kw">[hooks]</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="dt">on_add</span> <span class="op">=</span> <span class="op">[</span><span class="st">"scaffold_analysis"</span><span class="op">]</span></span></code></pre></div>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="dt">attach_mode</span> <span class="op">=</span> <span class="st">"interactive"</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="kw">[hooks]</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="dt">on_add</span> <span class="op">=</span> <span class="op">[</span><span class="st">"scaffold_analysis"</span><span class="op">]</span></span></code></pre></div>
 <p>Required fields:</p>
 <ul>
 <li>
@@ -112,6 +115,8 @@
 <code>[sources]</code> — per-package install specs (e.g. <code>"ggtext" = "wilkelab/ggtext"</code>) for packages that should not install by plain CRAN name.</li>
 <li>
 <code>attach</code> — startup attachment intent: omit or <code>true</code> to attach the pack’s <code>packages</code>, <code>false</code> to install without attaching, or a character vector to attach a subset.</li>
+<li>
+<code>attach_mode</code> — <code>"always"</code> (the default) or <code>"interactive"</code>. With <code>"interactive"</code>, the pack’s attached packages load only when <code><a href="https://rdrr.io/r/base/interactive.html" class="external-link">interactive()</a></code> is true. That is <code>FALSE</code> in <code>Rscript</code>, in Quarto and knitr renders (including RStudio’s Render button), and in targets, crew, and callr workers. Code that calls a function from such a package without a namespace prefix therefore works at the console and fails on render, so use <code>pkg::fn()</code> in helpers that must run everywhere. A package that another pack or <code>[attach].declared</code> requests without the interactive mode still attaches on every start. The key does not change what is installed. Write it above the first table header (<code>[sources]</code>, <code>[settings]</code>, <code>[hooks]</code>): below a table header it belongs to that table, so boosterpak does not read it as a pack key. Older boosterpak versions ignore the key and attach the packages on every start.</li>
 <li>
 <code>extends</code> — names of other packs this pack builds on; their packages, functions, and hooks resolve transitively.</li>
 <li>
@@ -175,13 +180,13 @@
 <p>The rules mirror <code>on_add</code> hooks:</p>
 <ul>
 <li>
-<strong>Scaffolded once, never overwritten.</strong> The section is appended only when its header is missing. Re-adding the pack, <code><a href="../reference/sync.html">sync()</a></code>, and every other boosterpak write leave your edits alone — all writers that touch an existing <code>boosters.toml</code> either rewrite a single known line or append, so custom sections survive by construction.</li>
+<strong>Scaffolded once, never overwritten.</strong> The section is appended only when its header is missing. Re-adding the pack, <code><a href="../reference/sync.html">sync()</a></code>, and every other boosterpak write leave your edits alone. The one exception is <code><a href="../reference/remove_pack.html">remove_pack()</a></code>, which deletes the section of a pack that leaves the resolved set (see the last rule).</li>
 <li>
 <strong>First add only, but regardless of <code>sync</code>.</strong> Unlike hooks, scaffolding also happens with <code>add_pack(name, sync = FALSE)</code>.</li>
 <li>
 <strong>Values are loosely typed</strong> — strings, booleans, numbers, or string arrays. The consuming function validates what it reads.</li>
 <li>
-<strong><code><a href="../reference/remove_pack.html">remove_pack()</a></code> keeps the section</strong>, the same way it keeps edited <code>fn_*.R</code> files. Delete it by hand if you no longer want it.</li>
+<strong><code><a href="../reference/remove_pack.html">remove_pack()</a></code> deletes the section of a pack that leaves the resolved set</strong>, together with its values. A pack that another declared pack still extends stays resolved, so its section is kept. Sections of packs that remain resolved are never touched. The removal message names the sections it deleted. Copy any values you still need before you remove the pack.</li>
 </ul></section><section class="level2"><h2 id="where-packs-live">Where packs live<a class="anchor" aria-label="anchor" href="#where-packs-live"></a>
 </h2>
 <p>Packs resolve from three scopes, first match wins:</p>
@@ -193,7 +198,7 @@
 <li>
 <strong>Built-in</strong> — shipped with the package (<code>core</code>, <code>eda</code>, <code>scaffold-analysis</code>, <code>example</code>, <code>github-example</code>).</li>
 </ol>
-<p>The usual authoring loop is: get a project working, <code>save_pack("name")</code> to capture its resolved packages and helper functions as a project pack, edit the generated manifest (add <code>attach</code>, <code>[sources]</code>, or <code>[hooks]</code> by hand), then <code>promote_pack("name")</code> when it is worth reusing elsewhere. See the <a href="getting-started.html">getting started</a> vignette for that workflow end-to-end.</p>
+<p>The usual authoring loop is: get a project working, <code>save_pack("name")</code> to capture its resolved packages and helper functions as a project pack, edit the generated manifest (add <code>attach</code>, <code>attach_mode</code>, <code>[sources]</code>, or <code>[hooks]</code> by hand), then <code>promote_pack("name")</code> when it is worth reusing elsewhere. <code><a href="../reference/save_pack.html">save_pack()</a></code> and <code><a href="../reference/create_pack.html">create_pack()</a></code> do not write <code>attach_mode</code>, so add it by hand; <code><a href="../reference/promote_pack.html">promote_pack()</a></code> and <code><a href="../reference/demote_pack.html">demote_pack()</a></code> copy the manifest as it is, so the key is kept. See the <a href="getting-started.html">getting started</a> vignette for that workflow end-to-end.</p>
 </section><script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
       var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
