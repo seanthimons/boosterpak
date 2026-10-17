@@ -8,11 +8,15 @@
 #'   counts, selected package-library strategy and path, renv state, lockfile
 #'   presence, and `.Rprofile` hook state.
 #'
-#'   The attach fields are `attach_enabled`, `attach_packages` (the package
-#'   names attached on every R start, including workers), `attach_package_count`,
-#'   and `attach_sources`, a data frame with one row per attached package and
-#'   columns `package` and `pack`. `pack` names the packs that requested the
-#'   package, or `"[attach].declared"` for packages listed in `boosters.toml`.
+#'   The attach fields are `attach_enabled`; `attach_packages`, the names of
+#'   every attached package, and `attach_package_count`, its length; and
+#'   `attach_every_start_count`, the number of those packages attached on every
+#'   R start, including workers. `attach_interactive_packages` names the packages
+#'   attached only in interactive sessions (`attach_mode = "interactive"` packs).
+#'   `attach_sources` is a data frame with one row per attached package and
+#'   columns `package`, `pack`, and `interactive`. `pack` names the packs that
+#'   requested the package, or `"[attach].declared"` for packages listed in
+#'   `boosters.toml`. `interactive` is `TRUE` for interactive-only packages.
 #'
 #'   `upgrade_needed` is `TRUE` when `boosters.toml` exists and its
 #'   `boosters_version` record is missing, unreadable, or older than the
@@ -89,6 +93,7 @@ status <- function(root = ".", verbose = NULL) {
     }
   }
   attach_packages <- attach_sources$package
+  attach_interactive_packages <- attach_sources$package[attach_sources$interactive]
   upgrade_needed <- project_needs_upgrade(root)
   pack_catalog <- available_packs(root)
   missing <- missing_packages(packages, root, library_strategy)
@@ -113,6 +118,8 @@ status <- function(root = ".", verbose = NULL) {
     attach_enabled = attach_enabled,
     attach_packages = attach_packages,
     attach_package_count = length(attach_packages),
+    attach_every_start_count = sum(!attach_sources$interactive),
+    attach_interactive_packages = attach_interactive_packages,
     attach_sources = attach_sources,
     attach_file_exists = file.exists(attach_file(root)),
     upgrade_needed = upgrade_needed,
@@ -190,20 +197,31 @@ status <- function(root = ".", verbose = NULL) {
     )
     if (isTRUE(out$config_valid)) {
       cli::cli_li(
-        "startup attach: {out$attach_enabled}, {out$attach_package_count} package{?s}, file {if (out$attach_file_exists) 'present' else 'missing'}"
+        "startup attach: {out$attach_enabled}, {out$attach_every_start_count} package{?s} on every start, file {if (out$attach_file_exists) 'present' else 'missing'}"
       )
     }
     cli::cli_li(
       "pack catalog: {out$pack_counts[['project']]} project, {out$pack_counts[['user']]} user, {out$pack_counts[['builtin']]} built-in"
     )
     if (isTRUE(out$config_valid) && isTRUE(out$attach_enabled)) {
+      every_start <- out$attach_sources[!out$attach_sources$interactive, , drop = FALSE]
       cli::cli_li(
-        "attached on every R start (including workers): {out$attach_package_count} package{?s}"
+        "attached on every R start (including workers): {out$attach_every_start_count} package{?s}"
       )
-      for (i in seq_len(nrow(out$attach_sources))) {
+      for (i in seq_len(nrow(every_start))) {
         cli::cli_li(
-          "{.pkg {out$attach_sources$package[[i]]}} from {out$attach_sources$pack[[i]]}"
+          "{.pkg {every_start$package[[i]]}} from {every_start$pack[[i]]}"
         )
+      }
+      interactive_count <- length(out$attach_interactive_packages)
+      if (interactive_count > 0) {
+        interactive_rows <- out$attach_sources[out$attach_sources$interactive, , drop = FALSE]
+        cli::cli_li("{interactive_count} more only in interactive sessions")
+        for (i in seq_len(nrow(interactive_rows))) {
+          cli::cli_li(
+            "{.pkg {interactive_rows$package[[i]]}} from {interactive_rows$pack[[i]]}"
+          )
+        }
       }
       if (!isTRUE(out$rprofile_hook)) {
         # rprofile = "no" is a valid choice, so this is information, not a warning.

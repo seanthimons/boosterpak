@@ -84,6 +84,8 @@ test_that("status has no attach sources when attach is disabled", {
   expect_false(s$attach_enabled)
   expect_equal(nrow(s$attach_sources), 0L)
   expect_equal(s$attach_packages, character())
+  expect_equal(s$attach_every_start_count, 0L)
+  expect_equal(s$attach_interactive_packages, character())
   expect_match(status_messages(root), "attached on every R start: disabled")
   expect_false(grepl("attached on every R start \\(including workers\\)", status_messages(root)))
 })
@@ -106,6 +108,61 @@ test_that("status prints the attach line with a singular or plural count", {
   two <- status_messages(root)
   expect_match(two, "attached on every R start \\(including workers\\): 3 packages")
   expect_match(two, "glue from \\[attach\\]\\.declared")
+})
+
+test_that("status separates packages attached on every start from interactive-only ones", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+  writeLines(
+    c(
+      'name = "live"',
+      'description = "Interactive glue."',
+      'packages = ["glue"]',
+      'attach_mode = "interactive"'
+    ),
+    file.path(root, "boosters", "packs", "live.toml")
+  )
+  boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "packs", "declared", c("core", "example", "live"))
+
+  s <- status(root = root, verbose = FALSE)
+  messages <- status_messages(root)
+
+  expect_equal(s$attach_packages, c("cli", "glue"))
+  expect_equal(s$attach_package_count, 2L)
+  expect_equal(s$attach_every_start_count, 1L)
+  expect_equal(s$attach_interactive_packages, "glue")
+  expect_equal(s$attach_sources$interactive, c(FALSE, TRUE))
+  expect_match(messages, "startup attach: TRUE, 1 package on every start", fixed = TRUE)
+  expect_match(messages, "attached on every R start (including workers): 1 package", fixed = TRUE)
+  expect_match(messages, "1 more only in interactive sessions", fixed = TRUE)
+  expect_match(messages, "glue from live", fixed = TRUE)
+  expect_match(messages, "cli from example", fixed = TRUE)
+  # Order matters: every-start packages are listed before the interactive group.
+  expect_lt(
+    regexpr("cli from example", messages, fixed = TRUE)[[1]],
+    regexpr("1 more only in interactive sessions", messages, fixed = TRUE)[[1]]
+  )
+  expect_gt(
+    regexpr("glue from live", messages, fixed = TRUE)[[1]],
+    regexpr("1 more only in interactive sessions", messages, fixed = TRUE)[[1]]
+  )
+})
+
+test_that("status counts zero every-start packages when every attached package is interactive", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("scaffold-analysis", root = root, sync = FALSE, verbose = FALSE)
+
+  s <- status(root = root, verbose = FALSE)
+  messages <- status_messages(root)
+
+  expect_equal(s$attach_every_start_count, 0L)
+  expect_equal(s$attach_interactive_packages, c("fs", "here"))
+  expect_equal(s$attach_package_count, 2L)
+  expect_match(messages, "attached on every R start (including workers): 0 packages", fixed = TRUE)
+  expect_match(messages, "2 more only in interactive sessions", fixed = TRUE)
+  expect_match(messages, "fs from scaffold-analysis", fixed = TRUE)
 })
 
 test_that("status warns and reports upgrade_needed when the record is stale", {

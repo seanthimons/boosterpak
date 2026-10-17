@@ -18,11 +18,15 @@ attach state, materialized function drift/missing counts, pack catalog
 counts, selected package-library strategy and path, renv state, lockfile
 presence, and \code{.Rprofile} hook state.
 
-The attach fields are \code{attach_enabled}, \code{attach_packages} (the package
-names attached on every R start, including workers), \code{attach_package_count},
-and \code{attach_sources}, a data frame with one row per attached package and
-columns \code{package} and \code{pack}. \code{pack} names the packs that requested the
-package, or \code{"[attach].declared"} for packages listed in \code{boosters.toml}.
+The attach fields are \code{attach_enabled}; \code{attach_packages}, the names of
+every attached package, and \code{attach_package_count}, its length; and
+\code{attach_every_start_count}, the number of those packages attached on every
+R start, including workers. \code{attach_interactive_packages} names the packages
+attached only in interactive sessions (\code{attach_mode = "interactive"} packs).
+\code{attach_sources} is a data frame with one row per attached package and
+columns \code{package}, \code{pack}, and \code{interactive}. \code{pack} names the packs that
+requested the package, or \code{"[attach].declared"} for packages listed in
+\code{boosters.toml}. \code{interactive} is \code{TRUE} for interactive-only packages.
 
 \code{upgrade_needed} is \code{TRUE} when \code{boosters.toml} exists and its
 \code{boosters_version} record is missing, unreadable, or older than the

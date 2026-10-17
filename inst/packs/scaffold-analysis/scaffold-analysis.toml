@@ -2,6 +2,7 @@ name = "scaffold-analysis"
 description = "Create a compact analysis project folder scaffold."
 packages = ["fs", "here"]
 functions = ["scaffold_analysis"]
+attach_mode = "interactive"
 
 [hooks]
 on_add = ["scaffold_analysis"]
