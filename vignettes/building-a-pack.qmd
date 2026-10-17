@@ -165,15 +165,18 @@ The rules mirror `on_add` hooks:
 
 - **Scaffolded once, never overwritten.** The section is appended only when
   its header is missing. Re-adding the pack, `sync()`, and every other
-  boosterpak write leave your edits alone — all writers that touch an
-  existing `boosters.toml` either rewrite a single known line or append,
-  so custom sections survive by construction.
+  boosterpak write leave your edits alone. The one exception is
+  `remove_pack()`, which deletes the section of a pack that leaves the resolved
+  set (see the last rule).
 - **First add only, but regardless of `sync`.** Unlike hooks, scaffolding
   also happens with `add_pack(name, sync = FALSE)`.
 - **Values are loosely typed** — strings, booleans, numbers, or string
   arrays. The consuming function validates what it reads.
-- **`remove_pack()` keeps the section**, the same way it keeps edited
-  `fn_*.R` files. Delete it by hand if you no longer want it.
+- **`remove_pack()` deletes the section of a pack that leaves the resolved
+  set**, together with its values. A pack that another declared pack still
+  extends stays resolved, so its section is kept. Sections of packs that remain
+  resolved are never touched. The removal message names the sections it
+  deleted. Copy any values you still need before you remove the pack.
 
 ## Where packs live
 

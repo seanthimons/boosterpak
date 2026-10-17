@@ -126,10 +126,10 @@ boosterpak::sync()
 
 Apply mode is additive. With the default renv-library strategy, it hydrates
 plain-name missing packages from renv-discoverable local libraries, installs
-anything still missing with `pak`, materializes missing bundled or installed
-helper functions, and, when `auto_snapshot = true`, writes
-`boosters/attach.R` and snapshots with `renv`. Use `hydrate = FALSE` to skip
-local reuse for stricter first-run installs.
+anything still missing with `pak`, and materializes missing bundled or installed
+helper functions. It writes `boosters/attach.R` on every run. When
+`auto_snapshot` is `true`, the default, it also snapshots with `renv`. Use
+`hydrate = FALSE` to skip local reuse for stricter first-run installs.
 
 ## Linux binary packages
 
@@ -159,8 +159,11 @@ value already there.
 
 The `.Rprofile` repository lines keep the generic URL, so one `.Rprofile` works
 on Windows, macOS, and Linux. A guarded line after them performs the rewrite on
-glibc Linux only, at startup. Distribution-specific URLs such as
-`.../cran/__linux__/noble/latest` are left alone. Rerun `init()` or `.rescue()`
+glibc Linux only, at startup. A second copy follows the renv activation line,
+because `renv::load()` resets the repositories to the lockfile URLs. It runs only
+while renv's Package Manager handling is on, so the lockfile keeps the generic
+URL. Distribution-specific URLs such as
+`.../cran/__linux__/noble/latest` are left alone. Rerun `init()` or `upgrade_project()`
 to replace the line written by an earlier boosterpak version.
 
 **When it applies.**
@@ -222,10 +225,12 @@ the generic Package Manager URL, so distributions Package Manager does not list
 compile from source again. `options(boosterpak.configure_repositories = FALSE)`
 only stops boosterpak's own repository configuration in the R session; it does
 not affect a line already in `.Rprofile`, and the environment variable wins if
-both are set. Rerunning `.rescue()` while opted out removes the managed
-repository lines from `.Rprofile`, because boosterpak then has no repository
-setup to write back. `init()` does the same on a project whose install-policy
-lines are missing.
+both are set. With repository setup opted out but install-policy setup still on,
+`upgrade_project()` removes the managed repository lines from `.Rprofile`,
+because boosterpak then has no repository setup to write back. The install-policy
+lines are kept. `init()` does the same when the install-policy lines are missing.
+If `BOOSTERPAK_CONFIGURE_INSTALL_POLICY` is off as well, neither command writes or
+removes setup lines.
 
 ## Safely deinitialize a project
 
@@ -349,13 +354,31 @@ packages = ["ggplot2", "patchwork", "ggtext"]
 Here, `ggplot2` and `patchwork` can hydrate or install by package name, while
 `ggtext` skips hydration and uses the GitHub source spec.
 
-Package attachment is a startup layer, not installation intent. Missing
-`attach` means a pack attaches its direct `packages`; use `attach = true` for
-that explicit default, `attach = false` to install without startup attachment,
-or `attach = ["pkg1", "pkg2"]` to attach a subset. The top-level `[attach]`
-table supports `enabled`, `declared`, and `exclude`. Workflow packages from
-`core` and `[extras]`, including `pak`, `renv`, and `boosterpak`, are installed
-but not attached unless explicitly listed in `[attach].declared`.
+Package attachment is a startup layer, not installation intent. By default a
+pack attaches its direct `packages`. The pack's `attach` field and the top-level
+`[attach]` table change that. The section "Startup cost and attach trimming"
+below covers the options and what they cost at every R start.
+
+### Remove a pack
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::remove_pack("example")
+```
+
+`remove_pack()` removes the pack from `[packs].declared` and regenerates
+`boosters/attach.R`, also with `sync = FALSE`, so the removed pack's packages
+stop attaching at startup. It deletes the `[settings.packs.<name>]` section of
+each pack that is no longer resolved, together with its values. Sections of
+packs that are still resolved, including packs that another declared pack
+extends, are kept. Helper files are kept too, unless you pass
+`remove_functions = TRUE`. That option deletes only files that still match the
+pack's copy, so edited helper files survive.
+
+The packages stay in `renv.lock` and in the project library. The removal
+message lists any that remain. To drop them, run `renv::snapshot()` to update
+the lockfile and `renv::remove()` to uninstall them.
 
 ## Add a Helper Function
 
@@ -369,6 +392,68 @@ Helper functions are materialized as `boosters/fn_*.R` files and tracked in
 `[functions].installed`. They are ordinary project files, so you can edit them
 after materialization. `sync()` restores missing installed helper files, but it
 does not overwrite local edits.
+
+## Startup cost and attach trimming
+
+Every R session that starts in the project runs `.Rprofile`. The managed
+startup hook then sources `boosters/attach.R` and each `boosters/fn_*.R` file.
+Worker processes that R starts from the project directory run it too, unless
+they start with `--vanilla` or `--no-init-file`. Each attached package therefore
+loads on every one of those starts. If startup is slow, trim attachment first.
+Trimming does not change what is installed.
+
+`boosters/attach.R` attaches each package on its own. A package that is not
+installed does not stop the others. boosterpak counts the missing packages and
+prints one message that names them and points to `renv::restore()`. The helper
+files still load, because the hook wraps `attach.R` and each `fn_*.R` file in
+its own `try()`.
+
+These settings control what attaches:
+
+- `[attach] enabled = false` attaches nothing. The managed `boosters/attach.R`
+  is removed. Packages stay installed, and helper files still load.
+- `[attach] exclude = [...]` keeps the listed packages installed but never
+  attached. It overrides every other attach rule. Packages listed in
+  `[exclude] declared` are also left out of `attach.R`.
+- `attach = false` in a pack installs that pack's packages without attaching
+  them. `attach = ["pkg1", "pkg2"]` attaches only the listed packages. These
+  values apply to the pack's own packages. Packages attached by a pack that the
+  pack extends still attach.
+- `[attach] declared = [...]` attaches the listed packages. The workflow packages
+  `pak`, `renv`, and `boosterpak`, and any package listed in `[extras].declared`,
+  do not attach unless they are listed here.
+
+A package attaches when a declared pack or `[attach].declared` lists it, and
+neither `[attach].exclude` nor `[exclude].declared` removes it. After you edit
+`[attach]` or a pack's `attach` field, run `boosterpak::sync()` or
+`boosterpak::write_attach()` to regenerate `boosters/attach.R`. Edit
+`boosters.toml`, not the generated file.
+
+For a targets pipeline, list the packages the targets use in
+`tar_option_set(packages = ...)`. Each worker then loads those packages for its
+targets, whatever `attach.R` contains, so the pipeline keeps working when attach
+trimming removes a package. `attach.R` still runs on every worker, so trim attach
+as well when startup time matters.
+
+`status()` shows what is attached and where it comes from. See
+[Inspect status](#inspect-status) below.
+
+## Project version record
+
+`[project].boosters_version` in `boosters.toml` records the boosterpak version
+the project was last migrated with. It is a record, not a lock:
+
+- `init()` writes it once its `.Rprofile` step has run. With `rprofile = "no"`,
+  or when the prompt is declined, the record is not written.
+- `upgrade_project()` writes it after a real run that reports no warnings.
+- `sync()` does not change it.
+
+`status()` warns when the record is older than the installed boosterpak. A missing
+record is reported as "no version recorded" without a warning, and
+`upgrade_needed` is still `TRUE`. The warning says to run `boosterpak::upgrade_project(dry_run = TRUE)`
+first, then `boosterpak::upgrade_project()`. Review the result with `git diff`
+before you commit it. The upgrade itself is covered in
+`vignette("upgrading-a-project", package = "boosterpak")`.
 
 ## Capture and Reuse
 
@@ -397,7 +482,9 @@ function-bearing packs as whole directories.
   project-shaped for a package and too reusable for copy-paste.
 
 That boundary is the point. `boosterpak` uses TOML for its own pack and project
-config, but it is not trying to be a general project requirements format.
+config, but it is not trying to be a general project requirements format. For
+how `boosterpak` compares with `rix`, `rv`, `uvr`, and `ir`, see
+[Choosing a setup](choosing-a-setup.html).
 
 ## Restore Exact Versions
 
@@ -421,7 +508,7 @@ If a project was initialized with boosterpak 0.5 and, after restart,
 "Troubleshooting: boosterpak absent from the lockfile" in
 `vignette("restoring-a-project", package = "boosterpak")`.
 
-## Inspect
+## Inspect status
 
 ```{r}
 #| echo: true
@@ -434,6 +521,15 @@ boosterpak::list_packs()
 packages resolve, whether project-local `renv` appears active, whether
 `renv.lock` exists, whether `boosters/attach.R` exists, and whether `.Rprofile`
 contains the startup hook.
+
+For startup attachment, `status()` prints each attached package with the pack
+that requested it, or `[attach].declared` for packages listed there, followed by
+`attached on every R start (including workers): N packages`. When the installed
+boosterpak is newer than the `boosters_version` record, it warns and names the
+upgrade commands. When `renv.lock` exists on Linux, it suggests
+`check_binary_repos(lockfile = "renv.lock")`. When the project declares GitHub
+sources, it reports whether a GitHub token is visible, as `TRUE` or `FALSE`. It
+never prints the token.
 
 `status()` does not use the network. To confirm that Package Manager serves
 binaries rather than source, run `boosterpak::check_binary_repos()`; see "Linux

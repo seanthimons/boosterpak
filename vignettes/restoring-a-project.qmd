@@ -58,12 +58,13 @@ of `renv.lock`. Then start R in the cloned project directory. The committed
 `.Rprofile` sources `renv/activate.R`, which bootstraps renv into an empty
 project library automatically.
 
-The first startup may print errors from the boosterpak hook: `.Rprofile`
-sources `boosters/attach.R`, whose `library()` calls refer to packages that are
-not installed yet. These errors disappear after restore and are harmless to the
-restore itself — but an error in `.Rprofile` stops the rest of the file from
-running, so any custom settings placed after the boosterpak hook will not apply
-until the packages are restored.
+The first startup may print a message from the boosterpak hook. `.Rprofile`
+sources `boosters/attach.R`, which attaches each package it lists. Packages that
+are not installed yet are counted in one message, such as `boosterpak: 3 attach
+packages not available or failed to load (a, b, c). Run renv::restore() if they
+are not installed.` The message goes away after restore. It does not block the
+restore. The hook runs inside `try()`, so an error in it does not stop the rest
+of `.Rprofile`, and the helper files still load.
 
 ## 2. Restore the library from the lockfile
 
@@ -109,9 +110,151 @@ boosterpak::check_functions()
 ```
 
 `status()` reports config validity, resolved packs and packages, missing direct
-packages, attach state, function drift, renv state, lockfile presence, and the
-`.Rprofile` hook. `check_functions()` compares materialized helper files
-against their pack sources.
+packages, the attached packages with the pack behind each one, function drift,
+renv state, lockfile presence, and the `.Rprofile` hook. It also warns when the
+`boosters_version` record is behind the installed boosterpak. `check_functions()`
+compares materialized helper files against their pack sources.
+
+## Pinned versions vs snapshots
+
+A restore installs the versions recorded in `renv.lock`, not the newest
+versions. On Linux, Package Manager serves a binary only for a version that is
+in the snapshot the repository URL points at. A pin that is older or newer than
+the version in that snapshot can still compile from source, even when
+`check_binary_repos()` reports that binaries are served.
+
+Compare the lockfile with the repositories it records:
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::check_binary_repos(lockfile = "renv.lock")
+```
+
+This downloads each repository's package index once and compares every pin
+with it. It installs nothing. It needs network access and only runs on Linux;
+on other platforms it returns an empty result. Pins from repositories that are
+not Package Manager repositories are not compared. When some pins are not
+available as binary, the warning gives the counts and lists the worst
+offenders first, compiled packages first. It ends with three options: relax
+the pins, point the lockfile repository at a dated snapshot, or accept
+compiling.
+
+To check dated snapshots before you change anything, name the dates:
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::check_binary_repos(lockfile = "renv.lock", snapshot_dates = "2026-10-14")
+```
+
+Only the dates you name are requested. In an interactive session, or with
+`verbose = TRUE`, the output reports, for each date, how many pins are available
+as binary. The same counts are always in the `snapshots` element of the
+`"lockfile"` attribute of the result.
+
+The three options trade off differently:
+
+- **Relax the pins.** Run `renv::update()` for the packages that compile, then
+  snapshot. The lockfile then records versions the project has not been tested
+  with, so run your checks and commit the new lockfile as a deliberate change.
+- **Use a dated snapshot.** A snapshot serves the versions that were current on
+  its date, so it matches a pin only when that version was current then. The
+  repository URL in `renv.lock` changes for every package, not only the ones
+  that compile. Check the dates with `snapshot_dates` first. The steps change
+  both repository lines in `.Rprofile`; they are in the README under "Pinned
+  versions and snapshots".
+- **Accept compiling.** Packages install from source. That needs a compiler
+  toolchain (Rtools on Windows, the Xcode command line tools on macOS, or a C,
+  C++, and Fortran compiler on Linux) and takes longer. On Windows and macOS,
+  boosterpak's install-policy lines in `.Rprofile` set
+  `install.packages.compile.from.source` to `"never"`. The lines are written on
+  every platform, but R reads that option only for `install.packages()` with
+  `type = "both"`, on platforms that install binary packages. On Windows and
+  macOS that means `"never"` stops `install.packages()` from compiling a source
+  package when no binary is available. On Linux the option has no effect.
+  Changing it means editing those lines by hand. boosterpak may rewrite them on a
+  later `init()` or `upgrade_project()`, so check `.Rprofile` after you run either
+  one.
+
+## GitHub rate limits
+
+Some packages install from GitHub: boosterpak itself, when it is missing from the
+project library and was installed from GitHub, and packs with a GitHub entry in
+`[sources]`. GitHub limits anonymous
+API requests. When `init()` or `sync()` installs with `pak` and GitHub answers
+with a rate limit, boosterpak stops with the install error followed by a hint
+that begins `GitHub rate limit reached.` and explains how to supply a token.
+`upgrade_project()` does not stop. It reports a
+`WARNING: workflow package install skipped` line with the hint appended, and it
+writes no `renv.lock`. A bare HTTP 403 or 429 from GitHub gets the same hint,
+with a first line that says GitHub may have rate-limited or refused the request. `renv::restore()` and `sync(mode = "restore")` do not add
+that hint. A rate limit there shows only renv's error, so set the token before
+you restore.
+
+There are three ways to supply a token. Set one before the install, and pick
+one:
+
+1. For one command, from a shell where the GitHub CLI is logged in:
+
+   ```sh
+   GITHUB_PAT=$(gh auth token) Rscript -e 'renv::restore()'
+   ```
+
+2. In your user-level `~/.Renviron`, outside any project. `GITHUB_TOKEN` also
+   works. Restart R after you edit the file.
+
+   ```text
+   GITHUB_PAT=<your token>
+   ```
+
+3. In the git credential store, with the `gitcreds` package installed:
+
+   ```{r}
+   #| echo: true
+   #| eval: false
+   gitcreds::gitcreds_set()
+   ```
+
+Never commit a token. Keep it out of `boosters.toml`, `.Rprofile`,
+`renv.lock`, and every other file in the project, and do not paste it into an
+issue or a chat. boosterpak reports only whether `GITHUB_PAT` or `GITHUB_TOKEN`
+is set. It never prints the value.
+
+## Linux notes
+
+### The "loaded before renv activated" warning
+
+Some Linux distributions load R packages from a system-wide R profile, before
+the project's `.Rprofile` activates renv. renv then prints this on every R start
+in the project:
+
+```text
+The following package(s) were loaded before renv activated this project:
+- CoprManager [/usr/share/R/library/CoprManager]
+```
+
+On Fedora, for example, a system site profile loads `CoprManager`. The warning
+comes from renv's check, not from boosterpak. For a package that the system
+profile loads, it is harmless, and you cannot change that load from inside the
+project.
+
+If the listed package is one you load yourself, for example in the project
+`.Rprofile` before renv activates, move that load after the activation line.
+That is a real problem, and the warning is pointing at it.
+
+To hide the warning in your own R sessions, set the variable in `~/.Renviron`,
+not in the project:
+
+```text
+RENV_CONFIG_NAMESPACES_CHECK=FALSE
+```
+
+Restart R after you edit the file. A setting in `~/.Renviron` stays out of git,
+so it is not committed, and it does not apply to other people who clone the
+project. boosterpak does not set this variable in the managed `.Rprofile`
+block. The warning is useful when a package is loaded by mistake, so it stays
+on by default.
 
 ## What does not re-run in a clone
 
@@ -146,3 +289,10 @@ the lockfile to contain only the listed packages and their dependencies,
 dropping every other project package.
 
 Then restart R and run `boosterpak::sync(mode = "restore")`.
+
+If the project was last migrated with an older boosterpak, upgrade it after the
+restore, not before. boosterpak is not installed on the machine until
+`renv::restore()` completes, so `upgrade_project()` cannot run earlier. Restart R,
+run `boosterpak::upgrade_project(dry_run = TRUE)`, then
+`boosterpak::upgrade_project()`. See
+`vignette("upgrading-a-project", package = "boosterpak")`.
