@@ -496,13 +496,16 @@ test_that("lockfile preview shows the generic Package Manager CRAN URL for manyl
   expect_false(any(grepl("manylinux", preview$lines, fixed = TRUE)))
 })
 
-test_that("call_renv_snapshot passes the generic repository URL to renv", {
+test_that("call_renv_snapshot keeps the session repos while renv strips the platform segment", {
   root <- withr::local_tempdir()
-  withr::local_options(list(
-    repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest")
-  ))
+  manylinux <- c(CRAN = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest")
+  withr::local_options(list(repos = manylinux))
   captured <- NULL
 
+  local_mocked_bindings(
+    renv_ppm_handling_enabled = function() TRUE,
+    .package = "boosterpak"
+  )
   local_mocked_bindings(
     snapshot = function(...) {
       captured <<- list(...)
@@ -513,14 +516,64 @@ test_that("call_renv_snapshot passes the generic repository URL to renv", {
 
   call_renv_snapshot(root, packages = c("renv", "pak"), update = TRUE)
 
+  # Passing the generic URL here makes renv record the manylinux URL as each
+  # package's repository, so the session value must go through unchanged.
+  expect_equal(captured$repos, manylinux)
+  expect_equal(captured$packages, c("renv", "pak"))
+  expect_true(captured$update)
+  expect_identical(getOption("repos"), manylinux)
+})
+
+test_that("call_renv_snapshot passes the generic URL when renv Package Manager handling is off", {
+  root <- withr::local_tempdir()
+  withr::local_options(list(
+    repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest")
+  ))
+  captured <- NULL
+
+  local_mocked_bindings(
+    renv_ppm_handling_enabled = function() FALSE,
+    .package = "boosterpak"
+  )
+  local_mocked_bindings(
+    snapshot = function(...) {
+      captured <<- list(...)
+      invisible(NULL)
+    },
+    .package = "renv"
+  )
+
+  call_renv_snapshot(root)
+
   expect_equal(
     captured$repos,
     c(CRAN = "https://packagemanager.posit.co/cran/latest")
   )
-  expect_equal(captured$packages, c("renv", "pak"))
-  expect_true(captured$update)
   expect_identical(
     getOption("repos"),
     c(CRAN = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest")
   )
+})
+
+test_that("renv_ppm_handling_enabled reads renv's own setting and fails closed", {
+  skip_if_not_installed("renv")
+  withr::local_options(list(renv.config.ppm.enabled = FALSE))
+  withr::local_envvar(RENV_PPM_ENABLED = NA, RENV_CONFIG_PPM_ENABLED = NA)
+
+  expect_false(renv_ppm_handling_enabled())
+
+  # With the setting on, only the mocked lookup decides the result: a lookup
+  # that works gives TRUE, one that fails gives FALSE.
+  withr::local_options(list(renv.config.ppm.enabled = TRUE))
+  local_mocked_bindings(
+    getFromNamespace = function(...) function() TRUE,
+    .package = "utils"
+  )
+  expect_true(renv_ppm_handling_enabled())
+
+  local_mocked_bindings(
+    getFromNamespace = function(...) stop("renv changed its internals"),
+    .package = "utils"
+  )
+  expect_false(renv_ppm_handling_enabled())
 })
