@@ -476,7 +476,7 @@ stale_boosters_version <- function(root, version = "0.6.0.9000") {
   writeLines(lines, path)
 }
 
-recorded_boosters_version <- function(root) {
+recorded_version_line <- function(root) {
   lines <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
   lines[grep("^boosters_version = ", lines)]
 }
@@ -493,7 +493,7 @@ test_that("upgrade records the installed boosterpak version after a clean run", 
 
   report <- upgrade_project(root, verbose = FALSE)
 
-  expect_equal(recorded_boosters_version(root), 'boosters_version = "99.0.0"')
+  expect_equal(recorded_version_line(root), 'boosters_version = "99.0.0"')
   expect_false(boosterpak:::project_needs_upgrade(root))
   expect_true(any(grepl("boosters.toml$", report$paths)))
   expect_true(any(grepl("recorded the installed boosterpak version", report$actions, fixed = TRUE)))
@@ -514,7 +514,7 @@ test_that("upgrade dry run leaves boosters_version untouched and lists boosters.
   report <- upgrade_project(root, dry_run = TRUE, verbose = FALSE)
 
   expect_equal(readLines(path, warn = FALSE), before)
-  expect_equal(recorded_boosters_version(root), 'boosters_version = "0.6.0.9000"')
+  expect_equal(recorded_version_line(root), 'boosters_version = "0.6.0.9000"')
   expect_true(any(grepl("boosters.toml$", report$paths)))
   expect_true(any(grepl("would record the installed boosterpak version", report$actions, fixed = TRUE)))
 })
@@ -536,7 +536,7 @@ test_that("upgrade does not record the version when it finishes with warnings", 
 
   expect_true(length(report$warnings) > 0)
   expect_true(any(grepl("boosters_version not recorded", report$skipped, fixed = TRUE)))
-  expect_equal(recorded_boosters_version(root), 'boosters_version = "0.6.0.9000"')
+  expect_equal(recorded_version_line(root), 'boosters_version = "0.6.0.9000"')
 })
 
 test_that("upgrade does not record the version when the upgrade is aborted", {
@@ -550,7 +550,7 @@ test_that("upgrade does not record the version when the upgrade is aborted", {
   )
 
   expect_error(upgrade_project(root, verbose = FALSE), "simulated abort")
-  expect_equal(recorded_boosters_version(root), 'boosters_version = "0.6.0.9000"')
+  expect_equal(recorded_version_line(root), 'boosters_version = "0.6.0.9000"')
 })
 
 test_that("rescue does not record boosters_version when workflow repair skips for renv", {
@@ -573,7 +573,7 @@ test_that("rescue does not record boosters_version when workflow repair skips fo
 
   expect_true(any(grepl("renv is unavailable", report$warnings)))
   expect_true(any(grepl("boosters_version not recorded", report$skipped, fixed = TRUE)))
-  expect_equal(recorded_boosters_version(root), 'boosters_version = "0.6.0.9000"')
+  expect_equal(recorded_version_line(root), 'boosters_version = "0.6.0.9000"')
 })
 
 test_that("upgrade reports renv/activate.R changes made while loading renv", {

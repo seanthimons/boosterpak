@@ -198,7 +198,12 @@ attach_file_lines <- function(packages) {
   }
 
   calls <- sprintf(
-    '  if (requireNamespace("%s", quietly = TRUE)) library(%s) else .missing <- c(.missing, "%s")',
+    paste0(
+      '  if (requireNamespace("%s", quietly = TRUE)) ',
+      'tryCatch(library(%s), error = function(err) .missing <<- c(.missing, "%s")) ',
+      'else .missing <- c(.missing, "%s")'
+    ),
+    packages,
     packages,
     packages,
     packages

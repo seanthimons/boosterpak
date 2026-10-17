@@ -346,3 +346,55 @@ test_that("remove_pack does not warn about lockfile packages that were never loc
   )
   expect_false(any(grepl("renv", messages, fixed = TRUE)))
 })
+
+test_that("remove_pack does not mistake a nested array line for a table header", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_removal_pack(root, "fake-attach")
+  add_pack("fake-attach", root = root, sync = FALSE, verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  writeLines(c(
+    readLines(path, warn = FALSE),
+    "[settings.packs.fake-attach.late]",
+    "points = [",
+    "  [1, 2]",
+    "]",
+    "more = 1"
+  ), path)
+
+  suppressWarnings(remove_pack("fake-attach", root = root, sync = FALSE, verbose = FALSE))
+
+  lines <- readLines(path, warn = FALSE)
+  expect_false(any(grepl("settings.packs.fake-attach", lines, fixed = TRUE)))
+  expect_false("more = 1" %in% lines)
+  expect_false(any(grepl("[1, 2]", lines, fixed = TRUE)))
+})
+
+test_that("remove_pack keeps tables with quoted or numeric keys that follow its section", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_removal_pack(root, "fake-attach")
+  add_pack("fake-attach", root = root, sync = FALSE, verbose = FALSE)
+  path <- file.path(root, "boosters.toml")
+  writeLines(c(
+    readLines(path, warn = FALSE),
+    "[settings.packs.fake-attach.late]",
+    "level = 3",
+    "",
+    '[tool."github.com/x"]',
+    "keep_quoted = 1",
+    "",
+    "[2024]",
+    "keep_numeric = 1"
+  ), path)
+
+  suppressWarnings(remove_pack("fake-attach", root = root, sync = FALSE, verbose = FALSE))
+
+  lines <- readLines(path, warn = FALSE)
+  expect_false("level = 3" %in% lines)
+  expect_true('[tool."github.com/x"]' %in% lines)
+  expect_true("keep_quoted = 1" %in% lines)
+  expect_true("[2024]" %in% lines)
+  expect_true("keep_numeric = 1" %in% lines)
+})
+

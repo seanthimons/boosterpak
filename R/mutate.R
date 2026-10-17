@@ -166,7 +166,15 @@ remove_pack_settings_sections <- function(path, pack_names) {
       startsWith(headers, child_prefixes[[2]])
     # Owned tables are matched wherever they appear, so a child table that
     # follows an unrelated table is removed along with the parent.
-    table_lines <- which(startsWith(headers, "["))
+    # Only lines shaped like a TOML table header count, so a line inside a
+    # multi-line array such as `[1, 2]` is not mistaken for one.
+    key <- "([A-Za-z0-9_-]+|\"[^\"]*\"|'[^']*')"
+    header_pattern <- sprintf(
+      "^\\[\\[?\\s*%s(\\s*\\.\\s*%s)*\\s*\\]\\]?$",
+      key,
+      key
+    )
+    table_lines <- which(grepl(header_pattern, headers))
     drop <- rep(FALSE, length(lines))
     for (k in seq_along(table_lines)) {
       first <- table_lines[[k]]
