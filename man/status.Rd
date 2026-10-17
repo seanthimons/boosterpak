@@ -17,6 +17,28 @@ validity, declared and resolved packs, package and missing-package counts,
 attach state, materialized function drift/missing counts, pack catalog
 counts, selected package-library strategy and path, renv state, lockfile
 presence, and \code{.Rprofile} hook state.
+
+The attach fields are \code{attach_enabled}, \code{attach_packages} (the package
+names attached on every R start, including workers), \code{attach_package_count},
+and \code{attach_sources}, a data frame with one row per attached package and
+columns \code{package} and \code{pack}. \code{pack} names the packs that requested the
+package, or \code{"[attach].declared"} for packages listed in \code{boosters.toml}.
+
+\code{upgrade_needed} is \code{TRUE} when \code{boosters.toml} exists and its
+\code{boosters_version} record is missing, unreadable, or older than the
+installed boosterpak. Only an older or unreadable record, or an earlier
+\code{.Rprofile} layout, prints a warning. A missing record is reported as
+"no version recorded" and prints no warning, because a project created
+with \code{init(rprofile = "no")} has none. A \code{.Rprofile} with no boosterpak
+hook is informational, not a warning. Run \code{upgrade_project(dry_run = TRUE)}
+before \code{upgrade_project()} when a warning asks for it.
+
+\code{github_token_visible} is \code{NA} unless the project declares GitHub sources
+(\code{owner/repo} specifications from \verb{[extras].declared} or from pack
+\code{sources}). Then it is \code{TRUE} when a token is visible through the
+\code{GITHUB_PAT} or \code{GITHUB_TOKEN} environment variables or, when the gitcreds
+package is installed, through its credential store. The token value is
+never returned or printed.
 }
 \description{
 Report boosterpak project status
