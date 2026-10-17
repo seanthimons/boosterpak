@@ -239,8 +239,9 @@ test_that("init inserts Rprofile hook after renv activation", {
   hook_line <- match(boosterpak:::rprofile_startup_begin_marker(), lines)
   repo_line <- match(boosterpak:::rprofile_repository_marker(), lines)
   expect_true(repo_line < renv_line)
-  # Two post-activation Linux binary lines sit between activation and the hook.
-  expect_equal(hook_line, renv_line + 3L)
+  # Post-activation lines (marker, CRAN default mirror line, Linux binary line)
+  # sit between activation and the hook.
+  expect_equal(hook_line, renv_line + 4L)
 })
 
 test_that("init upgrades historical Rprofile hooks to one managed block", {

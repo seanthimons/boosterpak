@@ -146,9 +146,15 @@ test_that("init persists PPM repository setup before renv activation", {
   expect_equal(lines[[renv_line + 1L]], boosterpak:::rprofile_repository_reapply_marker())
   expect_equal(
     lines[[renv_line + 2L]],
+    boosterpak:::rprofile_cran_default_line(
+      "https://packagemanager.posit.co/cran/latest"
+    )
+  )
+  expect_equal(
+    lines[[renv_line + 3L]],
     boosterpak:::rprofile_ppm_linux_binary_line(renv_ppm = TRUE)
   )
-  expect_equal(hook_line, renv_line + 3L)
+  expect_equal(hook_line, renv_line + 4L)
 })
 
 test_that("init configures package install policy before renv activation", {
@@ -726,9 +732,15 @@ test_that("init adds post-activation lines ahead of an existing managed hook", {
   expect_equal(lines[[renv_line + 1L]], boosterpak:::rprofile_repository_reapply_marker())
   expect_equal(
     lines[[renv_line + 2L]],
+    boosterpak:::rprofile_cran_default_line(
+      "https://packagemanager.posit.co/cran/latest"
+    )
+  )
+  expect_equal(
+    lines[[renv_line + 3L]],
     boosterpak:::rprofile_ppm_linux_binary_line(renv_ppm = TRUE)
   )
-  expect_equal(lines[[renv_line + 3L]], boosterpak:::rprofile_startup_begin_marker())
+  expect_equal(lines[[renv_line + 4L]], boosterpak:::rprofile_startup_begin_marker())
   expect_equal(sum(lines == boosterpak:::rprofile_startup_begin_marker()), 1L)
   expect_false(v092_ppm_linux_line() %in% lines)
   expect_true("before <- TRUE" %in% lines)
@@ -841,16 +853,21 @@ test_that("post-activation Linux lines are only planned for Package Manager repo
 
   expect_length(boosterpak:::boosterpak_repository_lines_for_session(), 0L)
 
-  options(repos = c(CRAN = "https://packagemanager.posit.co/cran/latest"))
+  ppm <- "https://packagemanager.posit.co/cran/latest"
+  options(repos = c(CRAN = ppm))
   lines <- boosterpak:::boosterpak_repository_lines_for_session()
   expect_equal(
-    tail(lines, 2L),
-    boosterpak:::rprofile_repository_reapply_lines(include_renv = FALSE)
+    tail(lines, 3L),
+    boosterpak:::rprofile_repository_reapply_lines(
+      include_renv = FALSE,
+      cran_url = ppm
+    )
   )
   # Only re-applied when renv's own Package Manager handling is on, so the
   # manylinux URL cannot reach renv.lock.
   expect_match(tail(lines, 1L), "renv:::renv_ppm_enabled()", fixed = TRUE)
-  expect_false(any(grepl("renv:::renv_ppm_enabled()", lines[seq_len(length(lines) - 2L)], fixed = TRUE)))
+  expect_match(tail(lines, 2L)[[1]], "renv:::renv_ppm_enabled()", fixed = TRUE)
+  expect_false(any(grepl("renv:::renv_ppm_enabled()", lines[seq_len(length(lines) - 3L)], fixed = TRUE)))
 })
 
 test_that("the post-activation Linux line is skipped when renv PPM handling is off", {
@@ -911,6 +928,448 @@ test_that("the post-activation guard never loads renv from the library", {
   expect_true("renv loaded: FALSE" %in% out)
   # renv is not loaded, so the guard is FALSE and the URL is left generic.
   expect_true("repos: https://packagemanager.posit.co/cran/latest" %in% out)
+})
+
+test_that("the post-activation CRAN line restores the session's Package Manager URL", {
+  expect_equal(
+    boosterpak:::ppm_cran_replacement(c(CRAN = "https://packagemanager.posit.co/cran/2026-01-02")),
+    "https://packagemanager.posit.co/cran/2026-01-02"
+  )
+  expect_equal(
+    boosterpak:::ppm_cran_replacement(c(
+      CRAN = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest"
+    )),
+    "https://packagemanager.posit.co/cran/latest"
+  )
+  expect_null(boosterpak:::ppm_cran_replacement(c(CRAN = "https://example.test/cran")))
+  expect_null(boosterpak:::ppm_cran_replacement(c(Internal = "https://packagemanager.posit.co/cran/latest")))
+  expect_null(boosterpak:::ppm_cran_replacement("https://packagemanager.posit.co/cran/latest"))
+})
+
+test_that("the CRAN default mirror line restores Package Manager on any OS", {
+  skip_if_not_installed("renv")
+  loadNamespace("renv")
+  local_ppm_hosts()
+  ppm <- "https://packagemanager.posit.co/cran/latest"
+  line <- boosterpak:::rprofile_cran_default_line(ppm)
+  withr::local_options(list(
+    repos = getOption("repos"),
+    renv.config.repos.override = NULL,
+    renv.config.ppm.enabled = TRUE
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_CONFIGURE_REPOSITORIES = NA,
+    RENV_PPM_ENABLED = NA,
+    RENV_RSPM_ENABLED = NA,
+    RENV_CONFIG_PPM_ENABLED = NA
+  )
+
+  for (mirror in c(
+    "https://cran.rstudio.com",
+    "https://cran.rstudio.com/",
+    "HTTPS://CRAN.RSTUDIO.COM/",
+    "https://cloud.r-project.org/",
+    "https://cran.r-project.org",
+    "@CRAN@"
+  )) {
+    options(repos = c(CRAN = mirror, Internal = "https://example.test/repo"))
+    eval(parse(text = line), baseenv())
+    expect_equal(
+      getOption("repos"),
+      c(CRAN = ppm, Internal = "https://example.test/repo"),
+      info = mirror
+    )
+  }
+
+  options(
+    repos = c(CRAN = "https://cran.rstudio.com"),
+    renv.config.repos.override = c(CRAN = "https://cran.rstudio.com")
+  )
+  eval(parse(text = line), baseenv())
+  expect_equal(getOption("renv.config.repos.override"), c(CRAN = ppm))
+
+  # Without the renv override line, the override is not touched.
+  options(
+    repos = c(CRAN = "https://cran.rstudio.com"),
+    renv.config.repos.override = c(CRAN = "https://cran.rstudio.com")
+  )
+  eval(
+    parse(text = boosterpak:::rprofile_cran_default_line(ppm, include_renv = FALSE)),
+    baseenv()
+  )
+  expect_equal(getOption("renv.config.repos.override"), c(CRAN = "https://cran.rstudio.com"))
+  expect_equal(getOption("repos"), c(CRAN = ppm))
+})
+
+test_that("the CRAN default mirror line leaves custom and non-CRAN repositories alone", {
+  skip_if_not_installed("renv")
+  loadNamespace("renv")
+  local_ppm_hosts()
+  ppm <- "https://packagemanager.posit.co/cran/latest"
+  line <- boosterpak:::rprofile_cran_default_line(ppm)
+  withr::local_options(list(
+    repos = getOption("repos"),
+    renv.config.repos.override = NULL,
+    renv.config.ppm.enabled = TRUE
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_CONFIGURE_REPOSITORIES = NA,
+    RENV_PPM_ENABLED = NA,
+    RENV_RSPM_ENABLED = NA,
+    RENV_CONFIG_PPM_ENABLED = NA
+  )
+
+  for (mirror in c(
+    "https://mirror.example.test/cran/",
+    "https://cran.example.test",
+    "http://cran.rstudio.com",
+    "https://packagemanager.posit.co/cran/2026-01-02"
+  )) {
+    repos <- c(CRAN = mirror, Internal = "https://cran.rstudio.com")
+    options(repos = repos)
+    eval(parse(text = line), baseenv())
+    expect_equal(getOption("repos"), repos, info = mirror)
+  }
+
+  # A session without a CRAN name, or with unnamed repos, must not error.
+  options(repos = c(Internal = "https://example.test/repo"))
+  expect_no_error(eval(parse(text = line), baseenv()))
+  expect_equal(getOption("repos"), c(Internal = "https://example.test/repo"))
+  options(repos = "https://cran.rstudio.com")
+  expect_no_error(eval(parse(text = line), baseenv()))
+  expect_equal(getOption("repos"), "https://cran.rstudio.com")
+})
+
+test_that("the CRAN default mirror line matches is_default_cran_mirror()", {
+  skip_if_not_installed("renv")
+  loadNamespace("renv")
+  ppm <- "https://packagemanager.posit.co/cran/latest"
+  line <- boosterpak:::rprofile_cran_default_line(ppm)
+  withr::local_options(list(
+    repos = getOption("repos"),
+    renv.config.repos.override = NULL,
+    boosterpak.default_cran_mirrors = character(),
+    renv.config.ppm.enabled = TRUE
+  ))
+  withr::local_envvar(
+    BOOSTERPAK_DEFAULT_CRAN_MIRRORS = NA,
+    BOOSTERPAK_CONFIGURE_REPOSITORIES = NA,
+    RENV_PPM_ENABLED = NA,
+    RENV_RSPM_ENABLED = NA,
+    RENV_CONFIG_PPM_ENABLED = NA
+  )
+
+  inputs <- c(
+    "@CRAN@",
+    "https://cran.rstudio.com/",
+    "HTTPS://Cran.RStudio.com",
+    "https://cloud.r-project.org",
+    "https://cran.r-project.org//",
+    "http://cran.rstudio.com",
+    "https://cran.rstudio.com/src",
+    "https://mirror.example.test"
+  )
+  for (repo in inputs) {
+    options(repos = c(CRAN = repo))
+    eval(parse(text = line), baseenv())
+    expect_equal(
+      getOption("repos")[["CRAN"]] == ppm,
+      boosterpak:::is_default_cran_mirror(repo),
+      info = repo
+    )
+  }
+})
+
+test_that("the CRAN default mirror line honors the opt-out and renv PPM handling", {
+  skip_if_not_installed("renv")
+  loadNamespace("renv")
+  local_ppm_hosts()
+  ppm <- "https://packagemanager.posit.co/cran/latest"
+  line <- boosterpak:::rprofile_cran_default_line(ppm)
+  withr::local_options(list(
+    repos = c(CRAN = "https://cran.rstudio.com"),
+    renv.config.repos.override = NULL,
+    renv.config.ppm.enabled = TRUE
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_CONFIGURE_REPOSITORIES = "false",
+    RENV_PPM_ENABLED = NA,
+    RENV_RSPM_ENABLED = NA,
+    RENV_CONFIG_PPM_ENABLED = NA
+  )
+
+  for (value in c("false", "0", "no", "off")) {
+    withr::local_envvar(BOOSTERPAK_CONFIGURE_REPOSITORIES = value)
+    eval(parse(text = line), baseenv())
+    expect_equal(getOption("repos"), c(CRAN = "https://cran.rstudio.com"))
+  }
+
+  withr::local_envvar(BOOSTERPAK_CONFIGURE_REPOSITORIES = "true")
+  options(renv.config.ppm.enabled = FALSE)
+  expect_false(renv:::renv_ppm_enabled())
+  eval(parse(text = line), baseenv())
+  expect_equal(getOption("repos"), c(CRAN = "https://cran.rstudio.com"))
+
+  options(renv.config.ppm.enabled = TRUE)
+  eval(parse(text = line), baseenv())
+  expect_equal(getOption("repos"), c(CRAN = ppm))
+})
+
+test_that("the CRAN default mirror line leaves no variables in the global environment", {
+  skip_if_not_installed("renv")
+  loadNamespace("renv")
+  local_ppm_hosts()
+  line <- boosterpak:::rprofile_cran_default_line("https://packagemanager.posit.co/cran/latest")
+  withr::local_options(list(
+    repos = c(CRAN = "https://cran.rstudio.com"),
+    renv.config.ppm.enabled = TRUE
+  ))
+  withr::local_envvar(
+    BOOSTERPAK_CONFIGURE_REPOSITORIES = NA,
+    RENV_PPM_ENABLED = NA,
+    RENV_RSPM_ENABLED = NA,
+    RENV_CONFIG_PPM_ENABLED = NA
+  )
+
+  env <- new.env(parent = baseenv())
+  eval(parse(text = line), env)
+
+  expect_equal(ls(env, all.names = TRUE), character())
+})
+
+test_that("the CRAN default mirror line is recognised and other lines are not", {
+  reapply <- boosterpak:::rprofile_repository_reapply_lines(
+    cran_url = "https://packagemanager.posit.co/cran/latest"
+  )
+  expect_true(boosterpak:::is_rprofile_cran_default_line(reapply[[2]]))
+  expect_false(boosterpak:::is_rprofile_cran_default_line(reapply[[3]]))
+  expect_false(boosterpak:::is_rprofile_cran_default_line(reapply[[1]]))
+  expect_false(boosterpak:::is_rprofile_cran_default_line(
+    boosterpak:::rprofile_repository_lines("https://packagemanager.posit.co/cran/latest")[[2]]
+  ))
+  expect_true(all(vapply(reapply, boosterpak:::is_rprofile_reapply_line, logical(1))[-1]))
+})
+
+test_that("a CRAN default mirror reset by renv activation is restored on every OS", {
+  skip_if_not_installed("renv")
+  loadNamespace("renv")
+  local_ppm_hosts()
+  withr::local_options(list(
+    repos = c(CRAN = "@CRAN@"),
+    renv.config.repos.override = NULL,
+    renv.config.ppm.enabled = TRUE,
+    HTTPUserAgent = "custom",
+    download.file.extra = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    RENV_CONFIG_PPM_ENABLED = NA,
+    RENV_PPM_ENABLED = NA,
+    RENV_RSPM_ENABLED = NA
+  )
+  root <- withr::local_tempdir()
+  writeLines(
+    c("before <- TRUE", 'source("renv/activate.R")', "after <- TRUE"),
+    file.path(root, ".Rprofile")
+  )
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+
+  # Stand-in for renv/activate.R: the lockfile records a default CRAN mirror.
+  dir.create(file.path(root, "renv"))
+  writeLines(
+    'options(repos = c(CRAN = "https://cran.rstudio.com"))',
+    file.path(root, "renv", "activate.R")
+  )
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  hook <- match(boosterpak:::rprofile_startup_begin_marker(), lines)
+  lines <- lines[seq_len(hook - 1L)]
+
+  withr::local_dir(root)
+  env <- new.env(parent = baseenv())
+  eval(parse(text = lines), envir = env)
+
+  # The CRAN line restores Package Manager on every OS, and the Linux line
+  # then rewrites it to the manylinux binary URL where that applies.
+  expected <- if (identical(R.version$os, "linux-gnu")) {
+    "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest"
+  } else {
+    "https://packagemanager.posit.co/cran/latest"
+  }
+  expect_equal(getOption("repos")[["CRAN"]], expected)
+  expect_true(env$before)
+})
+
+test_that("the Linux rewrite stays Linux-only when the CRAN line restores Package Manager", {
+  skip_if_not_installed("renv")
+  loadNamespace("renv")
+  local_ppm_hosts()
+  ppm <- "https://packagemanager.posit.co/cran/latest"
+  reapply <- boosterpak:::rprofile_repository_reapply_lines(
+    include_renv = FALSE,
+    cran_url = ppm
+  )
+  # Stand in for Windows or macOS: the Linux guard is always FALSE there.
+  reapply[[3]] <- sub(
+    'identical(R.version$os, "linux-gnu")',
+    "FALSE",
+    reapply[[3]],
+    fixed = TRUE
+  )
+  withr::local_options(list(
+    repos = c(CRAN = "https://cran.rstudio.com"),
+    renv.config.repos.override = NULL,
+    renv.config.ppm.enabled = TRUE,
+    HTTPUserAgent = "custom",
+    download.file.extra = NULL
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_CONFIGURE_REPOSITORIES = NA,
+    RENV_PPM_ENABLED = NA,
+    RENV_RSPM_ENABLED = NA,
+    RENV_CONFIG_PPM_ENABLED = NA
+  )
+
+  for (line in reapply[-1]) {
+    eval(parse(text = line), baseenv())
+  }
+
+  expect_equal(getOption("repos"), c(CRAN = ppm))
+  expect_equal(getOption("HTTPUserAgent"), "custom")
+  expect_null(getOption("renv.config.repos.override"))
+})
+
+test_that("init migrates an older post-activation block to the CRAN-aware block", {
+  local_ppm_hosts()
+  generic <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  withr::local_options(list(
+    repos = generic,
+    renv.config.repos.override = generic,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+  root <- withr::local_tempdir()
+  # The post-activation block as the previous release wrote it: no CRAN line.
+  writeLines(
+    c(
+      "before <- TRUE",
+      boosterpak:::rprofile_repository_lines(generic),
+      'source("renv/activate.R")',
+      boosterpak:::rprofile_repository_reapply_lines(),
+      boosterpak:::rprofile_startup_block(),
+      "after <- TRUE"
+    ),
+    file.path(root, ".Rprofile")
+  )
+
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+  first <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+
+  expect_equal(lines, first)
+  expect_equal(sum(lines == boosterpak:::rprofile_repository_reapply_marker()), 1L)
+  expect_equal(sum(vapply(lines, boosterpak:::is_rprofile_cran_default_line, logical(1))), 1L)
+  expect_equal(
+    sum(lines == boosterpak:::rprofile_ppm_linux_binary_line(renv_ppm = TRUE)),
+    1L
+  )
+  expect_equal(sum(lines == boosterpak:::rprofile_startup_begin_marker()), 1L)
+  renv_line <- grep('source\\("renv/activate\\.R"\\)', lines)
+  expect_equal(
+    lines[renv_line + 1:4],
+    c(
+      boosterpak:::rprofile_repository_reapply_marker(),
+      boosterpak:::rprofile_cran_default_line(generic[[1]]),
+      boosterpak:::rprofile_ppm_linux_binary_line(renv_ppm = TRUE),
+      boosterpak:::rprofile_startup_begin_marker()
+    )
+  )
+  expect_true(all(c("before <- TRUE", "after <- TRUE") %in% lines))
+})
+
+test_that("a missing managed hook goes after the CRAN default mirror and Linux lines", {
+  generic <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  setup <- boosterpak:::rprofile_repository_lines(generic, include_renv = FALSE)
+  reapply <- boosterpak:::rprofile_repository_reapply_lines(
+    include_renv = FALSE,
+    cran_url = generic[[1]]
+  )
+  root <- withr::local_tempdir()
+  writeLines(
+    c("before <- TRUE", setup, 'source("renv/activate.R")', reapply, "after <- TRUE"),
+    file.path(root, ".Rprofile")
+  )
+
+  changed <- boosterpak:::ensure_rprofile_line(
+    root = root,
+    rprofile = "yes",
+    repository_lines = c(setup, reapply)
+  )
+
+  expect_true(changed)
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  expect_equal(
+    lines,
+    c(
+      "before <- TRUE",
+      setup,
+      'source("renv/activate.R")',
+      reapply,
+      boosterpak:::rprofile_startup_block(),
+      "after <- TRUE"
+    )
+  )
+  expect_false(
+    boosterpak:::ensure_rprofile_line(
+      root = root,
+      rprofile = "yes",
+      repository_lines = c(setup, reapply)
+    )
+  )
+})
+
+test_that("deinit removes the CRAN default mirror line with the other post-activation lines", {
+  generic <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  lines <- c(
+    "before <- TRUE",
+    boosterpak:::rprofile_repository_lines(generic),
+    'source("renv/activate.R")',
+    boosterpak:::rprofile_repository_reapply_lines(cran_url = generic[[1]]),
+    "after <- TRUE"
+  )
+
+  result <- boosterpak:::remove_rprofile_managed_lines(lines, renv = FALSE)
+
+  expect_equal(
+    result$lines,
+    c("before <- TRUE", 'source("renv/activate.R")', "after <- TRUE")
+  )
+})
+
+test_that("rescue leaves a current block with the CRAN default mirror line unchanged", {
+  ppm <- "https://packagemanager.posit.co/cran/latest"
+  setup <- boosterpak:::rprofile_repository_lines(c(CRAN = ppm))
+  reapply <- boosterpak:::rprofile_repository_reapply_lines(cran_url = ppm)
+  lines <- c(
+    "before <- TRUE",
+    setup,
+    'source("renv/activate.R")',
+    reapply,
+    boosterpak:::rprofile_startup_block(),
+    "after <- TRUE"
+  )
+
+  planned <- boosterpak:::.rescue_rprofile_lines(lines, c(setup, reapply))
+
+  expect_false(planned$changed)
+  expect_equal(planned$lines, lines)
 })
 
 test_that("deinit removes the post-activation Linux lines and keeps renv activation", {

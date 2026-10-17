@@ -144,8 +144,8 @@ remove_rprofile_boosterpak_setup_blocks <- function(lines) {
 #' Remove the managed post-activation repository block
 #'
 #' @param lines Character vector of `.Rprofile` lines.
-#' @return `lines` without the post-activation marker and the Linux binary line
-#'   that follows it.
+#' @return `lines` without the post-activation marker and the lines that follow
+#'   it (the CRAN default mirror line and the Linux binary line).
 #' @noRd
 remove_rprofile_repository_reapply_block <- function(lines) {
   marker_idx <- which(lines == rprofile_repository_reapply_marker())
@@ -157,8 +157,9 @@ remove_rprofile_repository_reapply_block <- function(lines) {
   for (idx in marker_idx) {
     keep[[idx]] <- FALSE
     cursor <- idx + 1L
-    if (cursor <= length(lines) && is_rprofile_ppm_linux_line(lines[[cursor]])) {
+    while (cursor <= length(lines) && is_rprofile_reapply_line(lines[[cursor]])) {
       keep[[cursor]] <- FALSE
+      cursor <- cursor + 1L
     }
   }
   lines[keep]
@@ -241,6 +242,29 @@ is_rprofile_ppm_linux_line <- function(line) {
     '^if \\(identical\\(R\\.version\\$os, "linux-gnu"\\).*\\) options\\(repos = sub\\(',
     trimws(line)
   )
+}
+
+#' Identify the managed CRAN default mirror line
+#'
+#' Recognizes the post-activation line written by `rprofile_cran_default_line()`.
+#'
+#' @param line A single `.Rprofile` line.
+#' @return A single logical value.
+#' @noRd
+is_rprofile_cran_default_line <- function(line) {
+  grepl(
+    '^if \\(isNamespaceLoaded\\("renv"\\).*\\) local\\(\\{ for \\(option in c\\(',
+    trimws(line)
+  )
+}
+
+#' Identify any line in the managed post-activation block
+#'
+#' @param line A single `.Rprofile` line.
+#' @return A single logical value.
+#' @noRd
+is_rprofile_reapply_line <- function(line) {
+  is_rprofile_ppm_linux_line(line) || is_rprofile_cran_default_line(line)
 }
 
 #' Remove boosterpak-managed lines from an R profile
@@ -385,9 +409,9 @@ insert_before_renv_activation <- function(lines, new_lines) {
 #' Insert the managed startup block after renv activation
 #'
 #' The block goes after the activation line and after the post-activation
-#' repository lines when they are already there. The Linux binary re-apply then
-#' runs before the `boosters/` files are sourced, so the hook never ends up
-#' between the activation line and the re-apply.
+#' repository lines when they are already there. The CRAN and Linux binary
+#' re-apply then runs before the `boosters/` files are sourced, so the hook never
+#' ends up between the activation line and the re-apply.
 #'
 #' @param lines Character vector of `.Rprofile` lines.
 #' @param block The managed startup block lines.
@@ -403,7 +427,7 @@ insert_startup_block <- function(lines, block) {
   marker <- marker[marker > idx]
   if (length(marker) > 0) {
     idx <- marker[[1]]
-    if (idx + 1L <= length(lines) && is_rprofile_ppm_linux_line(lines[[idx + 1L]])) {
+    while (idx + 1L <= length(lines) && is_rprofile_reapply_line(lines[[idx + 1L]])) {
       idx <- idx + 1L
     }
   }
