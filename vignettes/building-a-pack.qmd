@@ -42,6 +42,7 @@ name = "scaffold-analysis"
 description = "Create a compact analysis project folder scaffold."
 packages = ["fs", "here"]
 functions = ["scaffold_analysis"]
+attach_mode = "interactive"
 
 [hooks]
 on_add = ["scaffold_analysis"]
@@ -60,6 +61,17 @@ Optional fields:
 - `attach` — startup attachment intent: omit or `true` to attach the pack's
   `packages`, `false` to install without attaching, or a character vector to
   attach a subset.
+- `attach_mode` — `"always"` (the default) or `"interactive"`. With
+  `"interactive"`, the pack's attached packages load only when `interactive()`
+  is true. That is `FALSE` in `Rscript`, in Quarto and knitr renders (including
+  RStudio's Render button), and in targets, crew, and callr workers. Code that
+  calls a function from such a package without a namespace prefix therefore works
+  at the console and fails on render, so use `pkg::fn()` in helpers that must run
+  everywhere. A package that another pack or `[attach].declared` requests without
+  the interactive mode still attaches on every start. The key does not change what
+  is installed. Write it above the first table header (`[sources]`, `[settings]`, `[hooks]`): below a
+  table header it belongs to that table, so boosterpak does not read it as a pack key. Older boosterpak versions ignore
+  the key and attach the packages on every start.
 - `extends` — names of other packs this pack builds on; their packages,
   functions, and hooks resolve transitively.
 - `functions` — helper functions the pack ships. Every listed name must have
@@ -190,7 +202,10 @@ Packs resolve from three scopes, first match wins:
 
 The usual authoring loop is: get a project working, `save_pack("name")` to
 capture its resolved packages and helper functions as a project pack, edit
-the generated manifest (add `attach`, `[sources]`, or `[hooks]` by hand),
-then `promote_pack("name")` when it is worth reusing elsewhere. See the
+the generated manifest (add `attach`, `attach_mode`, `[sources]`, or `[hooks]`
+by hand), then `promote_pack("name")` when it is worth reusing elsewhere.
+`save_pack()` and `create_pack()` do not write `attach_mode`, so add it by hand;
+`promote_pack()` and `demote_pack()` copy the manifest as it is, so the key is
+kept. See the
 [getting started](getting-started.html) vignette for that workflow
 end-to-end.

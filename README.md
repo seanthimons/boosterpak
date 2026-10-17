@@ -147,12 +147,13 @@ not duplicated.
   the generic URL.
 - A guarded line after them performs the rewrite on glibc Linux only, when R
   starts. It uses base R, because it runs before boosterpak loads.
-- A second copy of the guarded line follows the `renv/activate.R` line. renv's
+- A second copy of the guarded lines follows the `renv/activate.R` line. renv's
   `renv::load()` resets the repositories to the lockfile URLs, which would undo
   the first rewrite, so the rewrite is re-applied after activation. Every
   session that activates the project, including each worker, gets the rewritten
-  URLs. The re-applied line is written only where the repository lines are, and
-  it is marked so boosterpak can find and replace it. It runs only while renv's
+  URLs. The re-applied lines are written only where the repository lines are,
+  and they are marked so boosterpak can find and replace them. The first of
+  them replaces a default CRAN mirror with the Package Manager URL, as described below. It runs only while renv's
   Package Manager handling is on, which it checks with the internal
   `renv:::renv_ppm_enabled()`. With that handling off, `renv::snapshot()` does not
   strip the `__linux__` segment, so the line is skipped and the lockfile stays
@@ -160,16 +161,39 @@ not duplicated.
 - Distribution-specific URLs, such as `.../cran/__linux__/noble/latest`, and
   repositories that are not Package Manager repositories are left alone.
 - A `renv.lock` that still lists a default CRAN mirror, such as
-  `https://cran.rstudio.com`, is not rewritten in project sessions. `renv::load()`
-  sets `repos` from the lockfile, and the re-applied line only touches Package
-  Manager URLs, so `install.packages()` and `pak` in a session keep using that
-  mirror and compile from source on Linux. `renv::restore()` and `renv::install()`
-  still use `renv.config.repos.override`. To get binaries in sessions, run
-  `upgrade_project()`, which writes the Package Manager URL into the lockfile
-  on a real run with `snapshot = TRUE` unless repository configuration is
-  disabled or a custom CRAN mirror is set (check the lockfile preview of a dry
-  run first), or record a Package Manager repository yourself with
-  `renv::snapshot(repos = ...)`.
+  `https://cran.rstudio.com`, no longer keeps the session on that mirror. After
+  `renv::load()` sets `repos` from the lockfile, the re-applied block checks the
+  `CRAN` entry of `repos`, and of `renv.config.repos.override` where the project
+  sets it. If the entry is one of the built-in default mirrors (`@CRAN@`,
+  `https://cloud.r-project.org`, `https://cran.rstudio.com`, or
+  `https://cran.r-project.org`, compared without regard to case or a trailing
+  slash), the Package Manager URL that the session was configured with is put
+  back. That is normally `https://packagemanager.posit.co/cran/latest`.
+  `install.packages()` and `pak` then use Package Manager, which serves binaries
+  where it has them. Custom mirrors and
+  non-CRAN repositories are left alone. The restore applies only where the
+  `.Rprofile` repository lines name a Package Manager URL, and it is skipped
+  when `BOOSTERPAK_CONFIGURE_REPOSITORIES` turns repository setup off or when
+  renv's Package Manager handling is off. `renv::restore()` and
+  `renv::install()` still use `renv.config.repos.override`.
+- Unlike the Linux rewrite, the CRAN restore runs on every OS, so a lockfile
+  does not flip between the mirror and the Package Manager URL when
+  collaborators use different systems. This is a behaviour change for Windows
+  and macOS sessions too: where the restore applies, a snapshot now records the
+  generic Package Manager URL instead of the default mirror. Set
+  `BOOSTERPAK_CONFIGURE_REPOSITORIES=false` to turn the restore off for a
+  session.
+- The marker comment above the re-applied block in `.Rprofile` still says
+  "Linux", although the CRAN restore line is active on every OS. An older
+  boosterpak's `deinit()` removes the marker and, at most, the Linux line right
+  after it. On a file written by this version, it can leave the CRAN restore
+  line and the Linux line behind, so delete them by hand or run this version's
+  `deinit()`.
+- To put the Package Manager URL into the lockfile itself, run
+  `upgrade_project()`. On a real run with `snapshot = TRUE` it writes the URL
+  unless repository configuration is disabled or a custom CRAN mirror is set;
+  check the lockfile preview of a dry run first. You can also record a Package
+  Manager repository yourself with `renv::snapshot(repos = ...)`.
 - `init()` and `upgrade_project()` replace the repository lines written by
   earlier boosterpak versions, so existing projects upgrade by running either one.
 
@@ -454,7 +478,7 @@ flowchart TD
 The usual loop is to initialize once, add packs and helper functions as project capability intent, run `sync()`, then capture a useful baseline with `save_pack()`. Additive installs hydrate plain-name packages from local/user libraries before downloading, install any remaining packages with `pak`, and write `boosters/attach.R` for startup `library()` calls. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
 For an already initialized repo clone, do not re-run `init()`; follow the restore path with `renv::restore()`, restart R, then `boosterpak::sync(mode = "restore")`.
 
-A pack is deliberately typed and reviewable. Today that means packages, optional `[sources]`, optional `attach`, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.
+A pack is deliberately typed and reviewable. Today that means packages, optional `[sources]`, optional `attach` and `attach_mode`, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.
 
 ## Add a pack
 
@@ -468,7 +492,7 @@ The built-in pack catalog contains:
 -   `databases`: database workflow packages including `DBI`, `dbplyr`, `duckdb`, `RSQLite`, `odbc`, `connections`, and a DuckDB RStudio connection-pane option helper.
 -   `eda`: analysis helpers including `fs`, `here`, `janitor`, `rio`, core tidyverse packages, `scales`, `glue`, `digest`, `skimr`, and bundled helper functions.
 -   `example`: small documented example that installs `cli`.
--   `scaffold-analysis`: installs `fs` and `here` and carries a helper for a compact analysis folder scaffold.
+-   `scaffold-analysis`: installs `fs` and `here` and carries a helper for a compact analysis folder scaffold. Its packages attach only in interactive sessions (`attach_mode = "interactive"`).
 -   `github-example`: installs `ComptoxR` from `seanthimons/ComptoxR`.
 
 Packs can mix ordinary CRAN package names with source-specific install specs. Declare every package in `packages`, then add a `[sources]` entry only for packages that should come from somewhere else:
@@ -485,6 +509,8 @@ packages = ["ggplot2", "patchwork", "ggtext"]
 In this pack, `ggplot2` and `patchwork` install by package name, while `ggtext` uses the GitHub source spec.
 
 Attachment is separate from installation. Missing `attach` means a pack attaches its direct `packages`; packs can also use `attach = true`, `attach = false`, or `attach = ["pkg1", "pkg2"]`. The top-level `[attach]` table can add packages with `declared`, remove packages with `exclude`, or set `enabled = false` to remove the managed `boosters/attach.R` file. Workflow packages from `core` and `[extras]`, such as `pak`, `renv`, and `boosterpak`, are installed but not attached unless explicitly listed in `[attach].declared`.
+
+A pack can also set `attach_mode = "interactive"` (the default is `"always"`). Its packages still install, but they attach only when R is interactive, so worker processes and non-interactive runs skip them. Put the key above the first table header in the pack file (`[sources]`, `[settings]`, `[hooks]`). A key written below a table header belongs to that table, so boosterpak does not read it as a pack key. A package that another pack or `[attach].declared` also requests without the interactive mode still attaches on every start, and `[attach].exclude` still removes a package. Packages that a pack inherits through `extends` keep the mode of the pack that declares them. See "Startup cost and workers" below.
 
 Pack mutation is additive. Removing a pack updates `boosters.toml` and can run sync, but it does not uninstall packages.
 
@@ -535,7 +561,13 @@ Every package attached adds to that cost.
 
 To see what is attached, run `boosterpak::status()`. It lists each attached
 package with the pack that requested it (or `[attach].declared`), and prints
-`attached on every R start (including workers): N packages`.
+`attached on every R start (including workers): N packages`. Packages from
+interactive-only packs are not in that count. They follow it on their own line,
+as `M more only in interactive sessions`, with the pack behind each one. In the
+returned value, `attach_packages` and `attach_package_count` still cover every
+attached package. `attach_every_start_count` counts the ones that attach on every
+start, `attach_interactive_packages` names the interactive-only ones, and the
+`interactive` column of `attach_sources` marks them.
 
 To trim the list, use the narrowest option that does the job:
 
@@ -543,6 +575,9 @@ To trim the list, use the narrowest option that does the job:
   installed.
 - In a pack, `attach = false` attaches nothing from that pack, and
   `attach = ["pkg1"]` attaches only the listed packages.
+- In a pack, `attach_mode = "interactive"` keeps the pack's packages installed
+  and attaches them only when R is interactive. Workers and non-interactive runs
+  skip them.
 - `[attach] enabled = false` removes `boosters/attach.R` entirely. Packages are
   still installed, and the helper functions still load.
 - `remove_pack("name")` removes a pack from `boosters.toml`, rewrites
@@ -557,6 +592,24 @@ For a targets pipeline, list the packages the targets use in
 targets, whatever `attach.R` contains. That keeps the pipeline working when
 attach trimming removes a package. It does not stop `attach.R` from running on
 workers, so trim attach as well when startup time matters.
+
+Interactive-only packages are written to `attach.R` with the same guarded
+`library()` calls, inside an `if (interactive())` block. `interactive()` is
+`FALSE` in `Rscript`, in a Quarto or knitr render (including RStudio's Render
+button), and in targets, crew, and callr workers. Code that calls a function from
+such a package without a namespace prefix therefore works at the console and
+fails when a document renders or a pipeline runs. Write `here::here()` or
+`fs::path()` in code that must run everywhere.
+
+The shipped `scaffold-analysis` pack uses `attach_mode = "interactive"`. Its
+helper calls only `fs::` functions, so workers do not need `fs` or `here`
+attached, and interactive sessions still get both. A project that already has
+its own copy of a pack keeps that copy, because `add_pack()` and `sync()` never
+overwrite files in `boosters/packs/`. A project created before this key existed
+therefore still attaches those packages on every start. To change that, add
+`attach_mode = "interactive"` above the first table header in the copy, or delete the copy
+and run `boosterpak::sync()` to copy the current pack again. Older boosterpak
+versions ignore the key and attach every package on every start.
 
 `attach.R` handles a missing package on its own. Each package is attached
 separately, so one that is not installed does not stop the others. boosterpak
@@ -642,7 +695,7 @@ boosterpak::status()
 boosterpak::list_packs()
 ```
 
-`status()` reports config validity, declared and resolved packs, package counts, missing direct packages, the attached packages with the pack behind each one, `boosters/attach.R` presence, function drift or missing materialized files, pack catalog counts, `renv` state, lockfile presence, and the `.Rprofile` hook. It also:
+`status()` reports config validity, declared and resolved packs, package counts, missing direct packages, the attached packages with the pack behind each one (and which of them attach only in interactive sessions), `boosters/attach.R` presence, function drift or missing materialized files, pack catalog counts, `renv` state, lockfile presence, and the `.Rprofile` hook. It also:
 
 - warns when the installed boosterpak is newer than the `boosters_version` record. A missing record is reported as "no version recorded" without a warning. To act on a warning, run `upgrade_project(dry_run = TRUE)` first, then `upgrade_project()`.
 - prints a Linux hint to run `check_binary_repos(lockfile = "renv.lock")` when `renv.lock` exists.
