@@ -2,12 +2,78 @@
 
 # boosterpak NEWS
 
+## v0.9.3 (2026-10-17)
+
+#### New features
+
+- add attach_mode = “interactive” and use it in scaffold-analysis
+  ([c7e422b](https://github.com/seanthimons/boosterpak/tree/c7e422b070d862a4d7eef0f7199ba9d341f22a49))
+- list attach sources, upgrade need, and GitHub token visibility
+  ([5dbb89b](https://github.com/seanthimons/boosterpak/tree/5dbb89bd140f72c60396ff76dccd4d38d8496fd4))
+- add upgrade_project() with dry-run lockfile preview and rate-limit
+  hints
+  ([ea3efac](https://github.com/seanthimons/boosterpak/tree/ea3efac44c0be2038442ce7ebe27fba2c5f667b4))
+- warn in check_binary_repos() when curl cannot follow redirects
+  ([6ffe5b8](https://github.com/seanthimons/boosterpak/tree/6ffe5b81302475875a1406b92ad8c298d219e493))
+- add check_binary_repos() to verify Package Manager serves binaries
+  ([16bef5b](https://github.com/seanthimons/boosterpak/tree/16bef5b4e89638f33d8dfb9b49e9c858e9d00dbb))
+- send the R user agent header for curl and wget downloads
+  ([a8e5325](https://github.com/seanthimons/boosterpak/tree/a8e5325f8ac803596aba57c7c57b4aa04ef849ad))
+- recognize p3m.dev and self-hosted Package Manager hosts
+  ([7e48cde](https://github.com/seanthimons/boosterpak/tree/7e48cdeae273803b1fe68158e52c82561820c137))
+
+#### Bug fixes
+
+- keep package repository names when snapshotting on Linux
+  ([d678730](https://github.com/seanthimons/boosterpak/tree/d6787301c4979cc2c21d92b1f15c480b9a33cfed))
+- restore the Package Manager CRAN URL after renv activation on every OS
+  ([affc728](https://github.com/seanthimons/boosterpak/tree/affc728347637aa3f4ce34bc1aa9ae835a4462e7))
+- declare rlang in Imports and explain lockfile mirrors in project
+  sessions
+  ([cf0f672](https://github.com/seanthimons/boosterpak/tree/cf0f6725195aff17605470e40ba675637a835828))
+- catch attach failures per package and match only real TOML table
+  headers
+  ([0fff5b0](https://github.com/seanthimons/boosterpak/tree/0fff5b0fb80dc62d1daabf55c4094d6efbe9a030))
+- regenerate attach.R and prune settings on remove_pack, track
+  boosters_version
+  ([f73cb75](https://github.com/seanthimons/boosterpak/tree/f73cb75df61cf637189bb18dbcf31e864c34a9bc))
+- re-apply Linux binary repos after renv activation and guard attach.R
+  ([aee0f2f](https://github.com/seanthimons/boosterpak/tree/aee0f2fd8ee14a96765e7d3e14e5400f90e75566))
+
+#### Tests
+
+- use valid file URLs in the package index test on Windows
+  ([363ad79](https://github.com/seanthimons/boosterpak/tree/363ad79a7b8056deda059d07c1c16ae7fbac4a05))
+
+#### Docs
+
+- document attach_mode and the CRAN default-mirror restore
+  ([e33f5b8](https://github.com/seanthimons/boosterpak/tree/e33f5b8f87b90b1bcb0868c78602479bf70e30de))
+- add upgrade, Linux, rate-limit and startup-cost guidance and the R
+  manager crosswalk
+  ([0fff517](https://github.com/seanthimons/boosterpak/tree/0fff517f94fb06f64d92a7b525d4d2739f53bd06))
+- explain the portable Linux binary setup
+  ([3121b84](https://github.com/seanthimons/boosterpak/tree/3121b84f67ae56b64c98ac58569896be69471dfd))
+
+#### Other changes
+
+- bump version to 0.9.3 \[skip ci\]
+  ([2dfec62](https://github.com/seanthimons/boosterpak/tree/2dfec620d2fc1ccf199f28ced4da37193783d802))
+
+Full set of changes:
+[`v0.9.2...v0.9.3`](https://github.com/seanthimons/boosterpak/compare/v0.9.2...v0.9.3)
+
 ## v0.9.2 (2026-10-05)
 
 #### Bug fixes
 
 - use manylinux PPM binaries on Linux (#23)
   ([c7d3d59](https://github.com/seanthimons/boosterpak/tree/c7d3d5992924cad02809b5f1e8f460104f13cec8))
+
+#### Docs
+
+- update NEWS.md for v0.9.2 \[skip ci\]
+  ([98834f2](https://github.com/seanthimons/boosterpak/tree/98834f26135d75de15ca1ce032c612e7c65094d5))
 
 #### Other changes
 
