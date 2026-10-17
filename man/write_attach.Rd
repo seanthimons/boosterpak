@@ -16,7 +16,9 @@ Path to \code{boosters/attach.R}, invisibly.
 }
 \description{
 Resolves package attach intent from \code{boosters.toml} and writes a managed
-\code{boosters/attach.R} file containing static \code{library()} calls. Installation
-intent remains controlled by pack \code{packages}; attachment controls only what
-is loaded at startup by the optional \code{.Rprofile} hook.
+\code{boosters/attach.R} file. The file attaches each package independently: a
+package that is not installed is reported in one summary line, and the rest
+still attach. Installation intent remains controlled by pack \code{packages};
+attachment controls only what is loaded at startup by the optional
+\code{.Rprofile} hook.
 }

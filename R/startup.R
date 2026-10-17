@@ -209,14 +209,36 @@ ppm_download_extra_code <- function() {
 #' `BOOSTERPAK_CONFIGURE_REPOSITORIES=false`, so the opt-out also works for
 #' projects whose `.Rprofile` already contains it.
 #'
+#' When `renv_ppm` is `TRUE`, the line also requires renv's Package Manager
+#' handling to be on. Then `renv::snapshot()` strips the `__linux__` segment
+#' again. With it off, snapshot would write the manylinux URL into `renv.lock`.
+#' The check calls renv's own resolver, which also reads project settings and
+#' environment variables. It sits inside `tryCatch()` because this line runs
+#' from `.Rprofile`, where a missing or changed renv must not abort startup.
+#'
+#' `renv:::renv_ppm_enabled()` is an internal renv function, not a public API.
+#' If a future renv removes or renames it, the lookup errors, `tryCatch()`
+#' returns `FALSE`, and the rewrite is skipped. That fails closed, so the
+#' lockfile stays generic. The `isNamespaceLoaded("renv")` check runs first so
+#' the line never loads renv from the user library as a side effect; renv is
+#' already loaded by then because `renv/activate.R` has run.
+#'
 #' @param include_renv Whether to rewrite the renv repository override.
+#' @param renv_ppm Whether to require renv's Package Manager handling to be on.
 #' @return A character scalar containing the guarded `.Rprofile` line.
 #' @noRd
-rprofile_ppm_linux_binary_line <- function(include_renv = TRUE) {
+rprofile_ppm_linux_binary_line <- function(include_renv = TRUE, renv_ppm = FALSE) {
+  guards <- c(
+    'identical(R.version$os, "linux-gnu")',
+    if (isTRUE(renv_ppm)) {
+      'isNamespaceLoaded("renv") && isTRUE(tryCatch(renv:::renv_ppm_enabled(), error = function(e) FALSE))'
+    },
+    '!tolower(Sys.getenv("BOOSTERPAK_CONFIGURE_REPOSITORIES", "true")) %in% c("0", "false", "no", "off")'
+  )
   paste0(
-    'if (identical(R.version$os, "linux-gnu") && ',
-    '!tolower(Sys.getenv("BOOSTERPAK_CONFIGURE_REPOSITORIES", "true")) ',
-    '%in% c("0", "false", "no", "off")) ',
+    "if (",
+    paste(guards, collapse = " && "),
+    ") ",
     ppm_linux_binary_options_code(include_renv)
   )
 }
@@ -272,7 +294,11 @@ should_configure_install_policy <- function() {
 
 #' Get Boosterpak Install Policy Options
 #'
-#' @return A named list of package installation option values.
+#' @return A named list of package installation option values. Setting
+#'   `install.packages.compile.from.source` only matters when
+#'   `install.packages()` runs with `type = "both"` (the default on Windows and
+#'   macOS). R's default `pkgType` on Linux is `"source"`, so the option has no
+#'   effect there.
 #' @noRd
 boosterpak_install_policy_options <- function() {
   list(
@@ -304,7 +330,7 @@ configure_boosterpak_install_policy <- function(verbose = TRUE) {
 
   if (isTRUE(verbose) && length(changed) > 0) {
     cli::cli_inform(c(
-      "i" = "boosterpak is configuring package installs to prefer pak and avoid source compilation when binaries are available.",
+      "i" = "boosterpak is configuring package installs to prefer pak. On Windows and macOS, it also avoids compiling from source when binaries are available.",
       " " = "renv pak backend: {getOption('renv.config.pak.enabled')}",
       " " = "compile from source: {getOption('install.packages.compile.from.source')}"
     ))
@@ -553,6 +579,33 @@ rprofile_repository_lines <- function(repos, include_renv = TRUE) {
   c(lines, rprofile_ppm_linux_binary_line(include_renv))
 }
 
+#' Get the Post-Activation Linux Binary Marker
+#'
+#' @return The marker line that precedes the re-applied Linux binary rewrite.
+#' @noRd
+rprofile_repository_reapply_marker <- function() {
+  "# Re-apply boosterpak Linux binary repositories after renv activation."
+}
+
+#' Build Post-Activation Linux Binary R Profile Lines
+#'
+#' `renv/activate.R` calls `renv::load()`, which resets `repos` to the lockfile
+#' URLs and undoes the manylinux rewrite made before activation. These lines
+#' repeat the rewrite directly after the activation line, but only while renv's
+#' Package Manager handling is on. Then `renv::snapshot()` keeps the lockfile
+#' URL generic. See `rprofile_ppm_linux_binary_line()`.
+#'
+#' @param include_renv Whether to rewrite the renv repository override.
+#' @return A character vector: the marker followed by the guarded `.Rprofile`
+#'   line.
+#' @noRd
+rprofile_repository_reapply_lines <- function(include_renv = TRUE) {
+  c(
+    rprofile_repository_reapply_marker(),
+    rprofile_ppm_linux_binary_line(include_renv, renv_ppm = TRUE)
+  )
+}
+
 #' Build Install Policy Lines for the Current Session
 #'
 #' @param changes Character vector of options changed in the current session.
@@ -571,7 +624,8 @@ boosterpak_install_policy_lines_for_session <- function(changes = character()) {
 #'
 #' @param changes Character vector identifying repository settings changed in
 #'   the current session.
-#' @return A character vector of repository setup lines, or an empty vector when
+#' @return A character vector of repository setup lines (early lines followed
+#'   by the post-activation Linux binary lines), or an empty vector when
 #'   repository configuration is disabled or Posit Package Manager is unused.
 #' @noRd
 boosterpak_repository_lines_for_session <- function(changes = character()) {
@@ -585,7 +639,10 @@ boosterpak_repository_lines_for_session <- function(changes = character()) {
   include_renv <- "renv" %in%
     changes ||
     identical(getOption("renv.config.repos.override"), repos)
-  rprofile_repository_lines(repos, include_renv = include_renv)
+  c(
+    rprofile_repository_lines(repos, include_renv = include_renv),
+    rprofile_repository_reapply_lines(include_renv = include_renv)
+  )
 }
 
 #' Build Boosterpak R Profile Setup Lines

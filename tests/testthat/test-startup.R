@@ -143,7 +143,12 @@ test_that("init persists PPM repository setup before renv activation", {
     'options(renv.config.repos.override = c(CRAN = "https://packagemanager.posit.co/cran/latest"))'
   )
   expect_equal(lines[[marker + 3L]], boosterpak:::rprofile_ppm_linux_binary_line())
-  expect_equal(hook_line, renv_line + 1L)
+  expect_equal(lines[[renv_line + 1L]], boosterpak:::rprofile_repository_reapply_marker())
+  expect_equal(
+    lines[[renv_line + 2L]],
+    boosterpak:::rprofile_ppm_linux_binary_line(renv_ppm = TRUE)
+  )
+  expect_equal(hook_line, renv_line + 3L)
 })
 
 test_that("init configures package install policy before renv activation", {
@@ -406,7 +411,13 @@ test_that("init upgrades an existing generic PPM .Rprofile on Linux", {
 
   lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
   expect_equal(sum(lines == boosterpak:::rprofile_repository_marker()), 1L)
+  expect_equal(sum(lines == boosterpak:::rprofile_repository_reapply_marker()), 1L)
+  # One line before renv activation and one after it.
   expect_equal(sum(lines == boosterpak:::rprofile_ppm_linux_binary_line()), 1L)
+  expect_equal(
+    sum(lines == boosterpak:::rprofile_ppm_linux_binary_line(renv_ppm = TRUE)),
+    1L
+  )
   expect_true(user_line %in% lines)
 })
 
@@ -657,9 +668,11 @@ test_that("init upgrades a v0.9.2 .Rprofile line to the current form", {
     expect_equal(lines, first)
     expect_false(v092_ppm_linux_line(include_renv) %in% lines)
     expect_equal(sum(lines == boosterpak:::rprofile_repository_marker()), 1L)
+    expect_equal(sum(lines == boosterpak:::rprofile_repository_reapply_marker()), 1L)
+    # One line before renv activation and one after it.
     expect_equal(
       sum(vapply(lines, boosterpak:::is_rprofile_ppm_linux_line, logical(1))),
-      1L
+      2L
     )
     expect_true(user_line %in% lines)
   }
@@ -678,6 +691,244 @@ test_that("deinit removes a v0.9.2 and a current Linux line", {
     )
     expect_equal(result$lines, c("before <- TRUE", "after <- TRUE"))
   }
+})
+
+test_that("init adds post-activation lines ahead of an existing managed hook", {
+  local_ppm_hosts()
+  generic <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  withr::local_options(list(
+    repos = generic,
+    renv.config.repos.override = generic,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+  root <- withr::local_tempdir()
+  # A 0.9.2 layout: early repository lines and the managed hook, but no
+  # post-activation lines yet.
+  old_block <- boosterpak:::rprofile_repository_lines(generic)
+  old_block[length(old_block)] <- v092_ppm_linux_line()
+  writeLines(
+    c(
+      "before <- TRUE",
+      old_block,
+      'source("renv/activate.R")',
+      boosterpak:::rprofile_startup_block(),
+      "after <- TRUE"
+    ),
+    file.path(root, ".Rprofile")
+  )
+
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  renv_line <- grep('source\\("renv/activate\\.R"\\)', lines)
+  expect_equal(lines[[renv_line + 1L]], boosterpak:::rprofile_repository_reapply_marker())
+  expect_equal(
+    lines[[renv_line + 2L]],
+    boosterpak:::rprofile_ppm_linux_binary_line(renv_ppm = TRUE)
+  )
+  expect_equal(lines[[renv_line + 3L]], boosterpak:::rprofile_startup_begin_marker())
+  expect_equal(sum(lines == boosterpak:::rprofile_startup_begin_marker()), 1L)
+  expect_false(v092_ppm_linux_line() %in% lines)
+  expect_true("before <- TRUE" %in% lines)
+  expect_true("after <- TRUE" %in% lines)
+})
+
+test_that("a missing managed hook goes after the post-activation Linux lines", {
+  generic <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  setup <- boosterpak:::rprofile_repository_lines(generic, include_renv = FALSE)
+  reapply <- boosterpak:::rprofile_repository_reapply_lines(include_renv = FALSE)
+  root <- withr::local_tempdir()
+  # Setup lines and post-activation lines are current, but the hook is gone.
+  writeLines(
+    c("before <- TRUE", setup, 'source("renv/activate.R")', reapply, "after <- TRUE"),
+    file.path(root, ".Rprofile")
+  )
+
+  changed <- boosterpak:::ensure_rprofile_line(
+    root = root,
+    rprofile = "yes",
+    repository_lines = c(setup, reapply)
+  )
+
+  expect_true(changed)
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  expect_equal(
+    lines,
+    c(
+      "before <- TRUE",
+      setup,
+      'source("renv/activate.R")',
+      reapply,
+      boosterpak:::rprofile_startup_block(),
+      "after <- TRUE"
+    )
+  )
+  # The re-apply runs before the hook sources boosters/.
+  expect_lt(
+    match('source("renv/activate.R")', lines),
+    match(boosterpak:::rprofile_repository_reapply_marker(), lines)
+  )
+  expect_lt(
+    match(boosterpak:::rprofile_repository_reapply_marker(), lines),
+    match(boosterpak:::rprofile_startup_begin_marker(), lines)
+  )
+  expect_false(
+    boosterpak:::ensure_rprofile_line(
+      root = root,
+      rprofile = "yes",
+      repository_lines = c(setup, reapply)
+    )
+  )
+})
+
+test_that("the Linux binary rewrite is re-applied after renv activation", {
+  skip_if_not(identical(R.version$os, "linux-gnu"))
+  skip_if_not_installed("renv")
+  loadNamespace("renv")
+  local_ppm_hosts()
+  withr::local_options(list(
+    repos = c(CRAN = "@CRAN@"),
+    renv.config.repos.override = NULL,
+    renv.config.ppm.enabled = TRUE,
+    HTTPUserAgent = "custom",
+    download.file.extra = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    RENV_CONFIG_PPM_ENABLED = NA,
+    RENV_PPM_ENABLED = NA,
+    RENV_RSPM_ENABLED = NA
+  )
+  root <- withr::local_tempdir()
+  writeLines(
+    c("before <- TRUE", 'source("renv/activate.R")', "after <- TRUE"),
+    file.path(root, ".Rprofile")
+  )
+  init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+
+  # Stand-in for renv/activate.R: renv::load() resets repos to the lockfile URL.
+  dir.create(file.path(root, "renv"))
+  writeLines(
+    'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/latest"))',
+    file.path(root, "renv", "activate.R")
+  )
+  lines <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  # Run the profile up to the managed hook, which would source boosters/.
+  hook <- match(boosterpak:::rprofile_startup_begin_marker(), lines)
+  lines <- lines[seq_len(hook - 1L)]
+
+  withr::local_dir(root)
+  env <- new.env(parent = baseenv())
+  eval(parse(text = lines), envir = env)
+
+  linux <- "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest"
+  expect_equal(getOption("repos")[["CRAN"]], linux)
+  expect_equal(getOption("renv.config.repos.override")[["CRAN"]], linux)
+  expect_true(env$before)
+})
+
+test_that("post-activation Linux lines are only planned for Package Manager repos", {
+  withr::local_options(list(
+    repos = c(CRAN = "https://example.test/cran"),
+    renv.config.repos.override = NULL,
+    boosterpak.configure_repositories = TRUE
+  ))
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+
+  expect_length(boosterpak:::boosterpak_repository_lines_for_session(), 0L)
+
+  options(repos = c(CRAN = "https://packagemanager.posit.co/cran/latest"))
+  lines <- boosterpak:::boosterpak_repository_lines_for_session()
+  expect_equal(
+    tail(lines, 2L),
+    boosterpak:::rprofile_repository_reapply_lines(include_renv = FALSE)
+  )
+  # Only re-applied when renv's own Package Manager handling is on, so the
+  # manylinux URL cannot reach renv.lock.
+  expect_match(tail(lines, 1L), "renv:::renv_ppm_enabled()", fixed = TRUE)
+  expect_false(any(grepl("renv:::renv_ppm_enabled()", lines[seq_len(length(lines) - 2L)], fixed = TRUE)))
+})
+
+test_that("the post-activation Linux line is skipped when renv PPM handling is off", {
+  skip_if_not(identical(R.version$os, "linux-gnu"))
+  skip_if_not_installed("renv")
+  # renv is loaded by activation in real use, and the guard checks that first.
+  loadNamespace("renv")
+  local_ppm_hosts()
+  repos <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  withr::local_options(list(
+    repos = repos,
+    renv.config.repos.override = repos,
+    renv.config.ppm.enabled = FALSE,
+    HTTPUserAgent = "custom",
+    download.file.extra = NULL
+  ))
+  withr::local_envvar(
+    RENV_PPM_ENABLED = NA,
+    RENV_RSPM_ENABLED = NA,
+    RENV_CONFIG_PPM_ENABLED = NA
+  )
+  # Check the internal directly. A missing internal also makes the guard
+  # FALSE, so the rest of the test could otherwise pass without this check.
+  expect_false(renv:::renv_ppm_enabled())
+  line <- boosterpak:::rprofile_repository_reapply_lines(include_renv = TRUE)[[2]]
+
+  eval(parse(text = line), baseenv())
+
+  expect_equal(getOption("repos"), repos)
+  expect_equal(getOption("HTTPUserAgent"), "custom")
+})
+
+test_that("the post-activation guard never loads renv from the library", {
+  skip_if_not(identical(R.version$os, "linux-gnu"))
+  skip_if_not_installed("renv")
+  line <- boosterpak:::rprofile_ppm_linux_binary_line(include_renv = FALSE, renv_ppm = TRUE)
+  script <- tempfile(fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/latest"))',
+    line,
+    'cat(sprintf("renv loaded: %s\\n", isNamespaceLoaded("renv")))',
+    'cat(sprintf("repos: %s\\n", getOption("repos")[["CRAN"]]))'
+  ), script)
+  rscript <- file.path(R.home("bin"), if (.Platform$OS.type == "windows") "Rscript.exe" else "Rscript")
+
+  # The child process sees the same libraries as this session, so renv is
+  # findable even when it is installed only outside the default library.
+  lib_paths <- paste(.libPaths(), collapse = .Platform$path.sep)
+  out <- system2(
+    rscript,
+    c("--vanilla", script),
+    stdout = TRUE,
+    stderr = TRUE,
+    env = paste0("R_LIBS=", lib_paths)
+  )
+
+  expect_true("renv loaded: FALSE" %in% out)
+  # renv is not loaded, so the guard is FALSE and the URL is left generic.
+  expect_true("repos: https://packagemanager.posit.co/cran/latest" %in% out)
+})
+
+test_that("deinit removes the post-activation Linux lines and keeps renv activation", {
+  generic <- c(CRAN = "https://packagemanager.posit.co/cran/latest")
+  lines <- c(
+    "before <- TRUE",
+    boosterpak:::rprofile_repository_lines(generic),
+    'source("renv/activate.R")',
+    boosterpak:::rprofile_repository_reapply_lines(),
+    "after <- TRUE"
+  )
+
+  result <- boosterpak:::remove_rprofile_managed_lines(lines, renv = FALSE)
+
+  expect_equal(
+    result$lines,
+    c("before <- TRUE", 'source("renv/activate.R")', "after <- TRUE")
+  )
 })
 
 ppm_user_agent_header <- function() {
@@ -782,4 +1033,81 @@ test_that("the generated Linux line sets the header for curl and wget", {
   local_ppm_download_options(NULL, extra = NULL)
   eval(parse(text = line), baseenv())
   expect_null(getOption("download.file.extra"))
+})
+
+test_that("a second init without renv activation leaves .Rprofile unchanged", {
+  local_ppm_hosts()
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
+  root <- withr::local_tempdir()
+  base_options <- list(
+    repos = c(CRAN = "https://packagemanager.posit.co/cran/latest"),
+    renv.config.repos.override = NULL,
+    boosterpak.configure_repositories = TRUE,
+    boosterpak.configure_install_policy = FALSE
+  )
+  run_init <- function(rprofile) {
+    withr::with_options(
+      base_options,
+      init(root = root, renv = "no", rprofile = rprofile, verbose = FALSE)
+    )
+  }
+
+  expect_true(run_init("yes")$rprofile_changed)
+  before <- readLines(file.path(root, ".Rprofile"), warn = FALSE)
+  expect_false(boosterpak:::has_renv_activation(before))
+
+  # Non-interactive "ask" must not abort once the setup is complete.
+  expect_false(run_init("ask")$rprofile_changed)
+  expect_false(run_init("yes")$rprofile_changed)
+  expect_equal(readLines(file.path(root, ".Rprofile"), warn = FALSE), before)
+})
+
+test_that("init migrates a block from an earlier hook version to one current block", {
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  root <- withr::local_tempdir()
+  old_block <- c(
+    boosterpak:::rprofile_startup_begin_marker(),
+    sprintf("try(%s)", boosterpak:::rprofile_line()),
+    boosterpak:::rprofile_startup_end_marker()
+  )
+  writeLines(
+    c("before <- TRUE", old_block, "after <- TRUE"),
+    file.path(root, ".Rprofile")
+  )
+
+  result <- init(root = root, renv = "no", rprofile = "yes", verbose = FALSE)
+
+  expect_true(result$rprofile_changed)
+  # No activation line, so the current block is appended after the old one
+  # is removed.
+  expect_equal(
+    readLines(file.path(root, ".Rprofile"), warn = FALSE),
+    c("before <- TRUE", "after <- TRUE", boosterpak:::rprofile_startup_block())
+  )
+})
+
+test_that("a failing boosters function file does not stop later function files", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "boosters"))
+  writeLines('stop("broken fn")', file.path(root, "boosters", "fn_a_broken.R"))
+  writeLines(
+    "options(boosterpak.test.later_fn = TRUE)",
+    file.path(root, "boosters", "fn_b_later.R")
+  )
+  writeLines(boosterpak:::rprofile_startup_block(), file.path(root, ".Rprofile"))
+  withr::local_options(list(boosterpak.test.later_fn = NULL))
+  withr::local_dir(root)
+  env <- new.env(parent = baseenv())
+
+  # try() reports the broken file on stderr.
+  out <- capture.output(
+    sys.source(".Rprofile", envir = env),
+    type = "message"
+  )
+
+  expect_true(getOption("boosterpak.test.later_fn"))
+  expect_match(paste(out, collapse = "\n"), "broken fn", fixed = TRUE)
 })
