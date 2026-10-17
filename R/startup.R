@@ -203,6 +203,15 @@ ppm_download_extra_code <- function() {
   )
 }
 
+#' Build the Repository Opt-Out Guard
+#'
+#' @return R code that is `TRUE` unless `BOOSTERPAK_CONFIGURE_REPOSITORIES`
+#'   turns repository setup off.
+#' @noRd
+rprofile_repositories_enabled_code <- function() {
+  '!tolower(Sys.getenv("BOOSTERPAK_CONFIGURE_REPOSITORIES", "true")) %in% c("0", "false", "no", "off")'
+}
+
 #' Build the Linux Binary Repository R Profile Line
 #'
 #' The line is guarded to glibc Linux and honors
@@ -233,7 +242,7 @@ rprofile_ppm_linux_binary_line <- function(include_renv = TRUE, renv_ppm = FALSE
     if (isTRUE(renv_ppm)) {
       'isNamespaceLoaded("renv") && isTRUE(tryCatch(renv:::renv_ppm_enabled(), error = function(e) FALSE))'
     },
-    '!tolower(Sys.getenv("BOOSTERPAK_CONFIGURE_REPOSITORIES", "true")) %in% c("0", "false", "no", "off")'
+    rprofile_repositories_enabled_code()
   )
   paste0(
     "if (",
@@ -339,6 +348,22 @@ configure_boosterpak_install_policy <- function(verbose = TRUE) {
   invisible(changed)
 }
 
+#' Get the Built-In Default CRAN Mirrors
+#'
+#' These are the mirror values R and RStudio write by default. They are
+#' literals, so the generated `.Rprofile` line can embed exactly this list.
+#'
+#' @return A character vector of built-in default CRAN mirror values.
+#' @noRd
+built_in_cran_mirrors <- function() {
+  c(
+    "@CRAN@",
+    "https://cloud.r-project.org",
+    "https://cran.rstudio.com",
+    "https://cran.r-project.org"
+  )
+}
+
 #' Get Default-Like CRAN Mirrors
 #'
 #' @return A character vector of repository values treated as default CRAN
@@ -352,10 +377,7 @@ default_cran_mirrors <- function() {
     character()
   }
   mirrors <- c(
-    "@CRAN@",
-    "https://cloud.r-project.org",
-    "https://cran.rstudio.com",
-    "https://cran.r-project.org",
+    built_in_cran_mirrors(),
     getOption("boosterpak.default_cran_mirrors", character()),
     env_mirrors
   )
@@ -587,6 +609,64 @@ rprofile_repository_reapply_marker <- function() {
   "# Re-apply boosterpak Linux binary repositories after renv activation."
 }
 
+#' Get the Package Manager CRAN URL to Restore After Activation
+#'
+#' Matches the `CRAN` value the early repository line writes, so a dated or
+#' custom Package Manager URL is restored as it was configured.
+#'
+#' @param repos A character vector of repository URLs, optionally named.
+#' @return The generic `CRAN` URL the early line writes, or `NULL` when `CRAN`
+#'   is missing or is not a Package Manager URL.
+#' @noRd
+ppm_cran_replacement <- function(repos) {
+  repos <- portable_ppm_repos(repos)
+  if (!"CRAN" %in% names(repos)) {
+    return(NULL)
+  }
+  cran <- unname(repos[["CRAN"]])
+  if (is.na(cran) || !is_ppm_repo(cran)) {
+    return(NULL)
+  }
+  cran
+}
+
+#' Build the Post-Activation CRAN Default Mirror R Profile Line
+#'
+#' `renv::load()` can reset a `CRAN` entry to a default mirror such as
+#' `https://cran.rstudio.com`. This line puts the Package Manager URL back. It
+#' runs on every OS, because the lockfile would otherwise flip between mirrors
+#' on different machines. Only the built-in default mirrors are replaced, so a
+#' custom mirror or a non-CRAN repository is left alone. The check tolerates a
+#' missing `CRAN` name and a trailing slash, and it ignores case, so it matches
+#' `is_default_cran_mirror()` for the built-in mirrors. The line runs in
+#' `local()` so it leaves no variables in the global environment.
+#'
+#' @param cran_url The Package Manager URL to restore.
+#' @param include_renv Whether to restore the renv repository override too.
+#' @return A character scalar containing the guarded `.Rprofile` line.
+#' @noRd
+rprofile_cran_default_line <- function(cran_url, include_renv = TRUE) {
+  options_names <- c(
+    "repos",
+    if (isTRUE(include_renv)) "renv.config.repos.override"
+  )
+  guards <- c(
+    'isNamespaceLoaded("renv") && isTRUE(tryCatch(renv:::renv_ppm_enabled(), error = function(e) FALSE))',
+    rprofile_repositories_enabled_code()
+  )
+  sprintf(
+    paste0(
+      "if (%s) local({ for (option in c(%s)) { r <- getOption(option); ",
+      'if ("CRAN" %%in%% names(r) && tolower(sub("/+$", "", r[["CRAN"]])) %%in%% c(%s)) { ',
+      'r[["CRAN"]] <- "%s"; options(structure(list(r), names = option)) } } })'
+    ),
+    paste(guards, collapse = " && "),
+    paste(sprintf('"%s"', options_names), collapse = ", "),
+    paste(sprintf('"%s"', tolower(built_in_cran_mirrors())), collapse = ", "),
+    escape_r_string(cran_url)
+  )
+}
+
 #' Build Post-Activation Linux Binary R Profile Lines
 #'
 #' `renv/activate.R` calls `renv::load()`, which resets `repos` to the lockfile
@@ -595,13 +675,20 @@ rprofile_repository_reapply_marker <- function() {
 #' Package Manager handling is on. Then `renv::snapshot()` keeps the lockfile
 #' URL generic. See `rprofile_ppm_linux_binary_line()`.
 #'
+#' When `cran_url` is given, a line before the Linux binary line restores it
+#' over a default CRAN mirror on every OS. See `rprofile_cran_default_line()`.
+#' The Linux line runs second, so it rewrites the restored URL.
+#'
 #' @param include_renv Whether to rewrite the renv repository override.
+#' @param cran_url The Package Manager URL to restore over a default CRAN
+#'   mirror, or `NULL` to omit that line.
 #' @return A character vector: the marker followed by the guarded `.Rprofile`
-#'   line.
+#'   lines.
 #' @noRd
-rprofile_repository_reapply_lines <- function(include_renv = TRUE) {
+rprofile_repository_reapply_lines <- function(include_renv = TRUE, cran_url = NULL) {
   c(
     rprofile_repository_reapply_marker(),
+    if (!is.null(cran_url)) rprofile_cran_default_line(cran_url, include_renv),
     rprofile_ppm_linux_binary_line(include_renv, renv_ppm = TRUE)
   )
 }
@@ -625,8 +712,8 @@ boosterpak_install_policy_lines_for_session <- function(changes = character()) {
 #' @param changes Character vector identifying repository settings changed in
 #'   the current session.
 #' @return A character vector of repository setup lines (early lines followed
-#'   by the post-activation Linux binary lines), or an empty vector when
-#'   repository configuration is disabled or Posit Package Manager is unused.
+#'   by the post-activation lines), or an empty vector when repository
+#'   configuration is disabled or Posit Package Manager is unused.
 #' @noRd
 boosterpak_repository_lines_for_session <- function(changes = character()) {
   if (!should_configure_repositories()) {
@@ -641,7 +728,10 @@ boosterpak_repository_lines_for_session <- function(changes = character()) {
     identical(getOption("renv.config.repos.override"), repos)
   c(
     rprofile_repository_lines(repos, include_renv = include_renv),
-    rprofile_repository_reapply_lines(include_renv = include_renv)
+    rprofile_repository_reapply_lines(
+      include_renv = include_renv,
+      cran_url = ppm_cran_replacement(repos)
+    )
   )
 }
 

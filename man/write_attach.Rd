@@ -20,5 +20,7 @@ Resolves package attach intent from \code{boosters.toml} and writes a managed
 package that is not installed is reported in one summary line, and the rest
 still attach. Installation intent remains controlled by pack \code{packages};
 attachment controls only what is loaded at startup by the optional
-\code{.Rprofile} hook.
+\code{.Rprofile} hook. Packages from packs with \code{attach_mode = "interactive"} are
+attached only when \code{interactive()} is true, so workers and non-interactive
+runs skip them.
 }

@@ -137,7 +137,7 @@ test_that("rescue repairs legacy Rprofile hook around renv activation", {
   expect_match(lines[[marker + 1L]], "packagemanager\\.posit\\.co")
   expect_match(lines[[marker + 2L]], "renv.config.repos.override")
   expect_equal(lines[[renv_line + 1L]], boosterpak:::rprofile_repository_reapply_marker())
-  expect_equal(hook_line, renv_line + 3L)
+  expect_equal(hook_line, renv_line + 4L)
   expect_true("before <- TRUE" %in% lines)
   expect_true("after <- TRUE" %in% lines)
 })

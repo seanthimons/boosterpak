@@ -162,7 +162,9 @@ on Windows, macOS, and Linux. A guarded line after them performs the rewrite on
 glibc Linux only, at startup. A second copy follows the renv activation line,
 because `renv::load()` resets the repositories to the lockfile URLs. It runs only
 while renv's Package Manager handling is on, so the lockfile keeps the generic
-URL. Distribution-specific URLs such as
+URL. The re-applied block also restores the Package Manager URL on every OS when
+`renv::load()` left a default CRAN mirror, such as `https://cran.rstudio.com`, in
+`repos`. Custom mirrors are left alone. Distribution-specific URLs such as
 `.../cran/__linux__/noble/latest` are left alone. Rerun `init()` or `upgrade_project()`
 to replace the line written by an earlier boosterpak version.
 
@@ -356,8 +358,10 @@ Here, `ggplot2` and `patchwork` can hydrate or install by package name, while
 
 Package attachment is a startup layer, not installation intent. By default a
 pack attaches its direct `packages`. The pack's `attach` field and the top-level
-`[attach]` table change that. The section "Startup cost and attach trimming"
-below covers the options and what they cost at every R start.
+`[attach]` table change that. A pack can also set `attach_mode = "interactive"`
+so that its packages attach only in interactive sessions. The section "Startup
+cost and attach trimming" below covers the options and what they cost at every
+R start.
 
 ### Remove a pack
 
@@ -419,12 +423,21 @@ These settings control what attaches:
   them. `attach = ["pkg1", "pkg2"]` attaches only the listed packages. These
   values apply to the pack's own packages. Packages attached by a pack that the
   pack extends still attach.
+- `attach_mode = "interactive"` in a pack keeps that pack's packages installed
+  and attaches them only when R is interactive. Workers, `Rscript`, and document
+  renders skip them. The key goes above the first table header in the pack file
+  (`[sources]`, `[settings]`, `[hooks]`), because a key below a table header belongs
+  to that table and is not read as a pack key. A
+  package that another pack or `[attach].declared` also requests without the
+  interactive mode still attaches on every start.
 - `[attach] declared = [...]` attaches the listed packages. The workflow packages
   `pak`, `renv`, and `boosterpak`, and any package listed in `[extras].declared`,
   do not attach unless they are listed here.
 
 A package attaches when a declared pack or `[attach].declared` lists it, and
-neither `[attach].exclude` nor `[exclude].declared` removes it. After you edit
+neither `[attach].exclude` nor `[exclude].declared` removes it. A package that
+only an `attach_mode = "interactive"` pack lists attaches only in interactive
+sessions. After you edit
 `[attach]` or a pack's `attach` field, run `boosterpak::sync()` or
 `boosterpak::write_attach()` to regenerate `boosters/attach.R`. Edit
 `boosters.toml`, not the generated file.
@@ -434,6 +447,21 @@ For a targets pipeline, list the packages the targets use in
 targets, whatever `attach.R` contains, so the pipeline keeps working when attach
 trimming removes a package. `attach.R` still runs on every worker, so trim attach
 as well when startup time matters.
+
+Interactive-only packages go into `attach.R` inside an `if (interactive())` block.
+`interactive()` is `FALSE` in `Rscript`, in a Quarto or knitr render (including
+RStudio's Render button), and in targets, crew, and callr workers. Code that calls
+a function from such a package without a namespace prefix works at the console
+and fails when a document renders or a pipeline runs, so write `here::here()` or
+`fs::path()` in code that must run everywhere.
+
+The shipped `scaffold-analysis` pack uses `attach_mode = "interactive"`. Its
+helper calls only `fs::` functions, so workers do not need `fs` or `here`
+attached. A project that already has its own copy of a pack keeps that copy,
+because `add_pack()` and `sync()` never overwrite files in `boosters/packs/`.
+Such a project still attaches those packages on every start until the copy gets
+`attach_mode = "interactive"` above the first table header, or until the copy is deleted and
+`boosterpak::sync()` copies the current pack again.
 
 `status()` shows what is attached and where it comes from. See
 [Inspect status](#inspect-status) below.
@@ -524,7 +552,9 @@ contains the startup hook.
 
 For startup attachment, `status()` prints each attached package with the pack
 that requested it, or `[attach].declared` for packages listed there, followed by
-`attached on every R start (including workers): N packages`. When the installed
+`attached on every R start (including workers): N packages`. Packages from
+interactive-only packs are left out of that count and listed after it as
+`M more only in interactive sessions`. When the installed
 boosterpak is newer than the `boosters_version` record, it warns and names the
 upgrade commands. When `renv.lock` exists on Linux, it suggests
 `check_binary_repos(lockfile = "renv.lock")`. When the project declares GitHub

@@ -266,3 +266,195 @@ test_that("generated attach file keeps attaching after one package fails to load
   expect_match(msgs, "tools", fixed = TRUE)
   expect_match(msgs, "1 attach package", fixed = TRUE)
 })
+
+# Writes a pack manifest into the project's boosters/packs directory.
+write_pack_manifest <- function(root, name, packages, ..., extends = NULL) {
+  lines <- c(
+    sprintf('name = "%s"', name),
+    sprintf('description = "%s pack."', name),
+    sprintf("packages = [%s]", paste0('"', packages, '"', collapse = ", "))
+  )
+  if (!is.null(extends)) {
+    lines <- c(lines, sprintf('extends = ["%s"]', extends))
+  }
+  writeLines(c(lines, ...), file.path(root, "boosters", "packs", paste0(name, ".toml")))
+}
+
+# Sources generated attach lines in a stub session where `interactive()` and
+# `requireNamespace()` are fixed, and returns the packages `library()` was asked
+# for. Nothing is installed or attached for real.
+run_attach_lines <- function(lines, is_interactive) {
+  file <- withr::local_tempfile(fileext = ".R")
+  writeLines(lines, file)
+  attached <- character()
+  env <- new.env(parent = globalenv())
+  env$interactive <- function() is_interactive
+  env$requireNamespace <- function(package, ...) TRUE
+  env$library <- function(package, ...) {
+    attached <<- c(attached, as.character(substitute(package)))
+    invisible(NULL)
+  }
+  testthat::capture_messages(sys.source(file, envir = env))
+  attached
+}
+
+test_that("interactive pack packages stay in the attach list but are marked interactive", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_pack_manifest(root, "live", "glue", 'attach_mode = "interactive"')
+  boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "packs", "declared", "live")
+  config <- boosterpak:::read_config(root)
+
+  sources <- boosterpak:::resolve_config_attach_sources(config, root)
+
+  expect_equal(sources$package, "glue")
+  expect_equal(sources$pack, "live")
+  expect_true(sources$interactive)
+  expect_equal(boosterpak:::resolve_config_attach_packages(config, root), "glue")
+})
+
+test_that("pack attach_mode defaults to always and packages stay unconditional", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("example", root = root, sync = FALSE, verbose = FALSE)
+
+  sources <- boosterpak:::resolve_config_attach_sources(boosterpak:::read_config(root), root)
+
+  expect_equal(sources$package, "cli")
+  expect_false(sources$interactive)
+})
+
+test_that("an unconditional pack request wins over an interactive one in either order", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_pack_manifest(root, "live", "glue", 'attach_mode = "interactive"')
+  write_pack_manifest(root, "plain", "glue")
+  for (declared in list(c("live", "plain"), c("plain", "live"))) {
+    boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "packs", "declared", declared)
+    sources <- boosterpak:::resolve_config_attach_sources(boosterpak:::read_config(root), root)
+
+    expect_equal(sources$package, "glue")
+    expect_false(sources$interactive)
+  }
+})
+
+test_that("[attach].declared wins over an interactive pack request", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_pack_manifest(root, "live", "glue", 'attach_mode = "interactive"')
+  boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "packs", "declared", "live")
+  boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "attach", "declared", "glue")
+
+  sources <- boosterpak:::resolve_config_attach_sources(boosterpak:::read_config(root), root)
+
+  expect_equal(sources$package, "glue")
+  # The label still names every requesting pack, including the interactive one.
+  expect_equal(sources$pack, "live, [attach].declared")
+  expect_false(sources$interactive)
+})
+
+test_that("attach_mode applies to the packages each pack contributes through extends", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_pack_manifest(root, "base", "cli")
+  write_pack_manifest(root, "live_child", "glue", 'attach_mode = "interactive"', extends = "base")
+  boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "packs", "declared", "live_child")
+
+  sources <- boosterpak:::resolve_config_attach_sources(boosterpak:::read_config(root), root)
+  expect_setequal(sources$package, c("cli", "glue"))
+  expect_false(sources$interactive[sources$package == "cli"])
+  expect_true(sources$interactive[sources$package == "glue"])
+
+  write_pack_manifest(root, "live_base", "glue", 'attach_mode = "interactive"')
+  write_pack_manifest(root, "plain_child", "cli", extends = "live_base")
+  boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "packs", "declared", "plain_child")
+
+  sources <- boosterpak:::resolve_config_attach_sources(boosterpak:::read_config(root), root)
+  expect_setequal(sources$package, c("cli", "glue"))
+  expect_true(sources$interactive[sources$package == "glue"])
+  expect_false(sources$interactive[sources$package == "cli"])
+})
+
+test_that("attach exclude removes interactive-only packages", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_pack_manifest(root, "live", "glue", 'attach_mode = "interactive"')
+  boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "packs", "declared", "live")
+  boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "attach", "exclude", "glue")
+
+  config <- boosterpak:::read_config(root)
+
+  expect_equal(boosterpak:::resolve_config_attach_packages(config, root), character())
+  expect_equal(nrow(boosterpak:::resolve_config_attach_sources(config, root)), 0L)
+})
+
+test_that("write_attach puts interactive packages in an interactive block", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_pack_manifest(root, "plain", "cli")
+  write_pack_manifest(root, "live", "glue", 'attach_mode = "interactive"')
+  boosterpak:::update_declared_array(file.path(root, "boosters.toml"), "packs", "declared", c("plain", "live"))
+
+  path <- write_attach(root, verbose = FALSE)
+  lines <- readLines(path, warn = FALSE)
+  block_start <- grep("if (interactive()) {", lines, fixed = TRUE)
+
+  expect_length(block_start, 1L)
+  expect_lt(grep("library(cli)", lines, fixed = TRUE), block_start)
+  expect_gt(grep("library(glue)", lines, fixed = TRUE), block_start)
+  expect_length(grep("library(glue)", lines, fixed = TRUE), 1L)
+  expect_equal(run_attach_lines(lines, is_interactive = FALSE), "cli")
+  expect_equal(run_attach_lines(lines, is_interactive = TRUE), c("cli", "glue"))
+})
+
+test_that("an interactive-only attach file attaches nothing outside interactive sessions", {
+  lines <- boosterpak:::attach_file_lines(character(), "glue")
+
+  expect_equal(run_attach_lines(lines, is_interactive = FALSE), character())
+  expect_equal(run_attach_lines(lines, is_interactive = TRUE), "glue")
+})
+
+test_that("attach file keeps interactive packages literal for renv dependency discovery", {
+  skip_if_not_installed("renv")
+  root <- withr::local_tempdir()
+  path <- file.path(root, "attach.R")
+  writeLines(boosterpak:::attach_file_lines("cli", "glue"), path)
+
+  found <- renv::dependencies(path, progress = FALSE)
+
+  expect_setequal(found$Package, c("cli", "glue"))
+})
+
+test_that("no packages of either mode writes the header only", {
+  expect_equal(
+    boosterpak:::attach_file_lines(character(), character()),
+    boosterpak:::attach_file_lines(character())
+  )
+})
+
+test_that("pack attach_mode accepts only always or interactive", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+
+  write_pack_manifest(root, "badmode", "glue", 'attach_mode = "sometimes"')
+  expect_error(boosterpak:::load_pack("badmode", root = root), "attach_mode.*must be")
+
+  write_pack_manifest(root, "badtype", "glue", "attach_mode = true")
+  expect_error(boosterpak:::load_pack("badtype", root = root), "attach_mode.*must be")
+
+  write_pack_manifest(root, "goodmode", "glue", 'attach_mode = "always"')
+  expect_equal(boosterpak:::load_pack("goodmode", root = root)$attach_mode, "always")
+})
+
+test_that("scaffold-analysis ships interactive-only attachment for its helper packages", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  add_pack("scaffold-analysis", root = root, sync = FALSE, verbose = FALSE)
+
+  pack <- boosterpak:::load_pack("scaffold-analysis", root = root)
+  sources <- boosterpak:::resolve_config_attach_sources(boosterpak:::read_config(root), root)
+
+  expect_equal(pack$attach_mode, "interactive")
+  expect_setequal(sources$package, c("fs", "here"))
+  expect_true(all(sources$interactive))
+})

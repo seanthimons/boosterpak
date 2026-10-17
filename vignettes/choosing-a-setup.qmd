@@ -55,7 +55,8 @@ you would otherwise repeat by hand in each project:
 - **Startup behavior you can inspect.** The packages that attach when R starts
   come from a generated `boosters/attach.R`. `status()` shows each attached
   package and the pack behind it, so you can trim startup cost, for example in
-  `targets` and `crew` workers.
+  `targets` and `crew` workers. A pack can also attach its packages only in
+  interactive sessions, which keeps them out of worker startup.
 - **Helper functions that travel with the project.** Pack helper files are
   copied into the project, and `check_functions()` and `diff_function()` show
   when a copy has drifted from its source.
