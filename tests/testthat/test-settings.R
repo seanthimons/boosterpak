@@ -43,7 +43,26 @@ test_that("adding a pack with settings scaffolds a project settings section", {
   expect_true(all(header[grepl("^\\[|^#", header)] %in% lines))
 })
 
-test_that("re-adding a pack preserves edited project settings", {
+test_that("re-adding a declared pack preserves edited project settings", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_settings_pack(root)
+  path <- file.path(root, "boosters.toml")
+  add_pack("cfg", root = root, sync = FALSE, verbose = FALSE)
+
+  lines <- readLines(path, warn = FALSE)
+  lines[lines == "retries = 2"] <- "retries = 5"
+  writeLines(lines, path)
+
+  add_pack("cfg", root = root, sync = FALSE, verbose = FALSE)
+
+  lines <- readLines(path, warn = FALSE)
+  expect_true("retries = 5" %in% lines)
+  expect_false("retries = 2" %in% lines)
+  expect_equal(sum(lines == "[settings.packs.cfg]"), 1L)
+})
+
+test_that("removing a pack drops its settings section, so re-adding restores defaults", {
   root <- withr::local_tempdir()
   init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
   write_settings_pack(root)
@@ -55,12 +74,34 @@ test_that("re-adding a pack preserves edited project settings", {
   writeLines(lines, path)
 
   remove_pack("cfg", root = root, sync = FALSE, verbose = FALSE)
+  expect_false(any(grepl("settings.packs.cfg", readLines(path, warn = FALSE), fixed = TRUE)))
+
   add_pack("cfg", root = root, sync = FALSE, verbose = FALSE)
+  lines <- readLines(path, warn = FALSE)
+  expect_true("retries = 2" %in% lines)
+  expect_false("retries = 5" %in% lines)
+  expect_equal(sum(lines == "[settings.packs.cfg]"), 1L)
+})
+
+test_that("removing a pack keeps settings of packs still resolved through extends", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  write_settings_pack(root)
+  write_settings_pack(root, name = "child", extends = "cfg", settings = FALSE)
+  path <- file.path(root, "boosters.toml")
+  add_pack("cfg", root = root, sync = FALSE, verbose = FALSE)
+  add_pack("child", root = root, sync = FALSE, verbose = FALSE)
 
   lines <- readLines(path, warn = FALSE)
+  lines[lines == "retries = 2"] <- "retries = 5"
+  writeLines(lines, path)
+
+  # cfg is still declared, so removing child must not touch its section.
+  remove_pack("child", root = root, sync = FALSE, verbose = FALSE)
+  lines <- readLines(path, warn = FALSE)
+  expect_true("[settings.packs.cfg]" %in% lines)
   expect_true("retries = 5" %in% lines)
-  expect_false("retries = 2" %in% lines)
-  expect_equal(sum(lines == "[settings.packs.cfg]"), 1L)
+  expect_false(any(grepl("child", lines, fixed = TRUE)))
 })
 
 test_that("pack_setting resolves project override, pack default, then default", {

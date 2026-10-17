@@ -6,8 +6,7 @@
 default_config <- function(root = ".") {
   list(
     project = list(
-      name = basename(normalizePath(root, winslash = "/", mustWork = FALSE)),
-      boosters_version = package_version_string()
+      name = basename(normalizePath(root, winslash = "/", mustWork = FALSE))
     ),
     packs = list(declared = "core"),
     extras = list(declared = self_install_spec()),
@@ -173,13 +172,180 @@ warn_unknown_keys <- function(config) {
   invisible(TRUE)
 }
 
+#' Build the explanatory comment for the boosters_version field
+#'
+#' @return A character vector of TOML comment lines written above
+#'   `boosters_version` in `[project]`.
+#' @noRd
+boosters_version_comment <- function() {
+  c(
+    "# boosters_version is the boosterpak version this project was last migrated",
+    "# with. init() and the upgrade path refresh it; sync() does not. It is not a",
+    "# lock. When it is older than the installed boosterpak, run",
+    "# boosterpak::upgrade_project() to bring the project up to date."
+  )
+}
+
+#' Read the boosters_version recorded in boosters.toml
+#'
+#' @param root Project root.
+#' @return The recorded version as a `package_version`, or `NULL` when the
+#'   record is missing or invalid or `boosters.toml` cannot be parsed.
+#' @noRd
+recorded_boosters_version <- function(root = ".") {
+  recorded <- tryCatch(
+    read_config(root)$project$boosters_version,
+    error = function(err) NULL
+  )
+  if (!is.character(recorded) || length(recorded) != 1) {
+    return(NULL)
+  }
+  tryCatch(package_version(recorded), error = function(err) NULL)
+}
+
+#' Record the installed boosterpak version in boosters.toml
+#'
+#' Sets `[project].boosters_version` to the installed version, adding the
+#' explanatory comment when it is missing. The record is only written when it
+#' is missing or older than the installed version, so an older boosterpak never
+#' downgrades a record that a newer one wrote. Other lines are left unchanged,
+#' and the file is rewritten only when its content changes.
+#'
+#' @param root Project root.
+#' @return `TRUE` if `boosters.toml` changed, otherwise `FALSE`, invisibly.
+#' @noRd
+set_boosters_version <- function(root = ".") {
+  path <- boosters_file(root)
+  if (!file.exists(path)) {
+    cli::cli_abort(
+      "{.file boosters.toml} does not exist. Run {.code boosterpak::init()} first.",
+      call = NULL
+    )
+  }
+  recorded <- recorded_boosters_version(root)
+  if (
+    !is.null(recorded) &&
+      !recorded < package_version(package_version_string())
+  ) {
+    return(invisible(FALSE))
+  }
+  original <- readLines(path, warn = FALSE)
+  lines <- original
+  comment <- boosters_version_comment()
+  version_line <- sprintf('boosters_version = "%s"', package_version_string())
+  headers <- grep("^\\s*\\[[^]]+\\]\\s*(#.*)?$", lines)
+  project_start <- grep("^\\s*\\[project\\]\\s*(#.*)?$", lines)
+  if (length(project_start) > 1) {
+    cli::cli_abort(
+      "Could not find a unique [project] section in {.file {path}}.",
+      call = NULL
+    )
+  }
+
+  if (length(project_start) == 0) {
+    lines <- c(lines, "", "[project]", comment, version_line)
+  } else {
+    start <- project_start[[1]]
+    next_header <- headers[headers > start]
+    end <- if (length(next_header) > 0) next_header[[1]] - 1L else length(lines)
+    key <- grep("^\\s*boosters_version\\s*=", lines[start:end])
+    if (length(key) > 1) {
+      cli::cli_abort(
+        "Could not safely update [project].boosters_version in {.file {path}}.",
+        call = NULL
+      )
+    }
+    if (length(key) == 1) {
+      key_idx <- start + key[[1]] - 1L
+      lines[[key_idx]] <- version_line
+      # A user comment between the explanation and the key does not count as
+      # missing, so the explanation is not written a second time.
+      has_comment <- all(comment %in% lines[start:(key_idx - 1L)])
+      if (!has_comment) {
+        lines <- append(lines, comment, after = key_idx - 1L)
+      }
+    } else {
+      last <- start + max(which(nzchar(trimws(lines[start:end])))) - 1L
+      lines <- append(lines, c(comment, version_line), after = last)
+    }
+  }
+
+  if (identical(lines, original)) {
+    return(invisible(FALSE))
+  }
+  writeLines(lines, path, useBytes = TRUE)
+  invisible(TRUE)
+}
+
+#' Classify the boosters_version record against the installed boosterpak
+#'
+#' @param root Project root.
+#' @return One of `"missing"` (no `boosters_version` key), `"invalid"` (the file
+#'   cannot be parsed or the value is not a version), `"older"` (the record is
+#'   older than the installed version), `"current"`, or `"newer"`.
+#' @noRd
+boosters_version_state <- function(root = ".") {
+  config <- tryCatch(read_config(root), error = function(err) NULL)
+  if (is.null(config)) {
+    return("invalid")
+  }
+  value <- config$project$boosters_version
+  if (is.null(value)) {
+    return("missing")
+  }
+  recorded <- if (is.character(value) && length(value) == 1) {
+    tryCatch(package_version(value), error = function(err) NULL)
+  }
+  if (is.null(recorded)) {
+    return("invalid")
+  }
+  installed <- package_version(package_version_string())
+  if (recorded < installed) {
+    "older"
+  } else if (recorded == installed) {
+    "current"
+  } else {
+    "newer"
+  }
+}
+
+#' Check whether a project was last migrated with an older boosterpak
+#'
+#' A project is behind when `boosters.toml` exists and its record is missing,
+#' unreadable, or older than the installed boosterpak. A record that is newer
+#' than the installed version (an older boosterpak run on a newer project) is
+#' not treated as behind. A project created with `init(rprofile = "no")`, or
+#' with a declined prompt, has no record until a later `init()` completes the
+#' `.Rprofile` step, so it counts as behind here.
+#'
+#' @param root Project root.
+#' @return `TRUE` when the record is missing, invalid, or older than the
+#'   installed boosterpak, `FALSE` otherwise, including when `boosters.toml`
+#'   does not exist.
+#' @noRd
+project_needs_upgrade <- function(root = ".") {
+  if (!file.exists(boosters_file(root))) {
+    return(FALSE)
+  }
+  boosters_version_state(root) %in% c("missing", "invalid", "older")
+}
+
 #' Write the default project configuration
 #'
 #' @param root Project root.
+#' @param record_version Whether to record the installed version in
+#'   `[project].boosters_version`. `init()` passes `FALSE` for a new project
+#'   and records the version itself once the `.Rprofile` step has run.
 #' @return The path to `boosters.toml`, invisibly.
 #' @noRd
-write_default_config <- function(root = ".") {
+write_default_config <- function(root = ".", record_version = TRUE) {
   path <- boosters_file(root)
+  version_lines <- if (record_version) {
+    c(
+      boosters_version_comment(),
+      sprintf('boosters_version = "%s"', package_version_string())
+    )
+  }
   lines <- c(
     "# boosters.toml - project configuration",
     "# Edit this file directly or use boosterpak::add_pack() / remove_pack().",
@@ -189,7 +355,7 @@ write_default_config <- function(root = ".") {
       'name = "%s"',
       escape_toml_string(default_config(root)$project$name)
     ),
-    sprintf('boosters_version = "%s"', package_version_string()),
+    version_lines,
     "",
     "[packs]",
     'declared = ["core"]',

@@ -162,6 +162,10 @@ test_that("init repairs generated beta manifests with boosterpak self extra", {
 })
 
 test_that("init leaves custom extras arrays unchanged", {
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
   root <- withr::local_tempdir()
   writeLines(
     c(
@@ -180,15 +184,16 @@ test_that("init leaves custom extras arrays unchanged", {
   )
   before <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
 
+  # rprofile = "yes" completes the .Rprofile step, which records the version.
   expect_error(
-    init(root = root, renv = "no", rprofile = "no", verbose = FALSE),
+    init(root = root, renv = "no", rprofile = "yes", verbose = FALSE),
     NA
   )
 
-  expect_equal(
-    readLines(file.path(root, "boosters.toml"), warn = FALSE),
-    before
-  )
+  after <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
+  extras <- function(lines) lines[seq.int(grep("^\\[extras\\]$", lines), length(lines))]
+  expect_equal(extras(after), extras(before))
+  expect_equal(sum(grepl("^boosters_version = ", after)), 1L)
 })
 
 test_that("self install spec follows install metadata", {
@@ -234,7 +239,8 @@ test_that("init inserts Rprofile hook after renv activation", {
   hook_line <- match(boosterpak:::rprofile_startup_begin_marker(), lines)
   repo_line <- match(boosterpak:::rprofile_repository_marker(), lines)
   expect_true(repo_line < renv_line)
-  expect_equal(hook_line, renv_line + 1L)
+  # Two post-activation Linux binary lines sit between activation and the hook.
+  expect_equal(hook_line, renv_line + 3L)
 })
 
 test_that("init upgrades historical Rprofile hooks to one managed block", {
@@ -299,18 +305,26 @@ test_that("managed Rprofile hook errors do not abort later profile code", {
 })
 
 test_that("init does not overwrite existing boosters.toml", {
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
   root <- withr::local_tempdir()
   writeLines(c("[project]", 'name = "kept"'), file.path(root, "boosters.toml"))
   before <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
 
   expect_error(
-    init(root = root, renv = "no", rprofile = "no", verbose = FALSE),
+    init(root = root, renv = "no", rprofile = "yes", verbose = FALSE),
     NA
   )
 
+  after <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
+  # init only adds the boosters_version record; existing lines are kept in order.
+  expect_equal(after[after %in% before], before)
+  expect_true('name = "kept"' %in% after)
   expect_equal(
-    readLines(file.path(root, "boosters.toml"), warn = FALSE),
-    before
+    sum(grepl("^boosters_version = ", after)),
+    1L
   )
 })
 

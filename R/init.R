@@ -1,5 +1,13 @@
 #' Initialize a boosterpak project
 #'
+#' Creates or repairs the project files, then records the installed boosterpak
+#' version in `[project].boosters_version` of `boosters.toml`. That field is
+#' the version the project was last migrated with. It is written only once the
+#' `.Rprofile` startup step has run, so a new project created with
+#' `rprofile = "no"`, or where the prompt is declined, has no record and still
+#' counts as behind until a later `init()` completes that step. The record is
+#' never moved to an older version. [sync()] does not change it.
+#'
 #' @param root Project root.
 #' @param renv Whether to initialize project-local renv: `"ask"`, `"yes"`, or `"no"`.
 #' @param rprofile Whether to add the recommended `.Rprofile` startup hook that
@@ -29,7 +37,7 @@ init <- function(
   config_path <- boosters_file(root)
   wrote_config <- FALSE
   if (!file.exists(config_path)) {
-    write_default_config(root)
+    write_default_config(root, record_version = FALSE)
     wrote_config <- TRUE
   } else {
     repair_self_extra(config_path)
@@ -64,6 +72,11 @@ init <- function(
     rprofile,
     repository_lines = repository_lines
   )
+  # Only a finished .Rprofile step marks the project as migrated. With
+  # rprofile = "no", or a declined prompt, the startup setup is still behind.
+  if (!identical(rprofile, "no") && !isTRUE(attr(changed_rprofile, "skipped"))) {
+    set_boosters_version(root)
+  }
 
   if (should_emit(verbose)) {
     if (wrote_config) {
@@ -74,7 +87,10 @@ init <- function(
     }
   }
 
-  invisible(list(config = config_path, rprofile_changed = changed_rprofile))
+  invisible(list(
+    config = config_path,
+    rprofile_changed = isTRUE(changed_rprofile)
+  ))
 }
 
 #' Write the default Air formatter configuration
