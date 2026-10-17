@@ -146,9 +146,17 @@ call_renv_load <- function(root = ".") {
 call_renv_snapshot <- function(root = ".", packages = NULL, update = FALSE) {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
+  # On glibc Linux the session repos point at the manylinux binary URL. renv
+  # only strips that segment when its Package Manager handling is enabled, so
+  # pass the generic URL explicitly to keep renv.lock portable.
+  repos <- getOption("repos")
+  if (!is.null(repos)) {
+    repos <- portable_ppm_repos(repos)
+  }
   renv::snapshot(
     project = root,
     packages = packages,
+    repos = repos,
     prompt = FALSE,
     update = update
   )
@@ -270,12 +278,21 @@ install_via <- function(packages, root = ".", library = "renv") {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
   configure_boosterpak_install_policy(verbose = FALSE)
-  pak::pkg_install(
-    packages,
-    lib = package_library(root, library),
-    upgrade = FALSE
+  tryCatch(
+    pak_install_packages(packages, package_library(root, library)),
+    error = rethrow_github_rate_limit
   )
   invisible(packages)
+}
+
+#' Install Packages with Pak into One Library
+#'
+#' @param packages Character vector of package specifications to install.
+#' @param lib Library path to install into.
+#' @return The pak installation result, invisibly.
+#' @noRd
+pak_install_packages <- function(packages, lib) {
+  invisible(pak::pkg_install(packages, lib = lib, upgrade = FALSE))
 }
 
 #' Install Pak with Renv

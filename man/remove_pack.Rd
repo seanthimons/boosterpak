@@ -23,7 +23,8 @@ remove_pack(
 \item{remove_functions}{Whether to remove unchanged function files provided
 only by the removed pack.}
 
-\item{verbose}{Whether to print routine summaries.}
+\item{verbose}{Whether to print routine summaries and the note about
+packages that remain installed. \code{FALSE} suppresses both.}
 
 \item{library}{Package-library strategy passed to \code{\link[=sync]{sync()}}. \code{NULL} uses the
 project configuration.}
@@ -32,5 +33,14 @@ project configuration.}
 Updated declared pack names, invisibly.
 }
 \description{
-Remove a pack declaration
+Removes the pack from \code{boosters.toml}, drops its \verb{[settings.packs.<name>]}
+section when no remaining pack needs it, and regenerates
+\code{boosters/attach.R} so its packages stop attaching at startup. This happens
+whether or not \code{sync} is \code{TRUE}.
+}
+\details{
+Removing a pack does not uninstall anything. Packages it provided stay in
+\code{renv.lock} and the project library; run \code{renv::snapshot()} to drop them
+from the lockfile and \code{renv::remove()} to uninstall them. A note saying so
+is printed unless \code{verbose = FALSE}.
 }

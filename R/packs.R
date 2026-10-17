@@ -310,7 +310,9 @@ validate_pack_schema <- function(expected_name, path, data, scope) {
     data$hooks$on_add %||% character(),
     sprintf("%s [hooks].on_add", path)
   )
-  validate_pack_attach(data$attach, sprintf("%s attach", path))
+  # [[ ]] keeps `attach` from partially matching a bare `attach_mode` key.
+  validate_pack_attach(data[["attach"]], sprintf("%s attach", path))
+  validate_pack_attach_mode(data[["attach_mode"]], sprintf("%s attach_mode", path))
   if (
     !is.null(data$settings) &&
       (!is.list(data$settings) || is.data.frame(data$settings))

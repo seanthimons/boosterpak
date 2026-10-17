@@ -103,12 +103,27 @@ user_packs_dir <- function() {
   file.path(tools::R_user_dir("boosters", "config"), "packs")
 }
 
-#' Build the current startup hook
+#' Build the previous startup hook
 #'
-#' @return A single string containing the current `.Rprofile` startup hook.
+#' Kept byte-for-byte so blocks written by earlier versions are recognised and
+#' migrated. Not written by current versions; see `rprofile_hook_line()`.
+#'
+#' @return A single string containing the previous `.Rprofile` startup hook.
 #' @noRd
 rprofile_line <- function() {
   'if (dir.exists("boosters")) { attach <- file.path("boosters", "attach.R"); if (file.exists(attach)) source(attach); invisible(lapply(list.files("boosters", "^fn_.*\\\\.R$", full.names = TRUE), source)) }'
+}
+
+#' Build the current startup hook
+#'
+#' Each `boosters/fn_*.R` file is sourced in its own `try()`, so one broken
+#' file cannot stop the files after it. A failing `attach.R` does not stop
+#' the function files either.
+#'
+#' @return A single string containing the current `.Rprofile` startup hook.
+#' @noRd
+rprofile_hook_line <- function() {
+  'if (dir.exists("boosters")) { attach <- file.path("boosters", "attach.R"); if (file.exists(attach)) try(source(attach)); invisible(lapply(list.files("boosters", "^fn_.*\\\\.R$", full.names = TRUE), function(f) try(source(f)))) }'
 }
 
 #' Build the legacy startup hook
@@ -142,7 +157,7 @@ rprofile_startup_end_marker <- function() {
 rprofile_startup_block <- function() {
   c(
     rprofile_startup_begin_marker(),
-    sprintf("try(%s)", rprofile_line()),
+    sprintf("try(%s)", rprofile_hook_line()),
     rprofile_startup_end_marker()
   )
 }

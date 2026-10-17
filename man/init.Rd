@@ -25,5 +25,11 @@ sources \code{boosters/attach.R} before helper files.}
 Project setup paths, invisibly.
 }
 \description{
-Initialize a boosterpak project
+Creates or repairs the project files, then records the installed boosterpak
+version in \verb{[project].boosters_version} of \code{boosters.toml}. That field is
+the version the project was last migrated with. It is written only once the
+\code{.Rprofile} startup step has run, so a new project created with
+\code{rprofile = "no"}, or where the prompt is declined, has no record and still
+counts as behind until a later \code{init()} completes that step. The record is
+never moved to an older version. \code{\link[=sync]{sync()}} does not change it.
 }

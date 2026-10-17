@@ -516,3 +516,141 @@ declare_project_packs <- function(
   }
   invisible(next_packs)
 }
+
+#' Classify a GitHub access failure message
+#'
+#' pak and renv report GitHub failures as plain error text rather than a
+#' structured condition, so classification matches the message wording. An
+#' explicit rate-limit phrase is `"rate limit"`. A bare HTTP 403 or 429 from
+#' GitHub is `"refused"`, because a 403 can also mean the request was refused
+#' for another reason.
+#'
+#' @param message Error message text.
+#' @return `"rate limit"`, `"refused"`, or `NA` when the message is not a
+#'   GitHub access failure.
+#' @noRd
+github_failure_cause <- function(message) {
+  message <- paste(message, collapse = " ")
+  if (!nzchar(message)) {
+    return(NA_character_)
+  }
+  if (grepl("API rate limit", message, ignore.case = TRUE)) {
+    return("rate limit")
+  }
+  if (!grepl("github", message, ignore.case = TRUE)) {
+    return(NA_character_)
+  }
+  if (grepl("rate limit", message, ignore.case = TRUE)) {
+    return("rate limit")
+  }
+  if (grepl("\\b(403|429)\\b", message, ignore.case = TRUE)) {
+    return("refused")
+  }
+  NA_character_
+}
+
+#' Detect a GitHub API rate-limit or refusal failure
+#'
+#' @param message Error message text.
+#' @return `TRUE` when the message looks like a GitHub access failure.
+#' @noRd
+is_github_rate_limit_error <- function(message) {
+  !is.na(github_failure_cause(message))
+}
+
+#' Collect the messages of an error and its parent conditions
+#'
+#' `rlang` and `cli` wrap an underlying error in `parent`, and the rate-limit
+#' text often sits only in the parent.
+#'
+#' @param err A condition object.
+#' @return A character vector with one message per condition in the chain.
+#' @noRd
+condition_chain_messages <- function(err) {
+  messages <- character()
+  while (inherits(err, "condition")) {
+    messages <- c(
+      messages,
+      tryCatch(conditionMessage(err), error = function(e) "")
+    )
+    err <- err$parent
+  }
+  messages
+}
+
+#' Marker that identifies a rate-limit hint already added to a message
+#'
+#' Every hint contains this text, so a message is never hinted twice.
+#'
+#' @return The token instruction text that every GitHub token hint contains.
+#' @noRd
+github_rate_limit_marker <- function() {
+  "Set a token for the R session, then rerun."
+}
+
+#' Build the GitHub token hint for a rate-limit or refusal failure
+#'
+#' The hint names environment variables and commands. It reports only whether
+#' `GITHUB_PAT` or `GITHUB_TOKEN` is set and never reads or prints a token
+#' value. The first line is worded by evidence: an explicit rate limit is
+#' stated as one, while a bare 403 or 429 is hedged because GitHub may have
+#' refused the request for another reason.
+#'
+#' @param cause `"rate limit"` or `"refused"`, from `github_failure_cause()`.
+#' @return A single string with the hint lines.
+#' @noRd
+github_rate_limit_hint <- function(cause = c("rate limit", "refused")) {
+  cause <- match.arg(cause)
+  token_set <- nzchar(Sys.getenv("GITHUB_PAT")) ||
+    nzchar(Sys.getenv("GITHUB_TOKEN"))
+  token_status <- if (token_set) {
+    "A GitHub token is already set (GITHUB_PAT or GITHUB_TOKEN); it may be exhausted or lack access."
+  } else {
+    "No GitHub token is set (GITHUB_PAT or GITHUB_TOKEN)."
+  }
+  headline <- if (identical(cause, "rate limit")) {
+    "GitHub rate limit reached."
+  } else {
+    "GitHub may have rate-limited or refused the request."
+  }
+  paste(
+    c(
+      headline,
+      "Anonymous GitHub API requests share a limit of 60 requests per hour per IP address.",
+      token_status,
+      paste(
+        github_rate_limit_marker(),
+        "From a shell where the GitHub CLI is logged in:"
+      ),
+      "  bash or zsh:   export GITHUB_PAT=$(gh auth token)",
+      "  PowerShell:    $env:GITHUB_PAT = gh auth token",
+      "Or store one for your user account with gitcreds::gitcreds_set() or GITHUB_PAT in ~/.Renviron."
+    ),
+    collapse = "\n"
+  )
+}
+
+#' Re-signal an error with a GitHub token hint when it is a GitHub access failure
+#'
+#' Used as a `tryCatch()` error handler. The error and every parent condition
+#' are checked. Other errors, and errors that already carry the hint, are
+#' re-signalled unchanged.
+#'
+#' @param err Error condition caught by the handler.
+#' @return This function does not return; it signals an error.
+#' @noRd
+rethrow_github_rate_limit <- function(err) {
+  messages <- condition_chain_messages(err)
+  causes <- vapply(messages, github_failure_cause, character(1), USE.NAMES = FALSE)
+  if (
+    all(is.na(causes)) ||
+      any(grepl(github_rate_limit_marker(), messages, fixed = TRUE))
+  ) {
+    stop(err)
+  }
+  cause <- if ("rate limit" %in% causes) "rate limit" else "refused"
+  stop(
+    paste(conditionMessage(err), github_rate_limit_hint(cause), sep = "\n"),
+    call. = FALSE
+  )
+}

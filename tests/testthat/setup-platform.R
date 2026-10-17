@@ -4,3 +4,10 @@ local_mocked_bindings(
   .package = "boosterpak",
   .env = teardown_env()
 )
+# status() checks the developer's git credential store for GitHub projects.
+# Tests never run `git credential fill`; tests of that check mock it again.
+local_mocked_bindings(
+  gitcreds_lookup = function() NULL,
+  .package = "boosterpak",
+  .env = teardown_env()
+)

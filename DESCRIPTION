@@ -22,10 +22,12 @@ Imports:
     pak,
     renv,
     RcppTOML,
+    rlang,
     utils
 Suggests:
     autonewsmd,
     ggplot2,
+    gitcreds,
     knitr,
     quarto,
     rmarkdown,
