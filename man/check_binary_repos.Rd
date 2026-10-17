@@ -4,21 +4,38 @@
 \alias{check_binary_repos}
 \title{Check Whether Package Manager Serves Binary Packages}
 \usage{
-check_binary_repos(repos = getOption("repos"), package = "cli", verbose = NULL)
+check_binary_repos(
+  repos = NULL,
+  package = "cli",
+  verbose = NULL,
+  lockfile = NULL,
+  snapshot_dates = NULL
+)
 }
 \arguments{
 \item{repos}{Repository URLs to check. Defaults to \code{getOption("repos")}.
 Repositories that are not Posit Package Manager repositories, including
 self-hosted ones not listed in \code{BOOSTERPAK_PPM_REPO},
 \code{BOOSTERPAK_PPM_HOSTS}, or \code{options(boosterpak.ppm_hosts = c(...))}, are
-skipped.}
+skipped. Cannot be combined with \code{lockfile}.}
 
 \item{package}{A small package available from the repository, used as the
 probe. Defaults to \code{"cli"}.}
 
 \item{verbose}{Whether to print routine per-repository results. Warnings
 are always signaled for repositories serving source, unreachable
-repositories, and responses that cannot be interpreted.}
+repositories, responses that cannot be interpreted, and lockfile pins that
+are not available as binary. The count of lockfile pins that were not
+compared is always reported.}
+
+\item{lockfile}{Path to an \code{renv.lock}. When given, the repositories are the
+ones recorded in the lockfile, and the pins are compared with their
+indexes as described above.}
+
+\item{snapshot_dates}{Optional dates in \code{"YYYY-MM-DD"} form, such as
+\code{"2026-10-14"}. For each date, the pins from each Package Manager
+repository in \code{lockfile} are compared with that dated snapshot. Requires
+\code{lockfile}.}
 }
 \value{
 A data frame with one row per checked repository, invisibly. Columns
@@ -26,6 +43,26 @@ are \code{repo}, \code{name} (the repository name in \code{repos}), \code{packag
 \code{status} (the HTTP status of the final response), \code{package_type}
 (\code{"binary"} or \code{"source"}), \code{binary_tag}, and \code{binary} (\code{TRUE} for
 binaries, \code{FALSE} for source, \code{NA} when it could not be determined).
+
+With \code{lockfile}, the data frame also carries a \code{"lockfile"} attribute, a
+list with: \code{lockfile} (the path); \code{pins} (repository-sourced pins compared,
+\code{M}); \code{available} (\code{N}, pins available as binary); \code{unavailable};
+\code{needs_compilation} (\code{K}, unavailable pins whose package needs compilation
+in the index); \code{not_in_index} (unavailable pins whose package is not in
+the index); \code{unchecked} (repository-sourced pins not compared: their
+repository is not a Package Manager repository, is not recorded in the
+lockfile, or its index could not be read); \code{repositories} (per-repository
+counts); \code{offenders} (one row per unavailable pin that needs compilation or
+is not in the index, with \code{repository}, \code{package}, \code{pinned}, \code{current} (the
+index version, \code{NA} when absent), \code{available}, and \code{needs_compilation});
+and \code{snapshots} (counts per \code{snapshot_dates} entry, or \code{NULL} when none
+were given).
+
+The \code{"lockfile"} attribute is set only when the check runs, which is on
+Linux. On other platforms the function returns an empty data frame without
+it. The attribute is present on every Linux run with \code{lockfile}, including
+Linux without glibc. The \verb{__linux__} rewrite described above applies only
+on glibc Linux.
 }
 \description{
 Posit Package Manager silently serves source packages whenever it cannot
@@ -47,12 +84,48 @@ passes: it uses libcurl directly and follows redirects.
 
 The check follows the Linux binary layout, where the repository URL itself
 selects binaries, so it only runs on Linux; on other platforms it returns an
-empty data frame. It needs network access: it downloads the repository's
+empty data frame. It needs network access: it downloads each repository's
 package index with \code{utils::available.packages()} to find the current version
-of \code{package}, then sends the \code{HEAD} request. Nothing runs unless you call it.
+of \code{package}, then sends the \code{HEAD} request. Nothing runs unless you call it,
+and nothing is installed.
+\subsection{Pinned versions}{
+
+A project restores the versions pinned in \code{renv.lock}, not the current
+versions. Package Manager only serves a binary for a version that exists in
+the snapshot the URL points at, so a pin that is older or newer than the
+repository's current version can still compile from source even when the
+probe above passes. Pass \code{lockfile} to compare every repository-sourced pin
+with the index of its repository, using one index download per repository
+and no installs:
+\itemize{
+\item Repositories come from the lockfile's \code{R$Repositories}. Each pin is matched
+to one of them by its \code{Repository} field: first by repository name, then
+by URL with any trailing slash ignored. A value that is neither, such as
+\code{RSPM}, is matched to the lockfile's only Package Manager repository when
+there is exactly one. Pins that match no repository are not compared.
+\item On glibc Linux, with boosterpak's repository setup enabled (see
+\code{BOOSTERPAK_CONFIGURE_REPOSITORIES}), each generic Package Manager URL is
+checked as the Linux binary URL a restore on this machine would use, such
+as \verb{<host>/cran/__linux__/manylinux_2_28/latest}. Otherwise the URL as
+recorded is checked, because that is what a restore uses. Distro URLs such
+as \verb{<host>/cran/__linux__/noble/latest} are checked as they are.
+\item A pin is available as binary when its version equals the version in that
+index. Other pins, and pins missing from the index, are not available as
+binary. A pin that needs compilation is one whose package is marked
+\code{NeedsCompilation: yes} in the index. For a pin whose version differs from
+the index, that flag describes the current version, so it is an estimate.
+\item The result is warned about when any pin is not available as binary. The
+worst offenders, pins that need compilation first, are listed in the
+warning and in the \code{"lockfile"} attribute.
+\item \code{snapshot_dates} optionally compares the pins with dated snapshots that
+you name. Only those dates are requested. Nothing scans other dates.
+}
+}
 }
 \examples{
 \dontrun{
 check_binary_repos()
+check_binary_repos(lockfile = "renv.lock")
+check_binary_repos(lockfile = "renv.lock", snapshot_dates = "2026-10-14")
 }
 }
