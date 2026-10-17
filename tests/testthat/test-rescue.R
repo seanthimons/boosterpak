@@ -1,3 +1,44 @@
+test_that("rescue replaces a block from an earlier hook version with the current block", {
+  old_block <- c(
+    boosterpak:::rprofile_startup_begin_marker(),
+    sprintf("try(%s)", boosterpak:::rprofile_line()),
+    boosterpak:::rprofile_startup_end_marker()
+  )
+  lines <- c("before <- TRUE", 'source("renv/activate.R")', old_block, "after <- TRUE")
+
+  planned <- boosterpak:::.rescue_rprofile_lines(lines)
+
+  expect_true(planned$changed)
+  expect_equal(
+    planned$lines,
+    c(
+      "before <- TRUE",
+      'source("renv/activate.R")',
+      boosterpak:::rprofile_startup_block(),
+      "after <- TRUE"
+    )
+  )
+})
+
+test_that("rescue adds the managed hook after existing post-activation repository lines", {
+  reapply <- boosterpak:::rprofile_repository_reapply_lines()
+  lines <- c("before <- TRUE", 'source("renv/activate.R")', reapply, "after <- TRUE")
+
+  planned <- boosterpak:::.rescue_rprofile_lines(lines)
+
+  expect_true(planned$changed)
+  expect_equal(
+    planned$lines,
+    c(
+      "before <- TRUE",
+      'source("renv/activate.R")',
+      reapply,
+      boosterpak:::rprofile_startup_block(),
+      "after <- TRUE"
+    )
+  )
+})
+
 test_that("rescue aborts when boosters.toml is absent", {
   root <- withr::local_tempdir()
 
@@ -95,7 +136,8 @@ test_that("rescue repairs legacy Rprofile hook around renv activation", {
   expect_match(lines[[marker + 1L]], "options\\(repos = c")
   expect_match(lines[[marker + 1L]], "packagemanager\\.posit\\.co")
   expect_match(lines[[marker + 2L]], "renv.config.repos.override")
-  expect_equal(hook_line, renv_line + 1L)
+  expect_equal(lines[[renv_line + 1L]], boosterpak:::rprofile_repository_reapply_marker())
+  expect_equal(hook_line, renv_line + 3L)
   expect_true("before <- TRUE" %in% lines)
   expect_true("after <- TRUE" %in% lines)
 })
@@ -296,7 +338,21 @@ test_that("README documents bootstrap before hidden rescue when boosterpak is ab
   expect_true(any(grepl('requireNamespace\\("renv"', readme)))
   expect_true(any(grepl("renv::load()", readme, fixed = TRUE)))
   expect_true(any(grepl('renv::install("seanthimons/boosterpak"', readme, fixed = TRUE)))
-  expect_true(any(grepl("boosterpak:::.rescue()", readme, fixed = TRUE)))
+  # The README documents the exported upgrade_project(), not the internal helper.
+  expect_true(any(grepl("boosterpak::upgrade_project()", readme, fixed = TRUE)))
+
+  # Every R code block must parse, so the documented commands are valid R calls.
+  opens <- grep("^``` ?r\\s*$", readme)
+  closes <- grep("^```\\s*$", readme)
+  expect_gt(length(opens), 0)
+  parses <- vapply(opens, function(open) {
+    close <- closes[closes > open][[1]]
+    !inherits(
+      tryCatch(parse(text = readme[(open + 1L):(close - 1L)]), error = identity),
+      "error"
+    )
+  }, logical(1))
+  expect_true(all(parses))
 })
 
 test_that("rescue does not use interactive cli repository messages", {
@@ -402,4 +458,171 @@ test_that("rescue applies the download header for real runs on Linux", {
   boosterpak:::.rescue(root = root, verbose = FALSE)
 
   expect_match(getOption("download.file.extra"), "User-Agent: R \\(")
+})
+
+stale_boosters_version <- function(root, version = "0.6.0.9000") {
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  at <- grep("^boosters_version = ", lines)
+  version_line <- sprintf('boosters_version = "%s"', version)
+  if (length(at) == 0) {
+    # init(rprofile = "no") records no version, so the stale record is added
+    # under [project] to give the upgrade a record to refresh.
+    project <- grep("^\\[project\\]", lines)
+    lines <- append(lines, version_line, after = project[[1]])
+  } else {
+    lines[at] <- version_line
+  }
+  writeLines(lines, path)
+}
+
+recorded_boosters_version <- function(root) {
+  lines <- readLines(file.path(root, "boosters.toml"), warn = FALSE)
+  lines[grep("^boosters_version = ", lines)]
+}
+
+test_that("upgrade records the installed boosterpak version after a clean run", {
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  stale_boosters_version(root)
+  local_mocked_bindings(package_version_string = function() "99.0.0", .package = "boosterpak")
+
+  report <- upgrade_project(root, verbose = FALSE)
+
+  expect_equal(recorded_boosters_version(root), 'boosters_version = "99.0.0"')
+  expect_false(boosterpak:::project_needs_upgrade(root))
+  expect_true(any(grepl("boosters.toml$", report$paths)))
+  expect_true(any(grepl("recorded the installed boosterpak version", report$actions, fixed = TRUE)))
+})
+
+test_that("upgrade dry run leaves boosters_version untouched and lists boosters.toml", {
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  stale_boosters_version(root)
+  path <- file.path(root, "boosters.toml")
+  before <- readLines(path, warn = FALSE)
+  local_mocked_bindings(package_version_string = function() "99.0.0", .package = "boosterpak")
+
+  report <- upgrade_project(root, dry_run = TRUE, verbose = FALSE)
+
+  expect_equal(readLines(path, warn = FALSE), before)
+  expect_equal(recorded_boosters_version(root), 'boosters_version = "0.6.0.9000"')
+  expect_true(any(grepl("boosters.toml$", report$paths)))
+  expect_true(any(grepl("would record the installed boosterpak version", report$actions, fixed = TRUE)))
+})
+
+test_that("upgrade does not record the version when it finishes with warnings", {
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  stale_boosters_version(root)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  writeLines(sub("^enabled = true$", "enabled = \"yes\"", lines), path)
+  local_mocked_bindings(package_version_string = function() "99.0.0", .package = "boosterpak")
+
+  report <- upgrade_project(root, verbose = FALSE)
+
+  expect_true(length(report$warnings) > 0)
+  expect_true(any(grepl("boosters_version not recorded", report$skipped, fixed = TRUE)))
+  expect_equal(recorded_boosters_version(root), 'boosters_version = "0.6.0.9000"')
+})
+
+test_that("upgrade does not record the version when the upgrade is aborted", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  stale_boosters_version(root)
+  local_mocked_bindings(package_version_string = function() "99.0.0", .package = "boosterpak")
+  local_mocked_bindings(
+    .rescue_repositories = function(dry_run, verbose) stop("simulated abort", call. = FALSE),
+    .package = "boosterpak"
+  )
+
+  expect_error(upgrade_project(root, verbose = FALSE), "simulated abort")
+  expect_equal(recorded_boosters_version(root), 'boosters_version = "0.6.0.9000"')
+})
+
+test_that("rescue does not record boosters_version when workflow repair skips for renv", {
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  stale_boosters_version(root)
+  local_mocked_bindings(
+    has_project_renv = function(root = ".") TRUE,
+    .rescue_has_package = function(package) FALSE,
+    .package = "boosterpak"
+  )
+
+  report <- boosterpak:::.rescue_report(root, dry_run = FALSE)
+  report <- boosterpak:::.rescue_workflow_packages(root, FALSE, report)
+  report <- boosterpak:::.rescue_record_version(root, FALSE, report)
+
+  expect_true(any(grepl("renv is unavailable", report$warnings)))
+  expect_true(any(grepl("boosters_version not recorded", report$skipped, fixed = TRUE)))
+  expect_equal(recorded_boosters_version(root), 'boosters_version = "0.6.0.9000"')
+})
+
+test_that("upgrade reports renv/activate.R changes made while loading renv", {
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  root <- withr::local_tempdir()
+  boosterpak:::write_default_config(root)
+  dir.create(file.path(root, "renv"), showWarnings = FALSE)
+  writeLines("# before load", file.path(root, "renv", "activate.R"))
+
+  local_mocked_bindings(
+    has_project_renv = function(root = ".") TRUE,
+    .rescue_has_package = function(package) TRUE,
+    is_project_renv_active = function(root = ".") FALSE,
+    call_renv_load = function(root = ".") {
+      writeLines("# rewritten by load", file.path(root, "renv", "activate.R"))
+    },
+    missing_packages = function(packages, root = ".", ...) character(),
+    ensure_dependency_closure = function(packages, root = ".", library = "renv") {
+      invisible(character())
+    },
+    call_renv_snapshot = function(root = ".", packages = NULL, update = FALSE) invisible(TRUE),
+    .package = "boosterpak"
+  )
+
+  report <- boosterpak:::.rescue(root = root, verbose = FALSE)
+
+  expect_true(any(grepl("renv/activate.R$", report$paths)))
+  expect_true(any(grepl("updated renv/activate.R", report$actions, fixed = TRUE)))
+})
+
+test_that("rescue messages name upgrade_project rather than the internal function", {
+  withr::local_options(list(
+    boosterpak.configure_repositories = FALSE,
+    boosterpak.configure_install_policy = FALSE
+  ))
+  root <- withr::local_tempdir()
+  expect_error(
+    upgrade_project(root, verbose = FALSE),
+    "upgrade_project\\(\\) repairs existing boosterpak projects"
+  )
+
+  root <- withr::local_tempdir()
+  boosterpak:::write_default_config(root)
+  messages <- testthat::capture_messages(
+    upgrade_project(root, dry_run = TRUE, verbose = TRUE)
+  )
+  expect_true(any(grepl("boosterpak upgrade dry run", messages, fixed = TRUE)))
+  expect_false(any(grepl("rescue", messages, fixed = TRUE)))
 })

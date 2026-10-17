@@ -4,20 +4,24 @@
 #' @param dry_run Whether to report repairs without modifying files or the
 #'   active R session.
 #' @param verbose Whether to print the rescue report.
+#' @param snapshot Whether to write workflow packages to `renv.lock`.
 #' @return A rescue report, invisibly.
 #' @noRd
-.rescue <- function(root = ".", dry_run = FALSE, verbose = NULL) {
+.rescue <- function(root = ".", dry_run = FALSE, verbose = NULL, snapshot = TRUE) {
   .rescue_check_verbose(verbose)
   if (!is.logical(dry_run) || length(dry_run) != 1 || is.na(dry_run)) {
     .rescue_stop("dry_run must be TRUE or FALSE.")
+  }
+  if (!is.logical(snapshot) || length(snapshot) != 1 || is.na(snapshot)) {
+    .rescue_stop("snapshot must be TRUE or FALSE.")
   }
 
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
   if (!file.exists(boosters_file(root))) {
     .rescue_stop(
       c(
-        "boosters.toml does not exist; boosterpak:::.rescue() repairs existing boosterpak projects only.",
-        "Use boosterpak::init() for a new project, or restore boosters.toml before running rescue."
+        "boosters.toml does not exist; upgrade_project() repairs existing boosterpak projects only.",
+        "Use boosterpak::init() for a new project, or restore boosters.toml before running upgrade_project()."
       )
     )
   }
@@ -49,10 +53,93 @@
     dry_run = dry_run,
     report = report
   )
-  report <- .rescue_workflow_packages(root, dry_run, report)
+  # Captured before the workflow step, which may load renv and rewrite
+  # renv/activate.R; the change is reported on every path out of that step.
+  activate <- file.path(root, "renv", "activate.R")
+  activate_before <- .rescue_read_lines(activate)
+  report <- .rescue_workflow_packages(
+    root,
+    dry_run,
+    report,
+    snapshot = snapshot,
+    repos = repositories$repos
+  )
+  report <- .rescue_note_activate_change(report, activate, activate_before)
+  report <- .rescue_record_version(root, dry_run, report)
 
   .rescue_emit_report(report, verbose)
   invisible(report)
+}
+
+#' Record the installed boosterpak version after a completed upgrade
+#'
+#' `[project].boosters_version` marks the boosterpak version a project was last
+#' migrated with, so it is refreshed only when the upgrade finished without
+#' warnings. A dry run reports the change on a scratch copy and writes nothing.
+#'
+#' @param root Normalized project root.
+#' @param dry_run Whether the upgrade is a dry run.
+#' @param report Rescue report to update.
+#' @return The updated rescue report.
+#' @noRd
+.rescue_record_version <- function(root, dry_run, report) {
+  if (length(report$warnings) > 0) {
+    return(.rescue_add(
+      report,
+      "skipped",
+      "boosters_version not recorded: the upgrade reported warnings. Fix them and rerun upgrade_project()."
+    ))
+  }
+
+  path <- boosters_file(root)
+  changed <- tryCatch(
+    {
+      if (isTRUE(dry_run)) {
+        .rescue_version_would_change(path)
+      } else {
+        set_boosters_version(root)
+      }
+    },
+    error = function(err) {
+      report <<- .rescue_add(
+        report,
+        "warnings",
+        sprintf("boosters_version not recorded: %s", conditionMessage(err))
+      )
+      NULL
+    }
+  )
+  if (is.null(changed)) {
+    return(report)
+  }
+  if (!isTRUE(changed)) {
+    return(.rescue_add(report, "skipped", "boosters_version already matches the installed boosterpak."))
+  }
+
+  report <- .rescue_add_path(report, path)
+  .rescue_add(
+    report,
+    "actions",
+    if (isTRUE(dry_run)) {
+      "would record the installed boosterpak version in boosters.toml."
+    } else {
+      "recorded the installed boosterpak version in boosters.toml."
+    }
+  )
+}
+
+#' Check whether recording the boosterpak version would change boosters.toml
+#'
+#' @param path Path to the project's `boosters.toml`.
+#' @return `TRUE` when `set_boosters_version()` would change the file, otherwise
+#'   `FALSE`. The project file is not modified.
+#' @noRd
+.rescue_version_would_change <- function(path) {
+  scratch <- tempfile("boosterpak-version-")
+  dir.create(scratch)
+  on.exit(unlink(scratch, recursive = TRUE, force = TRUE), add = TRUE)
+  file.copy(path, file.path(scratch, "boosters.toml"))
+  isTRUE(set_boosters_version(scratch))
 }
 
 #' Validate rescue verbosity
@@ -100,7 +187,8 @@
     skipped = character(),
     warnings = character(),
     paths = character(),
-    repository_changes = character()
+    repository_changes = character(),
+    preview = character()
   )
 }
 
@@ -167,6 +255,7 @@
     changes <- configure_boosterpak_repositories(verbose = FALSE)
     install_policy_changes <- configure_boosterpak_install_policy(verbose = FALSE)
     lines <- boosterpak_rprofile_setup_lines(changes, install_policy_changes)
+    repos <- getOption("repos")
     options(repos = old_repos)
     options(renv.config.repos.override = old_renv_repos)
     options(HTTPUserAgent = old_user_agent)
@@ -176,6 +265,7 @@
     changes <- configure_boosterpak_repositories(verbose = FALSE)
     install_policy_changes <- configure_boosterpak_install_policy(verbose = FALSE)
     lines <- boosterpak_rprofile_setup_lines(changes, install_policy_changes)
+    repos <- getOption("repos")
   }
 
   if (!should_configure_repositories()) {
@@ -210,7 +300,13 @@
     report <- .rescue_add(report, "skipped", "package install policy already set.")
   }
 
-  list(report = report, lines = lines, changes = changes, install_policy_changes = install_policy_changes)
+  list(
+    report = report,
+    lines = lines,
+    changes = changes,
+    install_policy_changes = install_policy_changes,
+    repos = repos
+  )
 }
 
 #' Read and validate the rescue configuration
@@ -336,7 +432,7 @@
   planned <- .rescue_rprofile_lines(existing, repository_lines)
 
   if (!planned$changed) {
-    return(.rescue_add(report, "skipped", ".Rprofile startup setup already matches rescue requirements."))
+    return(.rescue_add(report, "skipped", ".Rprofile startup setup already matches upgrade requirements."))
   }
 
   report <- .rescue_add_path(report, path)
@@ -364,11 +460,18 @@
 
   if (length(repository_lines) > 0) {
     lines <- remove_rprofile_boosterpak_setup_blocks(lines)
-    lines <- insert_before_renv_activation(lines, repository_lines)
   }
 
+  # The hook goes after the activation line and after any post-activation
+  # repository lines, so the order is activation, repository re-apply, hook.
   if (!has_rprofile_startup_block(lines)) {
-    lines <- insert_after_renv_activation(lines, rprofile_startup_block())
+    # Drop a block from an earlier version so exactly one current block remains.
+    lines <- remove_rprofile_startup_blocks(lines)$lines
+    lines <- insert_startup_block(lines, rprofile_startup_block())
+  }
+
+  if (length(repository_lines) > 0) {
+    lines <- insert_repository_lines(lines, repository_lines)
   }
   list(lines = lines, changed = !identical(original, lines))
 }
@@ -525,9 +628,18 @@
 #' @param root Project root.
 #' @param dry_run Whether to report package repairs without applying them.
 #' @param report Rescue report to update.
+#' @param snapshot Whether to write the workflow packages to `renv.lock`.
+#' @param repos Repository option the run will use; used for the dry-run
+#'   lockfile preview.
 #' @return The updated rescue report.
 #' @noRd
-.rescue_workflow_packages <- function(root, dry_run, report) {
+.rescue_workflow_packages <- function(
+  root,
+  dry_run,
+  report,
+  snapshot = TRUE,
+  repos = getOption("repos")
+) {
   packages <- c("renv", "pak", "boosterpak")
 
   if (!has_project_renv(root)) {
@@ -538,10 +650,17 @@
     ))
   }
   if (!.rescue_has_package("renv")) {
-    return(.rescue_add(
+    # The upgrade is incomplete without renv, so it is reported as a warning
+    # and boosters_version is not recorded (see .rescue_record_version()).
+    report <- .rescue_add(
       report,
       "skipped",
-      "workflow package repair skipped: renv is unavailable; install renv and rerun boosterpak:::.rescue() to repair workflow packages."
+      "workflow package repair skipped: renv is unavailable; install renv and rerun upgrade_project() to repair workflow packages."
+    )
+    return(.rescue_add(
+      report,
+      "warnings",
+      "workflow package repair incomplete: renv is unavailable. Install renv and rerun upgrade_project()."
     ))
   }
 
@@ -614,8 +733,31 @@
     } else {
       report <- .rescue_add(report, "skipped", "workflow packages already installed.")
     }
+    if (!isTRUE(snapshot)) {
+      return(.rescue_add(report, "skipped", "renv.lock would not be written: snapshot = FALSE."))
+    }
+
+    preview <- tryCatch(
+      workflow_lockfile_preview(root, packages, repos),
+      error = function(err) {
+        list(
+          lines = sprintf("lockfile preview unavailable: %s", conditionMessage(err)),
+          renv_changed = FALSE
+        )
+      }
+    )
+    report$preview <- preview$lines
     report <- .rescue_add_path(report, file.path(root, "renv.lock"))
-    return(.rescue_add(report, "actions", "would snapshot workflow packages with update = TRUE."))
+    report <- .rescue_add(report, "actions", "would snapshot workflow packages with update = TRUE.")
+    if (isTRUE(preview$renv_changed) && file.exists(file.path(root, "renv", "activate.R"))) {
+      report <- .rescue_add_path(report, file.path(root, "renv", "activate.R"))
+      report <- .rescue_add(
+        report,
+        "actions",
+        "would rewrite renv/activate.R when renv::snapshot() records the new renv version."
+      )
+    }
+    return(report)
   }
 
   if (length(missing) > 0) {
@@ -648,11 +790,12 @@
     report <- .rescue_add(report, "skipped", "workflow packages already installed.")
   }
 
-  report <- .rescue_add_path(report, file.path(root, "renv.lock"))
   snapshotted <- tryCatch(
     {
       ensure_dependency_closure(packages, root)
-      call_renv_snapshot(root, packages = packages, update = TRUE)
+      if (isTRUE(snapshot)) {
+        call_renv_snapshot(root, packages = packages, update = TRUE)
+      }
       TRUE
     },
     error = function(err) {
@@ -670,7 +813,48 @@
   if (!isTRUE(snapshotted)) {
     return(report)
   }
-  .rescue_add(report, "actions", "snapshotted workflow packages with update = TRUE.")
+  if (!isTRUE(snapshot)) {
+    return(.rescue_add(
+      report,
+      "skipped",
+      "renv.lock not written: snapshot = FALSE. Run upgrade_project() without snapshot = FALSE to pin workflow packages."
+    ))
+  }
+
+  report <- .rescue_add_path(report, file.path(root, "renv.lock"))
+  report <- .rescue_add(report, "actions", "snapshotted workflow packages with update = TRUE.")
+  report
+}
+
+#' Read a text file for rescue comparisons
+#'
+#' @param path File path.
+#' @return The lines of `path`, or `NULL` when the file does not exist.
+#' @noRd
+.rescue_read_lines <- function(path) {
+  if (!file.exists(path)) {
+    return(NULL)
+  }
+  readLines(path, warn = FALSE)
+}
+
+#' Report a change to renv/activate.R made during the workflow step
+#'
+#' Loading or snapshotting renv can rewrite `renv/activate.R`. Reporting the
+#' change lets the user see it under files touched.
+#'
+#' @param report Rescue report to update.
+#' @param activate Path to `renv/activate.R`.
+#' @param before Lines of `renv/activate.R` captured before the workflow step,
+#'   or `NULL` when the file was absent.
+#' @return The updated rescue report.
+#' @noRd
+.rescue_note_activate_change <- function(report, activate, before) {
+  if (identical(before, .rescue_read_lines(activate))) {
+    return(report)
+  }
+  report <- .rescue_add_path(report, activate)
+  .rescue_add(report, "actions", "updated renv/activate.R while loading or snapshotting renv.")
 }
 
 #' Install missing rescue workflow packages
@@ -680,19 +864,24 @@
 #' @return `packages`, invisibly.
 #' @noRd
 .rescue_install_workflow_packages <- function(root, packages) {
-  install_specs <- c(
-    renv = "renv",
-    pak = "pak",
-    boosterpak = self_install_spec()
+  tryCatch(
+    {
+      install_specs <- c(
+        renv = "renv",
+        pak = "pak",
+        boosterpak = self_install_spec()
+      )
+      missing <- missing_packages(packages, root)
+      hydrate_via_renv(intersect(missing, c("renv", "pak")), root)
+      missing <- missing_packages(packages, root)
+      if ("pak" %in% missing) {
+        install_pak_via_renv(root)
+        missing <- missing_packages(packages, root)
+      }
+      install_via(unname(install_specs[missing]), root)
+    },
+    error = rethrow_github_rate_limit
   )
-  missing <- missing_packages(packages, root)
-  hydrate_via_renv(intersect(missing, c("renv", "pak")), root)
-  missing <- missing_packages(packages, root)
-  if ("pak" %in% missing) {
-    install_pak_via_renv(root)
-    missing <- missing_packages(packages, root)
-  }
-  install_via(unname(install_specs[missing]), root)
   invisible(packages)
 }
 
@@ -707,7 +896,7 @@
     return(invisible(report))
   }
 
-  title <- if (isTRUE(report$dry_run)) "boosterpak rescue dry run" else "boosterpak rescue"
+  title <- if (isTRUE(report$dry_run)) "boosterpak upgrade dry run" else "boosterpak upgrade"
   message(title)
   for (action in report$actions) {
     message("OK: ", action)
@@ -718,5 +907,32 @@
   for (warning in report$warnings) {
     message("WARNING: ", warning)
   }
+  if (length(report$preview) > 0) {
+    message("Lockfile preview (renv.lock):")
+    for (line in report$preview) {
+      message("  ", line)
+    }
+  }
+  files <- .rescue_display_paths(report$paths, report$root)
+  if (length(files) > 0) {
+    message(if (isTRUE(report$dry_run)) "Files a real run would touch:" else "Files touched:")
+    for (path in files) {
+      message("  ", path)
+    }
+    message("Review these changes with git diff (or your version control) before committing.")
+  }
   invisible(report)
+}
+
+#' Show rescue paths relative to the project root
+#'
+#' @param paths Normalized file paths recorded in a rescue report.
+#' @param root Normalized project root.
+#' @return A character vector of display paths.
+#' @noRd
+.rescue_display_paths <- function(paths, root) {
+  prefix <- paste0(root, "/")
+  inside <- startsWith(paths, prefix)
+  paths[inside] <- substring(paths[inside], nchar(prefix) + 1L)
+  paths
 }
