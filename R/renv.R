@@ -136,6 +136,20 @@ call_renv_load <- function(root = ".") {
   renv::load(project = root, quiet = TRUE)
 }
 
+#' Check whether renv's Package Manager handling is on
+#'
+#' Uses the internal `renv:::renv_ppm_enabled()`, which is not a public API.
+#' Any failure reads as "off", so the caller falls back to the generic URL.
+#'
+#' @return A single logical value.
+#' @noRd
+renv_ppm_handling_enabled <- function() {
+  isTRUE(tryCatch(
+    utils::getFromNamespace("renv_ppm_enabled", "renv")(),
+    error = function(err) FALSE
+  ))
+}
+
 #' Snapshot the Project Renv Lockfile
 #'
 #' @param root Project root.
@@ -146,11 +160,15 @@ call_renv_load <- function(root = ".") {
 call_renv_snapshot <- function(root = ".", packages = NULL, update = FALSE) {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
-  # On glibc Linux the session repos point at the manylinux binary URL. renv
-  # only strips that segment when its Package Manager handling is enabled, so
-  # pass the generic URL explicitly to keep renv.lock portable.
+  # On glibc Linux the session repos point at the manylinux binary URL. With
+  # renv's Package Manager handling on, renv strips that segment from the
+  # lockfile's repository URL itself and keeps each package's repository as a
+  # name such as "CRAN". Passing the generic URL instead makes renv record the
+  # manylinux URL on every package record, because it no longer matches the
+  # URL the package was installed from. Only when that handling is off does
+  # renv write the URL as given, so pass the generic one then.
   repos <- getOption("repos")
-  if (!is.null(repos)) {
+  if (!is.null(repos) && !renv_ppm_handling_enabled()) {
     repos <- portable_ppm_repos(repos)
   }
   renv::snapshot(
