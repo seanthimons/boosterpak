@@ -159,6 +159,17 @@ not duplicated.
   generic.
 - Distribution-specific URLs, such as `.../cran/__linux__/noble/latest`, and
   repositories that are not Package Manager repositories are left alone.
+- A `renv.lock` that still lists a default CRAN mirror, such as
+  `https://cran.rstudio.com`, is not rewritten in project sessions. `renv::load()`
+  sets `repos` from the lockfile, and the re-applied line only touches Package
+  Manager URLs, so `install.packages()` and `pak` in a session keep using that
+  mirror and compile from source on Linux. `renv::restore()` and `renv::install()`
+  still use `renv.config.repos.override`. To get binaries in sessions, run
+  `upgrade_project()`, which writes the Package Manager URL into the lockfile
+  on a real run with `snapshot = TRUE` unless repository configuration is
+  disabled or a custom CRAN mirror is set (check the lockfile preview of a dry
+  run first), or record a Package Manager repository yourself with
+  `renv::snapshot(repos = ...)`.
 - `init()` and `upgrade_project()` replace the repository lines written by
   earlier boosterpak versions, so existing projects upgrade by running either one.
 

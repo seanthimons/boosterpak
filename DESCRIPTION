@@ -22,6 +22,7 @@ Imports:
     pak,
     renv,
     RcppTOML,
+    rlang,
     utils
 Suggests:
     autonewsmd,
