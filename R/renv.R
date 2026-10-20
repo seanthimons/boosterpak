@@ -171,13 +171,83 @@ call_renv_snapshot <- function(root = ".", packages = NULL, update = FALSE) {
   if (!is.null(repos) && !renv_ppm_handling_enabled()) {
     repos <- portable_ppm_repos(repos)
   }
-  renv::snapshot(
+  result <- renv::snapshot(
     project = root,
     packages = packages,
     repos = repos,
     prompt = FALSE,
     update = update
   )
+  tryCatch(
+    normalize_lockfile_platform(root),
+    error = function(err) {
+      cli::cli_warn(c(
+        "Could not remove Linux-specific data from {.file renv.lock}.",
+        "i" = conditionMessage(err)
+      ))
+    }
+  )
+  invisible(result)
+}
+
+#' Remove Linux-Specific Data from Lockfile Package Records
+#'
+#' A lockfile written on Linux should restore on Windows and macOS like one
+#' written elsewhere. Packages installed from portable Linux binaries can carry
+#' a `Platform` tag, and a record's `Repository` can be a manylinux URL instead
+#' of a repository name. This drops the Linux `Platform` tag and maps a
+#' `Repository` URL back to the name of the matching lockfile repository, or to
+#' the generic Package Manager URL when no repository matches. The lockfile is
+#' rewritten only when a record changes.
+#'
+#' @param root Project root.
+#' @return The number of package records that changed, invisibly.
+#' @noRd
+normalize_lockfile_platform <- function(root = ".") {
+  path <- file.path(root, "renv.lock")
+  if (!file.exists(path)) {
+    return(invisible(0L))
+  }
+  lock <- renv::lockfile_read(file = path, project = root)
+  repositories <- lock$R$Repositories %||% list()
+  # renv reads the repositories as a list named by repository.
+  repo_names <- names(repositories) %||% character()
+  repo_urls <- vapply(repositories, function(url) as.character(url)[[1]], character(1))
+  repo_urls <- sub("/+$", "", portable_ppm_repos(repo_urls))
+
+  changed <- 0L
+  for (name in names(lock$Packages)) {
+    record <- lock$Packages[[name]]
+    before <- record
+
+    platform <- record$Platform
+    if (is.character(platform) && length(platform) == 1 && grepl("linux", platform, ignore.case = TRUE)) {
+      record$Platform <- NULL
+    }
+
+    repository <- record$Repository
+    if (is.character(repository) && length(repository) == 1 && grepl("^https?://", repository)) {
+      generic <- portable_ppm_repos(repository)
+      matched <- match(sub("/+$", "", generic), repo_urls)
+      record$Repository <- if (!is.na(matched) && nzchar(repo_names[[matched]])) {
+        repo_names[[matched]]
+      } else {
+        generic
+      }
+    }
+
+    if (!identical(record, before)) {
+      lock$Packages[[name]] <- record
+      changed <- changed + 1L
+    }
+  }
+
+  if (changed > 0L) {
+    old_options <- options(renv.verbose = FALSE)
+    on.exit(options(old_options), add = TRUE)
+    renv::lockfile_write(lock, file = path, project = root)
+  }
+  invisible(changed)
 }
 
 #' Read installed package metadata for dependency checks

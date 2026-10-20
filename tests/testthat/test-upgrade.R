@@ -555,6 +555,60 @@ test_that("call_renv_snapshot passes the generic URL when renv Package Manager h
   )
 })
 
+test_that("call_renv_snapshot strips Linux URLs and Platform tags from the lockfile", {
+  skip_if_not_installed("renv")
+  root <- withr::local_tempdir()
+  generic <- "https://packagemanager.posit.co/cran/latest"
+  manylinux <- "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest"
+  platform <- "x86_64-pc-linux-gnu-manylinux_2_17"
+  lock <- list(
+    R = list(
+      Version = "4.6.1",
+      Repositories = list(list(Name = "CRAN", URL = generic))
+    ),
+    Packages = list(
+      cli = list(Package = "cli", Version = "3.6.6", Source = "Repository", Repository = manylinux, Platform = platform),
+      rlang = list(Package = "rlang", Version = "1.2.0", Source = "Repository", Repository = "CRAN", Platform = platform),
+      here = list(Package = "here", Version = "1.0.2", Source = "Repository", Repository = generic),
+      jsonlite = list(Package = "jsonlite", Version = "2.0.0", Source = "Repository", Repository = "CRAN"),
+      other = list(Package = "other", Version = "1.0.0", Source = "Repository", Repository = "https://example.org/cran")
+    )
+  )
+  jsonlite::write_json(lock, file.path(root, "renv.lock"), auto_unbox = TRUE, pretty = TRUE)
+  withr::local_options(list(repos = c(CRAN = manylinux)))
+  local_mocked_bindings(
+    renv_ppm_handling_enabled = function() TRUE,
+    .package = "boosterpak"
+  )
+  local_mocked_bindings(snapshot = function(...) invisible(NULL), .package = "renv")
+
+  call_renv_snapshot(root)
+
+  records <- renv::lockfile_read(file = file.path(root, "renv.lock"), project = root)$Packages
+  repository <- vapply(records, function(record) record$Repository, character(1))
+  expected <- c(cli = "CRAN", rlang = "CRAN", here = "CRAN", jsonlite = "CRAN", other = "https://example.org/cran")
+  # renv writes records alphabetically, so compare by name.
+  expect_equal(repository[names(expected)], expected)
+  expect_null(records$cli$Platform)
+  expect_null(records$rlang$Platform)
+  text <- paste(readLines(file.path(root, "renv.lock")), collapse = "\n")
+  expect_false(grepl("__linux__|manylinux|\"Platform\"", text))
+})
+
+test_that("normalize_lockfile_platform leaves a portable lockfile untouched", {
+  skip_if_not_installed("renv")
+  root <- withr::local_tempdir()
+  write_upgrade_lock(root)
+  path <- file.path(root, "renv.lock")
+  before <- readLines(path)
+  mtime <- file.mtime(path)
+
+  expect_identical(normalize_lockfile_platform(root), 0L)
+  expect_identical(readLines(path), before)
+  expect_identical(file.mtime(path), mtime)
+  expect_identical(normalize_lockfile_platform(withr::local_tempdir()), 0L)
+})
+
 test_that("renv_ppm_handling_enabled reads renv's own setting and fails closed", {
   skip_if_not_installed("renv")
   withr::local_options(list(renv.config.ppm.enabled = FALSE))
