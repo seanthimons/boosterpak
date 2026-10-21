@@ -191,13 +191,16 @@ them are kept.
 - **Package records.** `renv`, `pak`, `boosterpak`, and their hard
   dependencies are recorded at their installed versions.
 - **`Repository` and `Platform` fields.** Packages installed from
-  Package Manager binaries can carry `Repository: RSPM` and a `Platform`
-  field. renv’s restore does not read `Platform`. `RSPM` is only a
-  preference, so restore falls back to the repository URLs in
-  `renv.lock`. Those URLs are the generic Package Manager URLs, which
-  also serve Windows and macOS binaries. A lockfile written on Linux
-  should therefore restore elsewhere. Check each platform after its
-  first restore.
+  Package Manager binaries can carry `Repository: RSPM` and a Linux
+  `Platform` tag. After its snapshot,
+  [`upgrade_project()`](https://seanthimons.github.io/boosterpak/reference/upgrade_project.md)
+  removes the Linux `Platform` tags and replaces any `Repository` URL
+  with the matching repository name, or with the generic Package Manager
+  URL. `RSPM` stays; it is a repository name, and restore falls back to
+  the repository URLs in `renv.lock`. Those are the generic Package
+  Manager URLs, which also serve Windows and macOS binaries. To check,
+  run `git diff -- renv.lock | grep -E '^\+.*("Platform"|__linux__)'`;
+  it should print nothing. Check each platform after its first restore.
 
 ## The managed .Rprofile block over time
 

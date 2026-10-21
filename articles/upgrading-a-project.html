@@ -72,7 +72,7 @@
 
 
 
-      <small class="dont-index">Source: <a href="https://github.com/seanthimons/boosterpak/blob/v0.9.3/vignettes/upgrading-a-project.qmd" class="external-link"><code>vignettes/upgrading-a-project.qmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/seanthimons/boosterpak/blob/main/vignettes/upgrading-a-project.qmd" class="external-link"><code>vignettes/upgrading-a-project.qmd</code></a></small>
       <div class="d-none name"><code></code></div>
     </div>
 
@@ -225,7 +225,7 @@
 <li>
 <strong>Package records.</strong> <code>renv</code>, <code>pak</code>, <code>boosterpak</code>, and their hard dependencies are recorded at their installed versions.</li>
 <li>
-<strong><code>Repository</code> and <code>Platform</code> fields.</strong> Packages installed from Package Manager binaries can carry <code>Repository: RSPM</code> and a <code>Platform</code> field. renv’s restore does not read <code>Platform</code>. <code>RSPM</code> is only a preference, so restore falls back to the repository URLs in <code>renv.lock</code>. Those URLs are the generic Package Manager URLs, which also serve Windows and macOS binaries. A lockfile written on Linux should therefore restore elsewhere. Check each platform after its first restore.</li>
+<strong><code>Repository</code> and <code>Platform</code> fields.</strong> Packages installed from Package Manager binaries can carry <code>Repository: RSPM</code> and a Linux <code>Platform</code> tag. After its snapshot, <code><a href="../reference/upgrade_project.html">upgrade_project()</a></code> removes the Linux <code>Platform</code> tags and replaces any <code>Repository</code> URL with the matching repository name, or with the generic Package Manager URL. <code>RSPM</code> stays; it is a repository name, and restore falls back to the repository URLs in <code>renv.lock</code>. Those are the generic Package Manager URLs, which also serve Windows and macOS binaries. To check, run <code>git diff -- renv.lock | grep -E '^\+.*("Platform"|__linux__)'</code>; it should print nothing. Check each platform after its first restore.</li>
 </ul></section><section class="level2"><h2 id="the-managed--rprofile-block-over-time">The managed .Rprofile block over time<a class="anchor" aria-label="anchor" href="#the-managed--rprofile-block-over-time"></a>
 </h2>
 <p>The startup lines have changed in each release. <code><a href="../reference/upgrade_project.html">upgrade_project()</a></code> replaces the older forms with the current one.</p>

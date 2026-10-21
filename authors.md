@@ -7,7 +7,7 @@
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/seanthimons/boosterpak/blob/v0.9.3/DESCRIPTION)
+[`DESCRIPTION`](https://github.com/seanthimons/boosterpak/blob/main/DESCRIPTION)
 
 Thimons S (2026). *boosterpak: Reusable Project Capability Packs*. R
 package version 0.9.3, <https://seanthimons.github.io/boosterpak/>.
