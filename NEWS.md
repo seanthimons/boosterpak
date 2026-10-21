@@ -2,6 +2,37 @@
 
 # boosterpak NEWS
 
+## v0.9.4 (2026-10-21)
+
+#### Bug fixes
+
+- skip index repair when a dead repository was dropped
+  ([ca66b60](https://github.com/seanthimons/boosterpak/tree/ca66b6000247211dd439524317af50137808a083))
+- leave unreachable repositories out of the restore
+  ([1dcb874](https://github.com/seanthimons/boosterpak/tree/1dcb874b09eb6f4e3c5cf064cfa32f9602b50521))
+- only repair index URLs when every repository answers
+  ([01bde67](https://github.com/seanthimons/boosterpak/tree/01bde6744a40e6b1dd0c467ce5e9fe37e69beef5))
+- fail fast when no repository is reachable and packages are missing
+  ([136e9c8](https://github.com/seanthimons/boosterpak/tree/136e9c8fb63e78d4ca1d43795a3b39e569da3e33))
+- harden index repair edges (empty sources, probe files, trailing slash)
+  ([b1400fe](https://github.com/seanthimons/boosterpak/tree/b1400fe1777fdab980173f46506ef489388a53d0))
+- route restore around index entries in missing directories
+  ([3584784](https://github.com/seanthimons/boosterpak/tree/3584784fd82ec48ab4fbc5552e2e5807ec4385ef))
+- work around PPM Windows index for restore
+  ([eba933b](https://github.com/seanthimons/boosterpak/tree/eba933bb5d5533010408df31b6bf5c55ec81c1dd))
+- normalize Linux lockfile records after snapshots
+  ([09a0232](https://github.com/seanthimons/boosterpak/tree/09a023286cde3d66755a2a2f2033156c85da142e))
+
+#### Other changes
+
+- bump version to 0.9.4 \[skip ci\]
+  ([a90cf5c](https://github.com/seanthimons/boosterpak/tree/a90cf5c10720008833c7bbeb20e692500e8a1ed0))
+- set BoosterPak directory icon
+  ([e93f6d6](https://github.com/seanthimons/boosterpak/tree/e93f6d63dba9fcd43443933529c2dee1fd169b38))
+
+Full set of changes:
+[`v0.9.3...v0.9.4`](https://github.com/seanthimons/boosterpak/compare/v0.9.3...v0.9.4)
+
 ## v0.9.3 (2026-10-17)
 
 #### New features
@@ -47,6 +78,8 @@
 
 #### Docs
 
+- update NEWS.md for v0.9.3 \[skip ci\]
+  ([0c84727](https://github.com/seanthimons/boosterpak/tree/0c847278ba90d76ae68aeb21bc00d9d148af4dcd))
 - document attach_mode and the CRAN default-mirror restore
   ([e33f5b8](https://github.com/seanthimons/boosterpak/tree/e33f5b8f87b90b1bcb0868c78602479bf70e30de))
 - add upgrade, Linux, rate-limit and startup-cost guidance and the R
