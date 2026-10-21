@@ -414,7 +414,7 @@ repair_unreachable_index_urls <- function(
   from_repo <- vapply(records, function(record) identical(record$Source, "Repository"), logical(1))
   # Offline, a failed probe would look like a missing directory; and pak's
   # index update has no timeout, so check the first repository before asking.
-  repos <- repos[nzchar(repos) & !grepl("@CRAN@", repos, fixed = TRUE)]
+  repos <- sub("/+$", "", repos[nzchar(repos) & !grepl("@CRAN@", repos, fixed = TRUE)])
   if (!any(from_repo) || length(repos) == 0 || !url_ok(paste0(repos[[1]], "/src/contrib/PACKAGES"))) {
     return(records)
   }
@@ -423,12 +423,20 @@ repair_unreachable_index_urls <- function(
     return(records)
   }
   rows <- rows[rows$platform != "source", , drop = FALSE]
-  urls <- vapply(rows$sources, function(source) source[[1]], character(1))
-  # Only entries filed under an extra `Path:` directory can point nowhere.
-  nested <- dirname(rows$target) != rows$repodir
-  dirs <- unique(dirname(urls[nested]))
-  dir_ok <- vapply(dirs, function(dir) url_ok(paste0(dir, "/PACKAGES")), logical(1))
-  broken <- nested & !dirname(urls) %in% dirs[dir_ok]
+  urls <- vapply(
+    rows$sources,
+    function(source) if (length(source)) source[[1]] else NA_character_,
+    character(1)
+  )
+  # Only entries filed under an extra `Path:` directory, at the locked
+  # version, can point nowhere; probe those files themselves.
+  nested <- dirname(rows$target) != rows$repodir & !is.na(urls)
+  locked <- vapply(rows$package, function(name) {
+    if (is.null(records[[name]]$Version)) NA_character_ else records[[name]]$Version
+  }, character(1))
+  nested <- nested & (rows$version == locked) %in% TRUE
+  broken <- nested
+  broken[nested] <- !vapply(urls[nested], url_ok, logical(1))
 
   repaired <- character()
   dropped <- character()
@@ -437,7 +445,7 @@ repair_unreachable_index_urls <- function(
     if (!any(broken & same)) {
       next
     }
-    candidates <- urls[same & !broken]
+    candidates <- urls[same & !broken & !is.na(urls)]
     working <- Find(url_ok, candidates)
     if (is.null(working)) {
       records[[name]] <- NULL

@@ -783,4 +783,20 @@ test_that("repair_unreachable_index_urls rewrites, drops, or leaves records alon
   # offline: first-repository probe fails, so nothing is asked of pak or dropped
   expect_equal(repair_unreachable_index_urls(records, function(p) stop("must not run"), function(url) FALSE, repos), records)
   expect_equal(repair_unreachable_index_urls(records, function(p) rows, bad_dir_ok, character()), records)
+
+  # empty sources element and trailing-slash repo: no error, still repaired
+  odd <- rows
+  odd$sources[[4]] <- character()
+  probed <- character()
+  expect_no_error(suppressWarnings(suppressMessages(
+    out <- repair_unreachable_index_urls(records, function(p) odd, function(url) {
+      probed <<- c(probed, url)
+      bad_dir_ok(url)
+    }, c(PPM = "https://repo/"))
+  )))
+  expect_equal(probed[[1]], "https://repo/src/contrib/PACKAGES")
+  expect_equal(out$foreign$Source, "URL")
+
+  # a nested file that opens is left alone even with no PACKAGES beside it
+  expect_equal(repair_unreachable_index_urls(records, function(p) rows, function(url) !grepl("PACKAGES$", url) || grepl("src/contrib", url), repos), records)
 })
