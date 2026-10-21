@@ -683,6 +683,38 @@ test_that("call_renv_restore restores from the pinned lockfile object", {
   expect_false(restore_args$prompt)
 })
 
+test_that("call_renv_restore skips the index repair when a repository was dropped", {
+  root <- withr::local_tempdir()
+  repaired <- FALSE
+  dead <- character()
+
+  local_mocked_bindings(
+    configure_boosterpak_repositories = function(verbose = TRUE) invisible(character()),
+    configure_boosterpak_install_policy = function(verbose = TRUE) invisible(character()),
+    scope_windows_native_tar = function(envir = parent.frame()) invisible(NULL),
+    abort_if_offline_with_missing = function(...) invisible(NULL),
+    scope_reachable_repos = function(...) dead,
+    repair_unreachable_index_urls = function(records, ...) {
+      repaired <<- TRUE
+      records
+    },
+    .package = "boosterpak"
+  )
+  local_mocked_bindings(
+    lockfile_read = function(...) list(Packages = list(), R = list(Repositories = list())),
+    restore = function(...) NULL,
+    .package = "renv"
+  )
+
+  call_renv_restore(root)
+  expect_true(repaired)
+
+  repaired <- FALSE
+  dead <- "https://packagemanager.posit.co/cran/latest"
+  call_renv_restore(root)
+  expect_false(repaired)
+})
+
 test_that("scope_windows_native_tar is a no-op off Windows", {
   skip_on_os("windows")
   withr::local_envvar(TAR = NA)

@@ -355,7 +355,12 @@ call_renv_restore <- function(root = ".") {
   abort_if_offline_with_missing(lockfile$Packages, root)
   dead <- scope_reachable_repos()
   lockfile$R$Repositories <- drop_repos_on_hosts_of(lockfile$R$Repositories, dead)
-  lockfile$Packages <- repair_unreachable_index_urls(lockfile$Packages)
+  # The index repair asks pak for repository metadata, which blocks once the
+  # repository set has changed (a dead repo was just dropped) and the cache is
+  # cold: pak adds CRAN and Bioconductor hosts of its own. Skip it then.
+  if (length(dead) == 0) {
+    lockfile$Packages <- repair_unreachable_index_urls(lockfile$Packages)
+  }
   renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
 }
 
