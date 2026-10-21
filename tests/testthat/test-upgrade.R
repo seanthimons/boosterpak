@@ -747,16 +747,40 @@ test_that("scope_windows_native_tar leaves a user-set TAR alone", {
   expect_equal(Sys.getenv("TAR"), "C:/custom/tar.exe")
 })
 
-test_that("skip_bundled_recommended drops bundled repository records and warns on drift", {
-  rec <- function(v, source = "Repository") list(Version = v, Source = source)
-  records <- list(
-    foreign = rec("0.8-92"), Matrix = rec("1.7-3"), MASS = rec("7.3-60", "GitHub"),
-    cli = rec("3.6.0")
+test_that("repair_unreachable_index_urls rewrites, drops, or leaves records alone", {
+  base <- "https://repo/bin/windows/contrib/4.6"
+  row <- function(package, version, path = NULL) {
+    target <- paste0("bin/windows/contrib/4.6/", if (!is.null(path)) paste0(path, "/"), package, "_", version, ".zip")
+    data.frame(
+      package = package, version = version, platform = "x86_64-w64-mingw32",
+      repodir = "bin/windows/contrib/4.6", target = target,
+      sources = I(list(paste0("https://repo/", target))), stringsAsFactors = FALSE
+    )
+  }
+  rows <- rbind(
+    row("foreign", "0.8-92", "4.6.2/Recommended"), row("foreign", "0.8-92"),
+    row("MASS", "7.3-66", "4.6.2/Recommended"),
+    row("cli", "3.6.0")
   )
-  bundled <- c(foreign = "0.8-91", Matrix = "1.7-3", MASS = "7.3-66")
-  expect_warning(out <- skip_bundled_recommended(records, bundled), "foreign")
-  expect_named(out, c("MASS", "cli"))
-  expect_no_warning(skip_bundled_recommended(records["Matrix"], bundled))
-  expect_equal(skip_bundled_recommended(list(), bundled), list())
-  expect_equal(skip_bundled_recommended(records, character()), records)
+  rec <- function(v) list(Version = v, Source = "Repository")
+  records <- list(foreign = rec("0.8-92"), MASS = rec("7.3-66"), cli = rec("3.6.0"), mine = list(Version = "1", Source = "GitHub"))
+  bad_dir_ok <- function(url) !grepl("Recommended", url)
+
+  repos <- c(PPM = "https://repo")
+  expect_warning(
+    expect_message(out <- repair_unreachable_index_urls(records, function(p) rows, bad_dir_ok, repos), "foreign"),
+    "MASS"
+  )
+  expect_equal(out$foreign$RemoteUrl, paste0(base, "/foreign_0.8-92.zip"))
+  expect_equal(out$foreign$Source, "URL")
+  expect_null(out$MASS)
+  expect_equal(out$cli, records$cli)
+  expect_equal(out$mine, records$mine)
+
+  expect_equal(repair_unreachable_index_urls(records, function(p) rows, function(url) TRUE, repos), records)
+  expect_equal(repair_unreachable_index_urls(records, function(p) stop("offline"), bad_dir_ok, repos), records)
+  expect_equal(repair_unreachable_index_urls(list(), function(p) rows, bad_dir_ok, repos), list())
+  # offline: first-repository probe fails, so nothing is asked of pak or dropped
+  expect_equal(repair_unreachable_index_urls(records, function(p) stop("must not run"), function(url) FALSE, repos), records)
+  expect_equal(repair_unreachable_index_urls(records, function(p) rows, bad_dir_ok, character()), records)
 })

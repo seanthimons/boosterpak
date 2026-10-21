@@ -352,9 +352,7 @@ call_renv_restore <- function(root = ".") {
   scope_windows_native_tar()
   lockfile <- renv::lockfile_read(project = ".")
   lockfile$Packages <- pin_github_commits(lockfile$Packages)
-  if (.Platform$OS.type == "windows") {
-    lockfile$Packages <- skip_bundled_recommended(lockfile$Packages)
-  }
+  lockfile$Packages <- repair_unreachable_index_urls(lockfile$Packages)
   renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
 }
 
@@ -381,40 +379,110 @@ pin_github_commits <- function(records) {
   records
 }
 
-#' Leave R's Bundled Recommended Packages Alone
+#' Route Around Index Entries That Point at Missing Directories
 #'
-#' Posit Package Manager's Windows binary index lists the recommended packages
-#' (`foreign`, `MASS`, ...) under `Path:` directories that do not exist, so
-#' restoring them fails with a 404. They ship with R, so repository records for
-#' ones installed in R's own library are dropped from the lockfile object
-#' passed to restore, and a warning names any whose locked version differs from
-#' the bundled one. The lockfile on disk is not changed.
+#' Posit Package Manager's Windows binary index lists some packages (the
+#' recommended ones, e.g. `foreign`) a second time with a `Path:` directory
+#' that does not exist, and pak can pick that entry, which 404s the restore.
+#' For each locked repository package, this looks at the index entries for its
+#' locked version and probes the `Path:` directories they use. If one is
+#' missing, the record is rewritten to the entry's working URL (same version),
+#' or dropped from the lockfile object when no entry works. The lockfile on disk
+#' is not changed, and any failure to look up the index leaves `records`
+#' untouched.
 #'
 #' @param records The `Packages` element of a lockfile.
-#' @param bundled Named character vector of versions of the recommended
-#'   packages installed in R's library.
-#' @return `records` without the bundled entries.
+#' @param meta Function returning pak's index metadata for package names.
+#' @param url_ok Function returning whether a URL can be opened.
+#' @param repos Repository URLs; the first is probed to detect being offline.
+#' @return `records`, with affected records rewritten to `url` records or
+#'   removed.
 #' @noRd
-skip_bundled_recommended <- function(
+repair_unreachable_index_urls <- function(
   records,
-  bundled = {
-    installed <- utils::installed.packages(lib.loc = .Library, priority = "recommended")
-    stats::setNames(installed[, "Version"], rownames(installed))
-  }
+  meta = function(packages) {
+    rows <- pak::meta_list(packages)
+    if (nrow(rows) == 0) {
+      pak::meta_update()
+      rows <- pak::meta_list(packages)
+    }
+    rows
+  },
+  url_ok = url_reachable,
+  repos = getOption("repos")
 ) {
-  skip <- vapply(names(records), function(name) {
-    name %in% names(bundled) && identical(records[[name]]$Source, "Repository")
-  }, logical(1))
-  locked <- vapply(records[skip], function(record) record$Version, character(1))
-  differs <- locked[locked != bundled[names(locked)]]
-  if (length(differs)) {
-    cli::cli_warn(c(
-      "Using R's bundled version of recommended packages instead of the locked one: {.pkg {names(differs)}}.",
-      i = "Posit Package Manager's Windows index lists them at unreachable URLs.",
-      i = "Locked: {differs}; bundled: {bundled[names(differs)]}."
+  from_repo <- vapply(records, function(record) identical(record$Source, "Repository"), logical(1))
+  # Offline, a failed probe would look like a missing directory; and pak's
+  # index update has no timeout, so check the first repository before asking.
+  repos <- repos[nzchar(repos) & !grepl("@CRAN@", repos, fixed = TRUE)]
+  if (!any(from_repo) || length(repos) == 0 || !url_ok(paste0(repos[[1]], "/src/contrib/PACKAGES"))) {
+    return(records)
+  }
+  rows <- tryCatch(meta(names(records)[from_repo]), error = function(error) NULL)
+  if (is.null(rows) || nrow(rows) == 0) {
+    return(records)
+  }
+  rows <- rows[rows$platform != "source", , drop = FALSE]
+  urls <- vapply(rows$sources, function(source) source[[1]], character(1))
+  # Only entries filed under an extra `Path:` directory can point nowhere.
+  nested <- dirname(rows$target) != rows$repodir
+  dirs <- unique(dirname(urls[nested]))
+  dir_ok <- vapply(dirs, function(dir) url_ok(paste0(dir, "/PACKAGES")), logical(1))
+  broken <- nested & !dirname(urls) %in% dirs[dir_ok]
+
+  repaired <- character()
+  dropped <- character()
+  for (name in names(records)[from_repo]) {
+    same <- rows$package == name & rows$version == records[[name]]$Version
+    if (!any(broken & same)) {
+      next
+    }
+    candidates <- urls[same & !broken]
+    working <- Find(url_ok, candidates)
+    if (is.null(working)) {
+      records[[name]] <- NULL
+      dropped <- c(dropped, name)
+    } else {
+      records[[name]] <- list(
+        Package = name,
+        Version = records[[name]]$Version,
+        Source = "URL",
+        RemoteType = "url",
+        RemoteUrl = working
+      )
+      repaired <- c(repaired, name)
+    }
+  }
+  if (length(repaired)) {
+    cli::cli_inform(c(
+      "i" = "Restoring {.pkg {repaired}} from direct URLs: the repository index lists them at a missing directory."
     ))
   }
-  records[!skip]
+  if (length(dropped)) {
+    cli::cli_warn(c(
+      "Skipping {.pkg {dropped}}: the repository index lists them only at a missing directory.",
+      i = "Install them separately, or restore again once the repository index is fixed."
+    ))
+  }
+  records
+}
+
+#' Check Whether a URL Can Be Opened
+#'
+#' @param url URL to open.
+#' @return `TRUE` if the server answers with a success status.
+#' @noRd
+url_reachable <- function(url) {
+  old <- options(timeout = 10)
+  on.exit(options(old), add = TRUE)
+  tryCatch(
+    {
+      connection <- suppressWarnings(url(url, "rb"))
+      close(connection)
+      TRUE
+    },
+    error = function(error) FALSE
+  )
 }
 
 #' Prefer Windows' Native tar for Pak
