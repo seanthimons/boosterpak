@@ -631,3 +631,132 @@ test_that("renv_ppm_handling_enabled reads renv's own setting and fails closed",
   )
   expect_false(renv_ppm_handling_enabled())
 })
+
+test_that("pin_github_commits drops RemotePkgRef only from SHA-pinned GitHub records", {
+  records <- list(
+    pinned = list(
+      Package = "pinned", RemoteType = "github", RemotePkgRef = "o/r@main",
+      RemoteRef = "main", RemoteSha = "09a023286cde3d66755a2a2f2033156c85da142e"
+    ),
+    no_sha = list(Package = "no_sha", RemoteType = "github", RemotePkgRef = "o/r@main"),
+    empty_sha = list(Package = "empty_sha", RemoteType = "github", RemotePkgRef = "o/r@main", RemoteSha = ""),
+    cran = list(Package = "cran", Source = "Repository", RemotePkgRef = "cran", RemoteSha = "abc")
+  )
+
+  out <- pin_github_commits(records)
+
+  expect_null(out$pinned$RemotePkgRef)
+  expect_equal(out$pinned$RemoteRef, "main")
+  expect_equal(out$pinned$RemoteSha, records$pinned$RemoteSha)
+  expect_equal(out$no_sha, records$no_sha)
+  expect_equal(out$empty_sha, records$empty_sha)
+  expect_equal(out$cran, records$cran)
+  expect_equal(pin_github_commits(list()), list())
+})
+
+test_that("call_renv_restore restores from the pinned lockfile object", {
+  root <- withr::local_tempdir()
+  restore_args <- NULL
+
+  local_mocked_bindings(
+    configure_boosterpak_repositories = function(verbose = TRUE) invisible(character()),
+    configure_boosterpak_install_policy = function(verbose = TRUE) invisible(character()),
+    scope_windows_native_tar = function(envir = parent.frame()) invisible(NULL),
+    .package = "boosterpak"
+  )
+  local_mocked_bindings(
+    lockfile_read = function(...) {
+      list(Packages = list(boosterpak = list(
+        Package = "boosterpak", RemoteType = "github",
+        RemotePkgRef = "o/r@main", RemoteSha = "abc123"
+      )))
+    },
+    restore = function(...) restore_args <<- list(...),
+    .package = "renv"
+  )
+
+  call_renv_restore(root)
+
+  expect_null(restore_args$lockfile$Packages$boosterpak$RemotePkgRef)
+  expect_equal(restore_args$lockfile$Packages$boosterpak$RemoteSha, "abc123")
+  expect_equal(restore_args$project, root)
+  expect_false(restore_args$prompt)
+})
+
+test_that("scope_windows_native_tar is a no-op off Windows", {
+  skip_on_os("windows")
+  withr::local_envvar(TAR = NA)
+
+  expect_null(scope_windows_native_tar())
+  expect_equal(Sys.getenv("TAR"), "")
+})
+
+test_that("scope_windows_native_tar sets TAR for the calling frame only", {
+  skip_if_not(.Platform$OS.type == "windows")
+  tar <- file.path(Sys.getenv("SystemRoot", "C:/Windows"), "System32", "tar.exe")
+  skip_if_not(file.exists(tar))
+  withr::local_envvar(TAR = NA)
+
+  during <- NULL
+  scoped <- function() {
+    scope_windows_native_tar()
+    during <<- Sys.getenv("TAR")
+  }
+  scoped()
+  expect_equal(during, tar)
+  expect_equal(Sys.getenv("TAR"), "")
+
+  # The frame's exit handler also fires when the frame errors.
+  failing <- function() {
+    scope_windows_native_tar()
+    stop("boom")
+  }
+  expect_error(failing(), "boom")
+  expect_equal(Sys.getenv("TAR"), "")
+})
+
+test_that("scope_windows_native_tar overrides renv's TAR=internal and restores it", {
+  skip_if_not(.Platform$OS.type == "windows")
+  tar <- file.path(Sys.getenv("SystemRoot", "C:/Windows"), "System32", "tar.exe")
+  skip_if_not(file.exists(tar))
+  withr::local_envvar(TAR = "internal")
+
+  during <- NULL
+  scoped <- function() {
+    scope_windows_native_tar()
+    during <<- Sys.getenv("TAR")
+  }
+  scoped()
+
+  expect_equal(during, tar)
+  expect_equal(Sys.getenv("TAR"), "internal")
+})
+
+test_that("scope_windows_native_tar leaves a user-set TAR alone", {
+  skip_if_not(.Platform$OS.type == "windows")
+  withr::local_envvar(TAR = "C:/custom/tar.exe")
+
+  scoped <- function() {
+    result <- scope_windows_native_tar()
+    list(result = result, during = Sys.getenv("TAR"))
+  }
+  out <- scoped()
+
+  expect_null(out$result)
+  expect_equal(out$during, "C:/custom/tar.exe")
+  expect_equal(Sys.getenv("TAR"), "C:/custom/tar.exe")
+})
+
+test_that("skip_bundled_recommended drops bundled repository records and warns on drift", {
+  rec <- function(v, source = "Repository") list(Version = v, Source = source)
+  records <- list(
+    foreign = rec("0.8-92"), Matrix = rec("1.7-3"), MASS = rec("7.3-60", "GitHub"),
+    cli = rec("3.6.0")
+  )
+  bundled <- c(foreign = "0.8-91", Matrix = "1.7-3", MASS = "7.3-66")
+  expect_warning(out <- skip_bundled_recommended(records, bundled), "foreign")
+  expect_named(out, c("MASS", "cli"))
+  expect_no_warning(skip_bundled_recommended(records["Matrix"], bundled))
+  expect_equal(skip_bundled_recommended(list(), bundled), list())
+  expect_equal(skip_bundled_recommended(records, character()), records)
+})

@@ -349,7 +349,100 @@ call_renv_restore <- function(root = ".") {
   on.exit(setwd(old), add = TRUE)
   configure_boosterpak_repositories(verbose = FALSE)
   configure_boosterpak_install_policy(verbose = FALSE)
-  renv::restore(project = root, prompt = FALSE)
+  scope_windows_native_tar()
+  lockfile <- renv::lockfile_read(project = ".")
+  lockfile$Packages <- pin_github_commits(lockfile$Packages)
+  if (.Platform$OS.type == "windows") {
+    lockfile$Packages <- skip_bundled_recommended(lockfile$Packages)
+  }
+  renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
+}
+
+#' Make GitHub Package Records Restore at Their Locked Commit
+#'
+#' renv's pak restore path installs `RemotePkgRef` when a record has one, which
+#' for a GitHub package is the branch (`user/repo@branch`) and silently
+#' discards the locked `RemoteSha`. Dropping `RemotePkgRef` from GitHub records
+#' that have a commit makes renv build the reference from the host, repo,
+#' subdirectory and `RemoteSha` instead. The lockfile on disk is not changed.
+#'
+#' @param records The `Packages` element of a lockfile.
+#' @return `records`, with `RemotePkgRef` removed from GitHub records that have
+#'   a `RemoteSha`.
+#' @noRd
+pin_github_commits <- function(records) {
+  for (name in names(records)) {
+    record <- records[[name]]
+    sha <- record$RemoteSha
+    if (identical(record$RemoteType, "github") && is.character(sha) && length(sha) == 1 && nzchar(sha)) {
+      records[[name]]$RemotePkgRef <- NULL
+    }
+  }
+  records
+}
+
+#' Leave R's Bundled Recommended Packages Alone
+#'
+#' Posit Package Manager's Windows binary index lists the recommended packages
+#' (`foreign`, `MASS`, ...) under `Path:` directories that do not exist, so
+#' restoring them fails with a 404. They ship with R, so repository records for
+#' ones installed in R's own library are dropped from the lockfile object
+#' passed to restore, and a warning names any whose locked version differs from
+#' the bundled one. The lockfile on disk is not changed.
+#'
+#' @param records The `Packages` element of a lockfile.
+#' @param bundled Named character vector of versions of the recommended
+#'   packages installed in R's library.
+#' @return `records` without the bundled entries.
+#' @noRd
+skip_bundled_recommended <- function(
+  records,
+  bundled = {
+    installed <- utils::installed.packages(lib.loc = .Library, priority = "recommended")
+    stats::setNames(installed[, "Version"], rownames(installed))
+  }
+) {
+  skip <- vapply(names(records), function(name) {
+    name %in% names(bundled) && identical(records[[name]]$Source, "Repository")
+  }, logical(1))
+  locked <- vapply(records[skip], function(record) record$Version, character(1))
+  differs <- locked[locked != bundled[names(locked)]]
+  if (length(differs)) {
+    cli::cli_warn(c(
+      "Using R's bundled version of recommended packages instead of the locked one: {.pkg {names(differs)}}.",
+      i = "Posit Package Manager's Windows index lists them at unreachable URLs.",
+      i = "Locked: {differs}; bundled: {bundled[names(differs)]}."
+    ))
+  }
+  records[!skip]
+}
+
+#' Prefer Windows' Native tar for Pak
+#'
+#' On Windows with Rtools on the PATH, pak's subprocesses run Rtools' GNU tar,
+#' which reads a `C:/` archive path as a remote host and fails. pkgdepends then
+#' falls back to starting an R process per archive, with no cap. Pointing `TAR`
+#' at the built-in `tar.exe` avoids that. renv sets `TAR` to `"internal"` when
+#' it is unset, which pkgdepends cannot run, so that counts as unset. Any other
+#' `TAR` the user set is left alone, and the prior value is restored on exit.
+#' pak reuses its subprocess, so this only helps if it runs before pak starts.
+#'
+#' @param envir Frame whose exit restores `TAR`.
+#' @return The tar path used, or `NULL` when nothing was changed, invisibly.
+#' @noRd
+scope_windows_native_tar <- function(envir = parent.frame()) {
+  old <- Sys.getenv("TAR")
+  if (.Platform$OS.type != "windows" || !old %in% c("", "internal")) {
+    return(invisible(NULL))
+  }
+  tar <- file.path(Sys.getenv("SystemRoot", "C:/Windows"), "System32", "tar.exe")
+  if (!file.exists(tar)) {
+    return(invisible(NULL))
+  }
+  Sys.setenv(TAR = tar)
+  restore <- bquote(if (nzchar(.(old))) Sys.setenv(TAR = .(old)) else Sys.unsetenv("TAR"))
+  do.call(on.exit, list(restore, add = TRUE), envir = envir)
+  invisible(tar)
 }
 
 #' Install Packages with Pak
@@ -380,6 +473,7 @@ install_via <- function(packages, root = ".", library = "renv") {
 #' @return The pak installation result, invisibly.
 #' @noRd
 pak_install_packages <- function(packages, lib) {
+  scope_windows_native_tar()
   invisible(pak::pkg_install(packages, lib = lib, upgrade = FALSE))
 }
 
