@@ -352,6 +352,7 @@ call_renv_restore <- function(root = ".") {
   scope_windows_native_tar()
   lockfile <- renv::lockfile_read(project = ".")
   lockfile$Packages <- pin_github_commits(lockfile$Packages)
+  abort_if_offline_with_missing(lockfile$Packages, root)
   lockfile$Packages <- repair_unreachable_index_urls(lockfile$Packages)
   renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
 }
@@ -413,9 +414,8 @@ repair_unreachable_index_urls <- function(
 ) {
   from_repo <- vapply(records, function(record) identical(record$Source, "Repository"), logical(1))
   # Offline, a failed probe would look like a missing directory; and pak's
-  # index update has no timeout, so check the first repository before asking.
-  repos <- sub("/+$", "", repos[nzchar(repos) & !grepl("@CRAN@", repos, fixed = TRUE)])
-  if (!any(from_repo) || length(repos) == 0 || !url_ok(paste0(repos[[1]], "/src/contrib/PACKAGES"))) {
+  # index update has no timeout, so make sure some repository answers first.
+  if (!any(from_repo) || !any_repo_reachable(repos, url_ok)) {
     return(records)
   }
   rows <- tryCatch(meta(names(records)[from_repo]), error = function(error) NULL)
@@ -473,6 +473,69 @@ repair_unreachable_index_urls <- function(
     ))
   }
   records
+}
+
+#' Check Whether Any Configured Repository Answers
+#'
+#' @param repos Repository URLs.
+#' @param url_ok Function returning whether a URL can be opened.
+#' @return `TRUE` as soon as one repository answers.
+#' @noRd
+any_repo_reachable <- function(repos = getOption("repos"), url_ok = url_reachable) {
+  repos <- unique(sub("/+$", "", repos[nzchar(repos) & !grepl("@CRAN@", repos, fixed = TRUE)]))
+  for (repo in repos) {
+    if (url_ok(paste0(repo, "/src/contrib/PACKAGES"))) {
+      return(TRUE)
+    }
+  }
+  FALSE
+}
+
+#' Stop Early When Nothing Can Be Fetched
+#'
+#' With no network, renv's pak restore blocks for minutes without a message.
+#' This aborts only when no configured repository answers and a locked
+#' package is not already installed at its locked version; one repository
+#' being down is fine, since the others can still serve the restore.
+#'
+#' @param records The `Packages` element of a lockfile.
+#' @param root Project root.
+#' @param repos Repository URLs.
+#' @param url_ok Function returning whether a URL can be opened.
+#' @return `NULL`, invisibly.
+#' @noRd
+abort_if_offline_with_missing <- function(
+  records,
+  root = ".",
+  repos = getOption("repos"),
+  url_ok = url_reachable
+) {
+  libraries <- c(renv::paths$library(project = root), .Library, .Library.site)
+  installed <- function(name, version) {
+    for (library in libraries) {
+      description <- file.path(library, name, "DESCRIPTION")
+      found <- if (file.exists(description)) {
+        tryCatch(unname(read.dcf(description, "Version")[1, 1]), error = function(error) NA_character_)
+      }
+      if (identical(found, version)) {
+        return(TRUE)
+      }
+    }
+    FALSE
+  }
+  missing <- names(records)[!vapply(names(records), function(name) {
+    installed(name, as.character(records[[name]]$Version))
+  }, logical(1))]
+  if (length(missing) == 0 || any_repo_reachable(repos, url_ok)) {
+    return(invisible(NULL))
+  }
+  cli::cli_abort(
+    c(
+      "No package repository is reachable, and {length(missing)} locked package{?s} {?is/are} not installed.",
+      i = "Check the network connection, then run the restore again."
+    ),
+    call = NULL
+  )
 }
 
 #' Check Whether a URL Can Be Opened

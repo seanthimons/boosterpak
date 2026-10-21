@@ -800,3 +800,27 @@ test_that("repair_unreachable_index_urls rewrites, drops, or leaves records alon
   # a nested file that opens is left alone even with no PACKAGES beside it
   expect_equal(repair_unreachable_index_urls(records, function(p) rows, function(url) !grepl("PACKAGES$", url) || grepl("src/contrib", url), repos), records)
 })
+
+test_that("any_repo_reachable is true when one repository answers", {
+  up <- function(url) grepl("cran", url)
+  expect_true(any_repo_reachable(c(PPM = "https://ppm/", CRAN = "https://cran", X = "@CRAN@"), up))
+  expect_false(any_repo_reachable(c(PPM = "https://ppm"), up))
+  expect_false(any_repo_reachable(character(), up))
+})
+
+test_that("abort_if_offline_with_missing fails fast only with no repo and a missing package", {
+  root <- withr::local_tempdir()
+  lib <- renv::paths$library(project = root)
+  dir.create(file.path(lib, "have"), recursive = TRUE)
+  writeLines(c("Package: have", "Version: 1.0"), file.path(lib, "have", "DESCRIPTION"))
+  have <- list(have = list(Version = "1.0"))
+  need <- list(have = list(Version = "1.0"), gone = list(Version = "2.0"))
+  repos <- c(PPM = "https://ppm", CRAN = "https://cran")
+
+  expect_error(abort_if_offline_with_missing(need, root, repos, function(url) FALSE), "gone|not installed")
+  # everything installed offline, or any one repo up: carry on
+  expect_no_error(abort_if_offline_with_missing(have, root, repos, function(url) FALSE))
+  expect_no_error(abort_if_offline_with_missing(need, root, repos, function(url) grepl("cran", url)))
+  # wrong installed version counts as missing
+  expect_error(abort_if_offline_with_missing(list(have = list(Version = "9")), root, repos, function(url) FALSE))
+})
