@@ -414,8 +414,9 @@ repair_unreachable_index_urls <- function(
 ) {
   from_repo <- vapply(records, function(record) identical(record$Source, "Repository"), logical(1))
   # Offline, a failed probe would look like a missing directory; and pak's
-  # index update has no timeout, so make sure some repository answers first.
-  if (!any(from_repo) || !any_repo_reachable(repos, url_ok)) {
+  # index update has no timeout and hangs on any dead repository, so only look
+  # when every repository answers.
+  if (!any(from_repo) || !repos_reachable(repos, url_ok, all = TRUE)) {
     return(records)
   }
   rows <- tryCatch(meta(names(records)[from_repo]), error = function(error) NULL)
@@ -475,20 +476,25 @@ repair_unreachable_index_urls <- function(
   records
 }
 
-#' Check Whether Any Configured Repository Answers
+#' Check Whether Configured Repositories Answer
 #'
 #' @param repos Repository URLs.
 #' @param url_ok Function returning whether a URL can be opened.
-#' @return `TRUE` as soon as one repository answers.
+#' @param all Require every repository to answer, rather than any one.
+#' @return A single logical value. With `all = FALSE`, stops at the first
+#'   repository that answers.
 #' @noRd
-any_repo_reachable <- function(repos = getOption("repos"), url_ok = url_reachable) {
+repos_reachable <- function(repos = getOption("repos"), url_ok = url_reachable, all = FALSE) {
   repos <- unique(sub("/+$", "", repos[nzchar(repos) & !grepl("@CRAN@", repos, fixed = TRUE)]))
+  if (length(repos) == 0) {
+    return(FALSE)
+  }
   for (repo in repos) {
-    if (url_ok(paste0(repo, "/src/contrib/PACKAGES"))) {
-      return(TRUE)
+    if (url_ok(paste0(repo, "/src/contrib/PACKAGES")) != all) {
+      return(!all)
     }
   }
-  FALSE
+  all
 }
 
 #' Stop Early When Nothing Can Be Fetched
@@ -526,7 +532,7 @@ abort_if_offline_with_missing <- function(
   missing <- names(records)[!vapply(names(records), function(name) {
     installed(name, as.character(records[[name]]$Version))
   }, logical(1))]
-  if (length(missing) == 0 || any_repo_reachable(repos, url_ok)) {
+  if (length(missing) == 0 || repos_reachable(repos, url_ok)) {
     return(invisible(NULL))
   }
   cli::cli_abort(

@@ -783,6 +783,11 @@ test_that("repair_unreachable_index_urls rewrites, drops, or leaves records alon
   # offline: first-repository probe fails, so nothing is asked of pak or dropped
   expect_equal(repair_unreachable_index_urls(records, function(p) stop("must not run"), function(url) FALSE, repos), records)
   expect_equal(repair_unreachable_index_urls(records, function(p) rows, bad_dir_ok, character()), records)
+  # one repository down: pak's index update could hang, so leave records alone
+  expect_equal(
+    repair_unreachable_index_urls(records, function(p) stop("must not run"), function(url) grepl("repo/", url), c(PPM = "https://repo", U = "https://down")),
+    records
+  )
 
   # empty sources element and trailing-slash repo: no error, still repaired
   odd <- rows
@@ -801,11 +806,15 @@ test_that("repair_unreachable_index_urls rewrites, drops, or leaves records alon
   expect_equal(repair_unreachable_index_urls(records, function(p) rows, function(url) !grepl("PACKAGES$", url) || grepl("src/contrib", url), repos), records)
 })
 
-test_that("any_repo_reachable is true when one repository answers", {
+test_that("repos_reachable checks any or all repositories", {
   up <- function(url) grepl("cran", url)
-  expect_true(any_repo_reachable(c(PPM = "https://ppm/", CRAN = "https://cran", X = "@CRAN@"), up))
-  expect_false(any_repo_reachable(c(PPM = "https://ppm"), up))
-  expect_false(any_repo_reachable(character(), up))
+  mixed <- c(PPM = "https://ppm/", CRAN = "https://cran", X = "@CRAN@")
+  expect_true(repos_reachable(mixed, up))
+  expect_false(repos_reachable(mixed, up, all = TRUE))
+  expect_true(repos_reachable(c(CRAN = "https://cran"), up, all = TRUE))
+  expect_false(repos_reachable(c(PPM = "https://ppm"), up))
+  expect_false(repos_reachable(character(), up))
+  expect_false(repos_reachable(character(), up, all = TRUE))
 })
 
 test_that("abort_if_offline_with_missing fails fast only with no repo and a missing package", {
