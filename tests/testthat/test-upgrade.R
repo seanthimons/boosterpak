@@ -555,6 +555,60 @@ test_that("call_renv_snapshot passes the generic URL when renv Package Manager h
   )
 })
 
+test_that("call_renv_snapshot strips Linux URLs and Platform tags from the lockfile", {
+  skip_if_not_installed("renv")
+  root <- withr::local_tempdir()
+  generic <- "https://packagemanager.posit.co/cran/latest"
+  manylinux <- "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest"
+  platform <- "x86_64-pc-linux-gnu-manylinux_2_17"
+  lock <- list(
+    R = list(
+      Version = "4.6.1",
+      Repositories = list(list(Name = "CRAN", URL = generic))
+    ),
+    Packages = list(
+      cli = list(Package = "cli", Version = "3.6.6", Source = "Repository", Repository = manylinux, Platform = platform),
+      rlang = list(Package = "rlang", Version = "1.2.0", Source = "Repository", Repository = "CRAN", Platform = platform),
+      here = list(Package = "here", Version = "1.0.2", Source = "Repository", Repository = generic),
+      jsonlite = list(Package = "jsonlite", Version = "2.0.0", Source = "Repository", Repository = "CRAN"),
+      other = list(Package = "other", Version = "1.0.0", Source = "Repository", Repository = "https://example.org/cran")
+    )
+  )
+  jsonlite::write_json(lock, file.path(root, "renv.lock"), auto_unbox = TRUE, pretty = TRUE)
+  withr::local_options(list(repos = c(CRAN = manylinux)))
+  local_mocked_bindings(
+    renv_ppm_handling_enabled = function() TRUE,
+    .package = "boosterpak"
+  )
+  local_mocked_bindings(snapshot = function(...) invisible(NULL), .package = "renv")
+
+  call_renv_snapshot(root)
+
+  records <- renv::lockfile_read(file = file.path(root, "renv.lock"), project = root)$Packages
+  repository <- vapply(records, function(record) record$Repository, character(1))
+  expected <- c(cli = "CRAN", rlang = "CRAN", here = "CRAN", jsonlite = "CRAN", other = "https://example.org/cran")
+  # renv writes records alphabetically, so compare by name.
+  expect_equal(repository[names(expected)], expected)
+  expect_null(records$cli$Platform)
+  expect_null(records$rlang$Platform)
+  text <- paste(readLines(file.path(root, "renv.lock")), collapse = "\n")
+  expect_false(grepl("__linux__|manylinux|\"Platform\"", text))
+})
+
+test_that("normalize_lockfile_platform leaves a portable lockfile untouched", {
+  skip_if_not_installed("renv")
+  root <- withr::local_tempdir()
+  write_upgrade_lock(root)
+  path <- file.path(root, "renv.lock")
+  before <- readLines(path)
+  mtime <- file.mtime(path)
+
+  expect_identical(normalize_lockfile_platform(root), 0L)
+  expect_identical(readLines(path), before)
+  expect_identical(file.mtime(path), mtime)
+  expect_identical(normalize_lockfile_platform(withr::local_tempdir()), 0L)
+})
+
 test_that("renv_ppm_handling_enabled reads renv's own setting and fails closed", {
   skip_if_not_installed("renv")
   withr::local_options(list(renv.config.ppm.enabled = FALSE))
@@ -576,4 +630,268 @@ test_that("renv_ppm_handling_enabled reads renv's own setting and fails closed",
     .package = "utils"
   )
   expect_false(renv_ppm_handling_enabled())
+})
+
+test_that("pin_github_commits drops RemotePkgRef only from SHA-pinned GitHub records", {
+  records <- list(
+    pinned = list(
+      Package = "pinned", RemoteType = "github", RemotePkgRef = "o/r@main",
+      RemoteRef = "main", RemoteSha = "09a023286cde3d66755a2a2f2033156c85da142e"
+    ),
+    no_sha = list(Package = "no_sha", RemoteType = "github", RemotePkgRef = "o/r@main"),
+    empty_sha = list(Package = "empty_sha", RemoteType = "github", RemotePkgRef = "o/r@main", RemoteSha = ""),
+    cran = list(Package = "cran", Source = "Repository", RemotePkgRef = "cran", RemoteSha = "abc")
+  )
+
+  out <- pin_github_commits(records)
+
+  expect_null(out$pinned$RemotePkgRef)
+  expect_equal(out$pinned$RemoteRef, "main")
+  expect_equal(out$pinned$RemoteSha, records$pinned$RemoteSha)
+  expect_equal(out$no_sha, records$no_sha)
+  expect_equal(out$empty_sha, records$empty_sha)
+  expect_equal(out$cran, records$cran)
+  expect_equal(pin_github_commits(list()), list())
+})
+
+test_that("call_renv_restore restores from the pinned lockfile object", {
+  root <- withr::local_tempdir()
+  restore_args <- NULL
+
+  local_mocked_bindings(
+    configure_boosterpak_repositories = function(verbose = TRUE) invisible(character()),
+    configure_boosterpak_install_policy = function(verbose = TRUE) invisible(character()),
+    scope_windows_native_tar = function(envir = parent.frame()) invisible(NULL),
+    .package = "boosterpak"
+  )
+  local_mocked_bindings(
+    lockfile_read = function(...) {
+      list(Packages = list(boosterpak = list(
+        Package = "boosterpak", RemoteType = "github",
+        RemotePkgRef = "o/r@main", RemoteSha = "abc123"
+      )))
+    },
+    restore = function(...) restore_args <<- list(...),
+    .package = "renv"
+  )
+
+  call_renv_restore(root)
+
+  expect_null(restore_args$lockfile$Packages$boosterpak$RemotePkgRef)
+  expect_equal(restore_args$lockfile$Packages$boosterpak$RemoteSha, "abc123")
+  expect_equal(restore_args$project, root)
+  expect_false(restore_args$prompt)
+})
+
+test_that("call_renv_restore skips the index repair when a repository was dropped", {
+  root <- withr::local_tempdir()
+  repaired <- FALSE
+  dead <- character()
+
+  local_mocked_bindings(
+    configure_boosterpak_repositories = function(verbose = TRUE) invisible(character()),
+    configure_boosterpak_install_policy = function(verbose = TRUE) invisible(character()),
+    scope_windows_native_tar = function(envir = parent.frame()) invisible(NULL),
+    abort_if_offline_with_missing = function(...) invisible(NULL),
+    scope_reachable_repos = function(...) dead,
+    repair_unreachable_index_urls = function(records, ...) {
+      repaired <<- TRUE
+      records
+    },
+    .package = "boosterpak"
+  )
+  local_mocked_bindings(
+    lockfile_read = function(...) list(Packages = list(), R = list(Repositories = list())),
+    restore = function(...) NULL,
+    .package = "renv"
+  )
+
+  call_renv_restore(root)
+  expect_true(repaired)
+
+  repaired <- FALSE
+  dead <- "https://packagemanager.posit.co/cran/latest"
+  call_renv_restore(root)
+  expect_false(repaired)
+})
+
+test_that("scope_windows_native_tar is a no-op off Windows", {
+  skip_on_os("windows")
+  withr::local_envvar(TAR = NA)
+
+  expect_null(scope_windows_native_tar())
+  expect_equal(Sys.getenv("TAR"), "")
+})
+
+test_that("scope_windows_native_tar sets TAR for the calling frame only", {
+  skip_if_not(.Platform$OS.type == "windows")
+  tar <- file.path(Sys.getenv("SystemRoot", "C:/Windows"), "System32", "tar.exe")
+  skip_if_not(file.exists(tar))
+  withr::local_envvar(TAR = NA)
+
+  during <- NULL
+  scoped <- function() {
+    scope_windows_native_tar()
+    during <<- Sys.getenv("TAR")
+  }
+  scoped()
+  expect_equal(during, tar)
+  expect_equal(Sys.getenv("TAR"), "")
+
+  # The frame's exit handler also fires when the frame errors.
+  failing <- function() {
+    scope_windows_native_tar()
+    stop("boom")
+  }
+  expect_error(failing(), "boom")
+  expect_equal(Sys.getenv("TAR"), "")
+})
+
+test_that("scope_windows_native_tar overrides renv's TAR=internal and restores it", {
+  skip_if_not(.Platform$OS.type == "windows")
+  tar <- file.path(Sys.getenv("SystemRoot", "C:/Windows"), "System32", "tar.exe")
+  skip_if_not(file.exists(tar))
+  withr::local_envvar(TAR = "internal")
+
+  during <- NULL
+  scoped <- function() {
+    scope_windows_native_tar()
+    during <<- Sys.getenv("TAR")
+  }
+  scoped()
+
+  expect_equal(during, tar)
+  expect_equal(Sys.getenv("TAR"), "internal")
+})
+
+test_that("scope_windows_native_tar leaves a user-set TAR alone", {
+  skip_if_not(.Platform$OS.type == "windows")
+  withr::local_envvar(TAR = "C:/custom/tar.exe")
+
+  scoped <- function() {
+    result <- scope_windows_native_tar()
+    list(result = result, during = Sys.getenv("TAR"))
+  }
+  out <- scoped()
+
+  expect_null(out$result)
+  expect_equal(out$during, "C:/custom/tar.exe")
+  expect_equal(Sys.getenv("TAR"), "C:/custom/tar.exe")
+})
+
+test_that("repair_unreachable_index_urls rewrites, drops, or leaves records alone", {
+  base <- "https://repo/bin/windows/contrib/4.6"
+  row <- function(package, version, path = NULL) {
+    target <- paste0("bin/windows/contrib/4.6/", if (!is.null(path)) paste0(path, "/"), package, "_", version, ".zip")
+    data.frame(
+      package = package, version = version, platform = "x86_64-w64-mingw32",
+      repodir = "bin/windows/contrib/4.6", target = target,
+      sources = I(list(paste0("https://repo/", target))), stringsAsFactors = FALSE
+    )
+  }
+  rows <- rbind(
+    row("foreign", "0.8-92", "4.6.2/Recommended"), row("foreign", "0.8-92"),
+    row("MASS", "7.3-66", "4.6.2/Recommended"),
+    row("cli", "3.6.0")
+  )
+  rec <- function(v) list(Version = v, Source = "Repository")
+  records <- list(foreign = rec("0.8-92"), MASS = rec("7.3-66"), cli = rec("3.6.0"), mine = list(Version = "1", Source = "GitHub"))
+  bad_dir_ok <- function(url) !grepl("Recommended", url)
+
+  repos <- c(PPM = "https://repo")
+  expect_warning(
+    expect_message(out <- repair_unreachable_index_urls(records, function(p) rows, bad_dir_ok, repos), "foreign"),
+    "MASS"
+  )
+  expect_equal(out$foreign$RemoteUrl, paste0(base, "/foreign_0.8-92.zip"))
+  expect_equal(out$foreign$Source, "URL")
+  expect_null(out$MASS)
+  expect_equal(out$cli, records$cli)
+  expect_equal(out$mine, records$mine)
+
+  expect_equal(repair_unreachable_index_urls(records, function(p) rows, function(url) TRUE, repos), records)
+  expect_equal(repair_unreachable_index_urls(records, function(p) stop("offline"), bad_dir_ok, repos), records)
+  expect_equal(repair_unreachable_index_urls(list(), function(p) rows, bad_dir_ok, repos), list())
+  # offline: first-repository probe fails, so nothing is asked of pak or dropped
+  expect_equal(repair_unreachable_index_urls(records, function(p) stop("must not run"), function(url) FALSE, repos), records)
+  expect_equal(repair_unreachable_index_urls(records, function(p) rows, bad_dir_ok, character()), records)
+  # one repository down: pak's index update could hang, so leave records alone
+  expect_equal(
+    repair_unreachable_index_urls(records, function(p) stop("must not run"), function(url) grepl("repo/", url), c(PPM = "https://repo", U = "https://down")),
+    records
+  )
+
+  # empty sources element and trailing-slash repo: no error, still repaired
+  odd <- rows
+  odd$sources[[4]] <- character()
+  probed <- character()
+  expect_no_error(suppressWarnings(suppressMessages(
+    out <- repair_unreachable_index_urls(records, function(p) odd, function(url) {
+      probed <<- c(probed, url)
+      bad_dir_ok(url)
+    }, c(PPM = "https://repo/"))
+  )))
+  expect_equal(probed[[1]], "https://repo/src/contrib/PACKAGES")
+  expect_equal(out$foreign$Source, "URL")
+
+  # a nested file that opens is left alone even with no PACKAGES beside it
+  expect_equal(repair_unreachable_index_urls(records, function(p) rows, function(url) !grepl("PACKAGES$", url) || grepl("src/contrib", url), repos), records)
+})
+
+test_that("repos_reachable checks any or all repositories", {
+  up <- function(url) grepl("cran", url)
+  mixed <- c(PPM = "https://ppm/", CRAN = "https://cran", X = "@CRAN@")
+  expect_true(repos_reachable(mixed, up))
+  expect_false(repos_reachable(mixed, up, all = TRUE))
+  expect_true(repos_reachable(c(CRAN = "https://cran"), up, all = TRUE))
+  expect_false(repos_reachable(c(PPM = "https://ppm"), up))
+  expect_false(repos_reachable(character(), up))
+  expect_false(repos_reachable(character(), up, all = TRUE))
+})
+
+test_that("abort_if_offline_with_missing fails fast only with no repo and a missing package", {
+  root <- withr::local_tempdir()
+  lib <- renv::paths$library(project = root)
+  dir.create(file.path(lib, "have"), recursive = TRUE)
+  writeLines(c("Package: have", "Version: 1.0"), file.path(lib, "have", "DESCRIPTION"))
+  have <- list(have = list(Version = "1.0"))
+  need <- list(have = list(Version = "1.0"), gone = list(Version = "2.0"))
+  repos <- c(PPM = "https://ppm", CRAN = "https://cran")
+
+  expect_error(abort_if_offline_with_missing(need, root, repos, function(url) FALSE), "gone|not installed")
+  # everything installed offline, or any one repo up: carry on
+  expect_no_error(abort_if_offline_with_missing(have, root, repos, function(url) FALSE))
+  expect_no_error(abort_if_offline_with_missing(need, root, repos, function(url) grepl("cran", url)))
+  # wrong installed version counts as missing
+  expect_error(abort_if_offline_with_missing(list(have = list(Version = "9")), root, repos, function(url) FALSE))
+})
+
+test_that("scope_reachable_repos drops dead repositories for the calling frame only", {
+  up <- function(url) grepl("cran", url)
+  withr::local_options(
+    repos = c(PPM = "https://ppm/", CRAN = "https://cran"),
+    renv.config.repos.override = c(PPM = "https://ppm", CRAN = "https://cran")
+  )
+  during <- NULL
+  scoped <- function() {
+    expect_warning(scope_reachable_repos(url_ok = up), "ppm")
+    during <<- list(getOption("repos"), getOption("renv.config.repos.override"))
+  }
+  scoped()
+  expect_equal(unname(during[[1]]), "https://cran")
+  expect_equal(unname(during[[2]]), "https://cran")
+  expect_equal(unname(getOption("repos")), c("https://ppm/", "https://cran"))
+
+  # all up, or none up: options untouched
+  expect_silent(scope_reachable_repos(url_ok = function(url) TRUE))
+  expect_silent(scope_reachable_repos(url_ok = function(url) FALSE))
+  expect_equal(unname(getOption("repos")), c("https://ppm/", "https://cran"))
+})
+
+test_that("drop_repos_on_hosts_of drops dead hosts from lockfile repositories", {
+  listed <- list(PPM = "https://ppm.co/cran/2026-01-01", CRAN = "https://cran.org")
+  expect_equal(drop_repos_on_hosts_of(listed, "https://ppm.co/cran/latest"), list(CRAN = "https://cran.org"))
+  expect_equal(drop_repos_on_hosts_of(listed, character()), listed)
+  expect_equal(drop_repos_on_hosts_of(listed, c("https://ppm.co/x", "https://cran.org")), listed)
+  expect_equal(drop_repos_on_hosts_of(list(), "https://ppm.co"), list())
 })

@@ -298,6 +298,35 @@ When pins are not available as binary, choose one of three options:
 - **Accept compiling.** Install from source. Installs are slower, and the system
   needs compilers and headers for packages with C, C++, or Fortran code.
 
+### Authoring on Linux, validating on Windows
+
+A lockfile written on Linux should restore on Windows and macOS the same way
+one written there does. After every snapshot that boosterpak runs (`init()`,
+`sync()`, `upgrade_project()`), it cleans the package records in
+`renv.lock`:
+
+- A `Platform` tag that names Linux, such as
+  `x86_64-pc-linux-gnu-manylinux_2_17`, is removed.
+- A `Repository` that is a URL is replaced by the name of the
+  matching repository in the lockfile, such as `CRAN`. A manylinux URL with no
+  matching repository becomes the generic Package Manager URL.
+
+Packages installed from Package Manager binaries still record `Repository`
+as `RSPM`. That is a repository name, not a URL. `renv::restore()` treats it as
+a preference and falls back to the repository URLs in the lockfile.
+
+A manual `renv::snapshot()` does not get this cleanup. Prefer `sync()` on the
+Linux machine, or check the diff before you commit:
+
+``` sh
+git diff -- renv.lock | grep -E '^\+.*("Platform"|__linux__)'
+```
+
+The command prints nothing for a portable lockfile. Expect the `R` version in
+the diff to change when the machines run different R versions. Run `renv::restore()`
+on Windows after the first Linux snapshot, then check that the lockfile still
+has no Linux entries.
+
 ### The "loaded before renv activated" warning
 
 Some systems print this message when a project starts:
