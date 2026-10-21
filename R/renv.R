@@ -353,6 +353,8 @@ call_renv_restore <- function(root = ".") {
   lockfile <- renv::lockfile_read(project = ".")
   lockfile$Packages <- pin_github_commits(lockfile$Packages)
   abort_if_offline_with_missing(lockfile$Packages, root)
+  dead <- scope_reachable_repos()
+  lockfile$R$Repositories <- drop_repos_on_hosts_of(lockfile$R$Repositories, dead)
   lockfile$Packages <- repair_unreachable_index_urls(lockfile$Packages)
   renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
 }
@@ -495,6 +497,55 @@ repos_reachable <- function(repos = getOption("repos"), url_ok = url_reachable, 
     }
   }
   all
+}
+
+#' Drop Lockfile Repositories on a Dead Host
+#'
+#' renv also reads repositories from the lockfile, which may name the dead
+#' mirror at a different path (a dated snapshot, say), so match on host. If
+#' every listed repository is dead the list is left as it is.
+#'
+#' @param listed The lockfile's `R$Repositories`.
+#' @param dead URLs of repositories that did not answer.
+#' @return `listed`, without entries on the hosts of `dead`.
+#' @noRd
+drop_repos_on_hosts_of <- function(listed, dead) {
+  host <- function(url) sub("^[a-z]+://([^/]+).*$", "\\1", url)
+  on_dead <- unlist(lapply(listed, host)) %in% host(dead)
+  if (length(dead) == 0 || length(listed) == 0 || all(on_dead)) listed else listed[!on_dead]
+}
+
+#' Leave Unreachable Repositories Out of the Restore
+#'
+#' renv and pak block for minutes on a repository that never answers, so a
+#' down mirror (say Package Manager) would stall a restore that the remaining
+#' repositories could serve. Repositories that do not answer are removed from
+#' `repos` and `renv.config.repos.override` for the calling function, and the
+#' options are restored on exit. If none answers, nothing is changed.
+#'
+#' @param envir Frame whose exit restores the options.
+#' @param url_ok Function returning whether a URL can be opened.
+#' @return The dropped repository URLs, invisibly.
+#' @noRd
+scope_reachable_repos <- function(envir = parent.frame(), url_ok = url_reachable) {
+  clean <- function(repos) sub("/+$", "", repos)
+  urls <- unique(clean(c(getOption("repos"), getOption("renv.config.repos.override"))))
+  urls <- urls[nzchar(urls) & !grepl("@CRAN@", urls, fixed = TRUE)]
+  alive <- vapply(urls, function(url) url_ok(paste0(url, "/src/contrib/PACKAGES")), logical(1))
+  if (all(alive) || !any(alive)) {
+    return(invisible(character()))
+  }
+  dead <- urls[!alive]
+  keep <- function(repos) repos[!clean(repos) %in% dead]
+  old <- options("repos", "renv.config.repos.override")
+  new <- lapply(old, function(repos) if (is.null(repos)) NULL else keep(repos))
+  options(new)
+  do.call(on.exit, list(bquote(options(.(old))), add = TRUE), envir = envir)
+  cli::cli_warn(c(
+    "Skipping unreachable {cli::qty(length(dead))}repositor{?y/ies}: {.url {dead}}",
+    i = "Packages will be restored from the remaining repositories."
+  ))
+  invisible(dead)
 }
 
 #' Stop Early When Nothing Can Be Fetched

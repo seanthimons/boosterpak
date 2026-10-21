@@ -833,3 +833,33 @@ test_that("abort_if_offline_with_missing fails fast only with no repo and a miss
   # wrong installed version counts as missing
   expect_error(abort_if_offline_with_missing(list(have = list(Version = "9")), root, repos, function(url) FALSE))
 })
+
+test_that("scope_reachable_repos drops dead repositories for the calling frame only", {
+  up <- function(url) grepl("cran", url)
+  withr::local_options(
+    repos = c(PPM = "https://ppm/", CRAN = "https://cran"),
+    renv.config.repos.override = c(PPM = "https://ppm", CRAN = "https://cran")
+  )
+  during <- NULL
+  scoped <- function() {
+    expect_warning(scope_reachable_repos(url_ok = up), "ppm")
+    during <<- list(getOption("repos"), getOption("renv.config.repos.override"))
+  }
+  scoped()
+  expect_equal(unname(during[[1]]), "https://cran")
+  expect_equal(unname(during[[2]]), "https://cran")
+  expect_equal(unname(getOption("repos")), c("https://ppm/", "https://cran"))
+
+  # all up, or none up: options untouched
+  expect_silent(scope_reachable_repos(url_ok = function(url) TRUE))
+  expect_silent(scope_reachable_repos(url_ok = function(url) FALSE))
+  expect_equal(unname(getOption("repos")), c("https://ppm/", "https://cran"))
+})
+
+test_that("drop_repos_on_hosts_of drops dead hosts from lockfile repositories", {
+  listed <- list(PPM = "https://ppm.co/cran/2026-01-01", CRAN = "https://cran.org")
+  expect_equal(drop_repos_on_hosts_of(listed, "https://ppm.co/cran/latest"), list(CRAN = "https://cran.org"))
+  expect_equal(drop_repos_on_hosts_of(listed, character()), listed)
+  expect_equal(drop_repos_on_hosts_of(listed, c("https://ppm.co/x", "https://cran.org")), listed)
+  expect_equal(drop_repos_on_hosts_of(list(), "https://ppm.co"), list())
+})
