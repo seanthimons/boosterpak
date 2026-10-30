@@ -218,3 +218,50 @@ test_that("public P3M fallback preserves dates and explicit private policies", {
   add_public_cran_fallback()
   expect_false("CRAN_fallback" %in% names(getOption("repos")))
 })
+
+test_that("binary index repairs preserve repository identity without changing the cache", {
+  root <- withr::local_tempdir()
+  library <- file.path(root, "library")
+  path <- file.path(library, "example")
+  dir.create(file.path(path, "Meta"), recursive = TRUE)
+  fields <- c(
+    Package = "example",
+    Version = "1.0",
+    Repository = "RSPM",
+    RemoteType = "url",
+    RemoteUrl = "https://p3m.dev/example.tgz"
+  )
+  write.dcf(as.list(fields), file.path(path, "DESCRIPTION"))
+  saveRDS(
+    list(DESCRIPTION = fields, other = TRUE),
+    file.path(path, "Meta", "package.rds")
+  )
+  isolated <- FALSE
+  local_mocked_bindings(
+    isolate = function(project) {
+      isolated <<- TRUE
+    },
+    .package = "renv"
+  )
+  paths <- renv::paths
+  paths$library <- function(...) library
+  local_mocked_bindings(paths = paths, .package = "renv")
+  original <- list(
+    example = list(Source = "Repository", Version = "1.0", Repository = "CRAN")
+  )
+  restored <- list(example = list(Source = "URL"))
+  restore_repository_metadata(root, original, restored)
+  expect_true(isolated)
+  actual <- read.dcf(file.path(path, "DESCRIPTION"))
+  expect_false(any(grepl("^Remote", colnames(actual))))
+  expect_equal(unname(actual[1, "Repository"]), "CRAN")
+  meta <- readRDS(file.path(path, "Meta", "package.rds"))
+  expect_true(meta$other)
+  expect_identical(
+    meta$DESCRIPTION,
+    setNames(as.character(actual[1, ]), colnames(actual))
+  )
+  isolated <- FALSE
+  restore_repository_metadata(root, restored, restored)
+  expect_false(isolated)
+})

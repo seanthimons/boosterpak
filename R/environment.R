@@ -121,3 +121,48 @@ add_public_cran_fallback <- function() {
   options(repos = repos, renv.config.repos.override = override)
   invisible(NULL)
 }
+
+#' Preserve repository identity after routing around a broken binary index
+#'
+#' URL installation is a transport workaround for an unchanged repository
+#' package. Isolate the library before editing metadata so the shared cache
+#' remains untouched. Never alter intentional URL or GitHub dependencies.
+#' @noRd
+restore_repository_metadata <- function(root, original, restored) {
+  repaired <- names(original)[vapply(
+    names(original),
+    function(name) {
+      identical(original[[name]]$Source, "Repository") &&
+        identical(restored[[name]]$Source, "URL")
+    },
+    logical(1)
+  )]
+  if (!length(repaired)) {
+    return(invisible(NULL))
+  }
+  renv::isolate(project = root)
+  library <- renv::paths$library(project = root)
+  for (name in repaired) {
+    path <- file.path(library, name)
+    description <- file.path(path, "DESCRIPTION")
+    fields <- read.dcf(description)
+    stopifnot(identical(unname(fields[1, "Version"]), original[[name]]$Version))
+    fields <- fields[, !grepl("^Remote", colnames(fields)), drop = FALSE]
+    fields <- fields[, colnames(fields) != "Repository", drop = FALSE]
+    fields <- cbind(
+      fields,
+      Repository = original[[name]]$Repository %||% "CRAN"
+    )
+    write.dcf(fields, description)
+    metadata <- file.path(path, "Meta", "package.rds")
+    if (file.exists(metadata)) {
+      record <- readRDS(metadata)
+      record$DESCRIPTION <- setNames(
+        as.character(fields[1, ]),
+        colnames(fields)
+      )
+      saveRDS(record, metadata)
+    }
+  }
+  invisible(NULL)
+}

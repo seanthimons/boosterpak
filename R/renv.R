@@ -355,6 +355,7 @@ call_renv_restore <- function(root = ".") {
   scope_windows_native_tar()
   scope_binary_platforms()
   lockfile <- renv::lockfile_read(project = ".")
+  original_records <- lockfile$Packages
   lockfile$Packages <- pin_github_commits(lockfile$Packages)
   abort_if_offline_with_missing(lockfile$Packages, root)
   dead <- scope_reachable_repos()
@@ -365,7 +366,9 @@ call_renv_restore <- function(root = ".") {
   if (length(dead) == 0) {
     lockfile$Packages <- repair_unreachable_index_urls(lockfile$Packages)
   }
-  renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
+  result <- renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
+  restore_repository_metadata(root, original_records, lockfile$Packages)
+  invisible(result)
 }
 
 #' Make GitHub Package Records Restore at Their Locked Commit
