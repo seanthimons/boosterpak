@@ -18,6 +18,10 @@ test_that("PPM Linux URLs are portable across distributions and preserve snapsho
 })
 
 test_that("restore_project repairs old lockfiles before exact restore without packs", {
+  withr::local_options(list(
+    repos = getOption("repos"),
+    renv.config.repos.override = getOption("renv.config.repos.override")
+  ))
   root <- withr::local_tempdir()
   url <- "https://packagemanager.posit.co/cran/__linux__/trixie/2026-10-01"
   lock <- list(
@@ -78,6 +82,10 @@ test_that("restore_project repairs old lockfiles before exact restore without pa
 })
 
 test_that("snapshot_project uses the active environment without packs", {
+  withr::local_options(list(
+    repos = getOption("repos"),
+    renv.config.repos.override = getOption("renv.config.repos.override")
+  ))
   root <- withr::local_tempdir()
   events <- character()
   local_mocked_bindings(
@@ -152,4 +160,61 @@ test_that("Sonoma accepts older same-CPU Darwin builds without crossing architec
     )
   }
   check_old()
+})
+
+test_that("public P3M fallback preserves dates and explicit private policies", {
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_CONFIGURE_REPOSITORIES = NA
+  )
+  withr::local_options(
+    repos = c(
+      CRAN = "https://p3m.dev/cran/2026-10-01",
+      private = "https://example.org"
+    ),
+    renv.config.repos.override = "https://p3m.dev/cran/2026-09-01",
+    boosterpak.configure_repositories = TRUE
+  )
+  add_public_cran_fallback()
+  expect_identical(
+    getOption("repos")[["CRAN"]],
+    "https://p3m.dev/cran/2026-10-01"
+  )
+  expect_identical(getOption("repos")[["private"]], "https://example.org")
+  expect_identical(
+    getOption("repos")[["CRAN_fallback"]],
+    "https://cloud.r-project.org"
+  )
+  expect_identical(
+    getOption("renv.config.repos.override")[["CRAN"]],
+    "https://p3m.dev/cran/2026-09-01"
+  )
+  expect_identical(
+    getOption("renv.config.repos.override")[["CRAN_fallback"]],
+    "https://cloud.r-project.org"
+  )
+  options(renv.config.repos.override = "https://example.org/private")
+  add_public_cran_fallback()
+  expect_identical(
+    getOption("renv.config.repos.override"),
+    "https://example.org/private"
+  )
+  options(
+    repos = c(
+      CRAN = "https://p3m.dev/cran/latest",
+      CRAN_fallback = "https://example.org/mirror"
+    ),
+    renv.config.repos.override = NULL
+  )
+  add_public_cran_fallback()
+  expect_identical(
+    getOption("repos")[["CRAN_fallback"]],
+    "https://example.org/mirror"
+  )
+  options(
+    repos = c(CRAN = "https://p3m.dev/cran/latest"),
+    boosterpak.configure_repositories = FALSE
+  )
+  add_public_cran_fallback()
+  expect_false("CRAN_fallback" %in% names(getOption("repos")))
 })

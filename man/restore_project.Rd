@@ -17,4 +17,6 @@ Restores the exact versions in \code{renv.lock}. Before restoration, normalizes
 Posit Package Manager Linux URLs in the lockfile and removes Linux Platform
 tags. Package versions and non-PPM repositories are preserved. No
 \code{boosters.toml}, packs, or attachment hooks are required or created.
+Public P3M repositories use Cloud CRAN as a binary fallback. Explicit
+private overrides, repository dates, and repository opt-outs are preserved.
 }

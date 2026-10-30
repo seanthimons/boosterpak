@@ -20,6 +20,8 @@ boosterpak::snapshot_project()  # after intentional dependency changes
 ```
 
 Restore repairs existing Linux PPM repository records before installation.
+Public P3M repositories use Cloud CRAN as a binary fallback; explicit private
+repository overrides and custom fallback settings are preserved.
 Snapshot removes Linux metadata after recording the project library. Both
 preserve snapshot dates and custom repositories; restore preserves package
 versions. The configured renv snapshot type still applies, so explicit projects

@@ -22,6 +22,7 @@ jobs:
         with:
           r-version: release
           cran: https://p3m.dev/cran/latest
+          extra-repositories: https://cloud.r-project.org
           use-public-rspm: true
 
       - name: Set up pandoc

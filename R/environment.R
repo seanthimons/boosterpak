@@ -4,6 +4,8 @@
 #' Posit Package Manager Linux URLs in the lockfile and removes Linux Platform
 #' tags. Package versions and non-PPM repositories are preserved. No
 #' `boosters.toml`, packs, or attachment hooks are required or created.
+#' Public P3M repositories use Cloud CRAN as a binary fallback. Explicit
+#' private overrides, repository dates, and repository opt-outs are preserved.
 #'
 #' @param root Project root containing `renv.lock`.
 #' @return The restored package records, invisibly.
@@ -16,6 +18,8 @@ restore_project <- function(root = ".") {
     )
   }
   normalize_lockfile_platform(root)
+  configure_boosterpak_repositories(verbose = FALSE)
+  add_public_cran_fallback()
   invisible(call_renv_restore(root))
 }
 
@@ -33,6 +37,7 @@ snapshot_project <- function(root = ".") {
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
   ensure_project_renv(root)
   configure_boosterpak_repositories(verbose = FALSE)
+  add_public_cran_fallback()
   configure_boosterpak_install_policy(verbose = FALSE)
   invisible(call_renv_snapshot(root))
 }
@@ -71,5 +76,48 @@ scope_binary_platforms <- function(envir = parent.frame(), platform = NULL) {
   old <- options(pkg.platforms = unique(c(platform, alias, "source")))
   restore <- bquote(options(.(old)))
   do.call(on.exit, list(restore, add = TRUE), envir = envir)
+  invisible(NULL)
+}
+
+#' Add a binary mirror fallback to environment-only public P3M restores
+#'
+#' Preserve explicit private mirrors, repository dates, custom fallback names,
+#' and the existing repository-configuration opt-out.
+#' @return NULL, invisibly.
+#' @noRd
+add_public_cran_fallback <- function() {
+  if (!should_configure_repositories()) {
+    return(invisible(NULL))
+  }
+  pattern <- sprintf(
+    "^https?://(%s)/cran(/|$)",
+    paste(escape_regex(ppm_default_hosts()), collapse = "|")
+  )
+  public_primary <- function(values) {
+    primary <- if (any(names(values) == "CRAN")) {
+      values["CRAN"]
+    } else {
+      head(values, 1L)
+    }
+    any(grepl(pattern, unname(primary)))
+  }
+  repos <- getOption("repos")
+  override <- renv::config$repos.override()
+  if (
+    !public_primary(repos) || (!is.null(override) && !public_primary(override))
+  ) {
+    return(invisible(NULL))
+  }
+  if (!any(names(repos) == "CRAN_fallback")) {
+    repos["CRAN_fallback"] <- "https://cloud.r-project.org"
+  }
+  override <- override %||% repos
+  if (is.null(names(override)) && length(override) == 1L) {
+    names(override) <- "CRAN"
+  }
+  if (!any(names(override) == "CRAN_fallback")) {
+    override["CRAN_fallback"] <- "https://cloud.r-project.org"
+  }
+  options(repos = repos, renv.config.repos.override = override)
   invisible(NULL)
 }

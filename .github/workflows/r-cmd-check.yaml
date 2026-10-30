@@ -49,6 +49,7 @@ jobs:
         with:
           r-version: ${{ matrix.config.r }}
           cran: https://p3m.dev/cran/latest
+          extra-repositories: https://cloud.r-project.org
           use-public-rspm: true
 
       - name: Set up pandoc
