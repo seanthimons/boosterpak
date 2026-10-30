@@ -24,7 +24,9 @@ Snapshot removes Linux metadata after recording the project library. Both
 preserve snapshot dates and custom repositories; restore preserves package
 versions. The configured renv snapshot type still applies, so explicit projects
 must declare boosterpak in DESCRIPTION if it should be included in the lockfile.
-Opening the project performs no installation; run restore explicitly for setup.
+These functions create no startup hooks; run restore explicitly for setup.
+For offline opening, use baseline's paired `setup.R` and `.Rprofile` templates,
+which load a machine-local prepared library instead of bootstrapping renv.
 A plain `renv::snapshot()` bypasses this cleanup.
 
 ## 1. Install pak
