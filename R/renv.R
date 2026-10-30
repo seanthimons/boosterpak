@@ -353,7 +353,7 @@ call_renv_restore <- function(root = ".") {
   configure_boosterpak_repositories(verbose = FALSE)
   configure_boosterpak_install_policy(verbose = FALSE)
   scope_windows_native_tar()
-  scope_linux_binary_platforms()
+  scope_binary_platforms()
   lockfile <- renv::lockfile_read(project = ".")
   lockfile$Packages <- pin_github_commits(lockfile$Packages)
   abort_if_offline_with_missing(lockfile$Packages, root)
@@ -678,7 +678,7 @@ install_via <- function(packages, root = ".", library = "renv") {
 #' @noRd
 pak_install_packages <- function(packages, lib) {
   scope_windows_native_tar()
-  scope_linux_binary_platforms()
+  scope_binary_platforms()
   invisible(pak::pkg_install(packages, lib = lib, upgrade = FALSE))
 }
 

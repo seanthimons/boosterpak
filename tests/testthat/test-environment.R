@@ -107,7 +107,7 @@ test_that("Linux PPM restore accepts vendor aliases without changing CPU or OS",
   withr::local_envvar(PKG_PLATFORMS = NA)
   local_mocked_bindings(is_glibc_linux = function() TRUE)
   check <- function() {
-    scope_linux_binary_platforms(platform = "x86_64-redhat-linux-gnu-fedora-44")
+    scope_binary_platforms(platform = "x86_64-redhat-linux-gnu-fedora-44")
     expect_identical(
       getOption("pkg.platforms"),
       c(
@@ -120,6 +120,36 @@ test_that("Linux PPM restore accepts vendor aliases without changing CPU or OS",
   check()
   expect_null(getOption("pkg.platforms"))
   options(pkg.platforms = "source")
-  scope_linux_binary_platforms(platform = "aarch64-unknown-linux-gnu-debian-13")
+  scope_binary_platforms(platform = "aarch64-unknown-linux-gnu-debian-13")
   expect_identical(getOption("pkg.platforms"), "source")
+})
+
+test_that("Sonoma accepts older same-CPU Darwin builds without crossing architectures", {
+  withr::local_options(
+    repos = c(CRAN = "https://p3m.dev/cran/latest"),
+    pkg.platforms = NULL
+  )
+  withr::local_envvar(PKG_PLATFORMS = NA)
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  check <- function() {
+    scope_binary_platforms(platform = "aarch64-apple-darwin23")
+    expect_identical(
+      getOption("pkg.platforms"),
+      c(
+        "aarch64-apple-darwin23",
+        "aarch64-apple-darwin20",
+        "source"
+      )
+    )
+  }
+  check()
+  expect_null(getOption("pkg.platforms"))
+  check_old <- function() {
+    scope_binary_platforms(platform = "aarch64-apple-darwin20")
+    expect_identical(
+      getOption("pkg.platforms"),
+      c("aarch64-apple-darwin20", "source")
+    )
+  }
+  check_old()
 })
