@@ -782,7 +782,7 @@ test_that("scope_windows_native_tar leaves a user-set TAR alone", {
   expect_equal(Sys.getenv("TAR"), "C:/custom/tar.exe")
 })
 
-test_that("repair_unreachable_index_urls rewrites, drops, or leaves records alone", {
+test_that("repair_unreachable_index_urls repairs URLs without dropping locked versions", {
   base <- "https://repo/bin/windows/contrib/4.6"
   row <- function(package, version, path = NULL) {
     target <- paste0("bin/windows/contrib/4.6/", if (!is.null(path)) paste0(path, "/"), package, "_", version, ".zip")
@@ -808,7 +808,7 @@ test_that("repair_unreachable_index_urls rewrites, drops, or leaves records alon
   )
   expect_equal(out$foreign$RemoteUrl, paste0(base, "/foreign_0.8-92.zip"))
   expect_equal(out$foreign$Source, "URL")
-  expect_null(out$MASS)
+  expect_equal(out$MASS, records$MASS)
   expect_equal(out$cli, records$cli)
   expect_equal(out$mine, records$mine)
 

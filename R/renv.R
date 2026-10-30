@@ -353,6 +353,7 @@ call_renv_restore <- function(root = ".") {
   configure_boosterpak_repositories(verbose = FALSE)
   configure_boosterpak_install_policy(verbose = FALSE)
   scope_windows_native_tar()
+  scope_linux_binary_platforms()
   lockfile <- renv::lockfile_read(project = ".")
   lockfile$Packages <- pin_github_commits(lockfile$Packages)
   abort_if_offline_with_missing(lockfile$Packages, root)
@@ -398,7 +399,7 @@ pin_github_commits <- function(records) {
 #' For each locked repository package, this looks at the index entries for its
 #' locked version and probes the `Path:` directories they use. If one is
 #' missing, the record is rewritten to the entry's working URL (same version),
-#' or dropped from the lockfile object when no entry works. The lockfile on disk
+#' or kept at its locked version when no entry works. The lockfile on disk
 #' is not changed, and any failure to look up the index leaves `records`
 #' untouched.
 #'
@@ -407,7 +408,7 @@ pin_github_commits <- function(records) {
 #' @param url_ok Function returning whether a URL can be opened.
 #' @param repos Repository URLs; the first is probed to detect being offline.
 #' @return `records`, with affected records rewritten to `url` records or
-#'   removed.
+#'   retained at their locked versions.
 #' @noRd
 repair_unreachable_index_urls <- function(
   records,
@@ -450,7 +451,7 @@ repair_unreachable_index_urls <- function(
   broken[nested] <- !vapply(urls[nested], url_ok, logical(1))
 
   repaired <- character()
-  dropped <- character()
+  unavailable <- character()
   for (name in names(records)[from_repo]) {
     same <- rows$package == name & rows$version == records[[name]]$Version
     if (!any(broken & same)) {
@@ -459,8 +460,7 @@ repair_unreachable_index_urls <- function(
     candidates <- urls[same & !broken & !is.na(urls)]
     working <- Find(url_ok, candidates)
     if (is.null(working)) {
-      records[[name]] <- NULL
-      dropped <- c(dropped, name)
+      unavailable <- c(unavailable, name)
     } else {
       records[[name]] <- list(
         Package = name,
@@ -477,10 +477,10 @@ repair_unreachable_index_urls <- function(
       "i" = "Restoring {.pkg {repaired}} from direct URLs: the repository index lists them at a missing directory."
     ))
   }
-  if (length(dropped)) {
+  if (length(unavailable)) {
     cli::cli_warn(c(
-      "Skipping {.pkg {dropped}}: the repository index lists them only at a missing directory.",
-      i = "Install them separately, or restore again once the repository index is fixed."
+      "Keeping the locked request for {.pkg {unavailable}}: the repository index lists them only at a missing directory.",
+      i = "Restore may fail until the repository index is fixed; locked versions will not be dropped."
     ))
   }
   records
@@ -678,6 +678,7 @@ install_via <- function(packages, root = ".", library = "renv") {
 #' @noRd
 pak_install_packages <- function(packages, lib) {
   scope_windows_native_tar()
+  scope_linux_binary_platforms()
   invisible(pak::pkg_install(packages, lib = lib, upgrade = FALSE))
 }
 

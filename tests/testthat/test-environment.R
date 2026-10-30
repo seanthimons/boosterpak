@@ -98,3 +98,28 @@ test_that("snapshot_project uses the active environment without packs", {
   expect_identical(events, c("active", "repos", "policy", "snapshot"))
   expect_false(file.exists(file.path(root, "boosters.toml")))
 })
+
+test_that("Linux PPM restore accepts vendor aliases without changing CPU or OS", {
+  withr::local_options(
+    repos = c(CRAN = "https://p3m.dev/cran/latest"),
+    pkg.platforms = NULL
+  )
+  withr::local_envvar(PKG_PLATFORMS = NA)
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  check <- function() {
+    scope_linux_binary_platforms(platform = "x86_64-redhat-linux-gnu-fedora-44")
+    expect_identical(
+      getOption("pkg.platforms"),
+      c(
+        "x86_64-redhat-linux-gnu-fedora-44",
+        "x86_64-pc-linux-gnu-fedora-44",
+        "source"
+      )
+    )
+  }
+  check()
+  expect_null(getOption("pkg.platforms"))
+  options(pkg.platforms = "source")
+  scope_linux_binary_platforms(platform = "aarch64-unknown-linux-gnu-debian-13")
+  expect_identical(getOption("pkg.platforms"), "source")
+})
