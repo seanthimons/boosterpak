@@ -36,6 +36,8 @@ reference:
       - upgrade_project
       - deinit
       - sync
+      - restore_project
+      - snapshot_project
       - write_attach
       - status
       - check_binary_repos
