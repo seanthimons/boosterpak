@@ -8,6 +8,25 @@
 
 Use `boosterpak` when the reusable thing is not just "these packages", but "these packages plus the helper functions, attachment choices, and setup conventions that make this kind of project ready to work in."
 
+## Environment-only projects
+
+Projects can use boosterpak only to maintain a portable renv environment. No
+packs, `boosters.toml`, or startup attachments are required. In an existing renv
+project, install boosterpak once, then use:
+
+```r
+boosterpak::restore_project()   # new machine: restore locked versions
+boosterpak::snapshot_project()  # after intentional dependency changes
+```
+
+Restore repairs existing Linux PPM repository records before installation.
+Snapshot removes Linux metadata after recording the project library. Both
+preserve snapshot dates and custom repositories; restore preserves package
+versions. The configured renv snapshot type still applies, so explicit projects
+must declare boosterpak in DESCRIPTION if it should be included in the lockfile.
+Opening the project performs no installation; run restore explicitly for setup.
+A plain `renv::snapshot()` bypasses this cleanup.
+
 ## 1. Install pak
 
 ``` r
@@ -308,7 +327,7 @@ one written there does. After every snapshot that boosterpak runs (`init()`,
 - A `Platform` tag that names Linux, such as
   `x86_64-pc-linux-gnu-manylinux_2_17`, is removed.
 - A `Repository` that is a URL is replaced by the name of the
-  matching repository in the lockfile, such as `CRAN`. A manylinux URL with no
+  matching repository in the lockfile, such as `CRAN`. A Linux PPM URL with no
   matching repository becomes the generic Package Manager URL.
 
 Packages installed from Package Manager binaries still record `Repository`

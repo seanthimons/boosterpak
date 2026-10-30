@@ -212,6 +212,9 @@ normalize_lockfile_platform <- function(root = ".") {
   repositories <- lock$R$Repositories %||% list()
   # renv reads the repositories as a list named by repository.
   repo_names <- names(repositories) %||% character()
+  portable_repositories <- lapply(repositories, portable_ppm_repos)
+  repositories_changed <- !identical(repositories, portable_repositories)
+  lock$R$Repositories <- portable_repositories
   repo_urls <- vapply(repositories, function(url) as.character(url)[[1]], character(1))
   repo_urls <- sub("/+$", "", portable_ppm_repos(repo_urls))
 
@@ -242,7 +245,7 @@ normalize_lockfile_platform <- function(root = ".") {
     }
   }
 
-  if (changed > 0L) {
+  if (changed > 0L || repositories_changed) {
     old_options <- options(renv.verbose = FALSE)
     on.exit(options(old_options), add = TRUE)
     renv::lockfile_write(lock, file = path, project = root)

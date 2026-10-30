@@ -662,6 +662,9 @@ test_that("call_renv_restore restores from the pinned lockfile object", {
     configure_boosterpak_repositories = function(verbose = TRUE) invisible(character()),
     configure_boosterpak_install_policy = function(verbose = TRUE) invisible(character()),
     scope_windows_native_tar = function(envir = parent.frame()) invisible(NULL),
+    abort_if_offline_with_missing = function(...) invisible(NULL),
+    scope_reachable_repos = function(...) character(),
+    repair_unreachable_index_urls = function(records, ...) records,
     .package = "boosterpak"
   )
   local_mocked_bindings(
