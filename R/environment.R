@@ -140,8 +140,25 @@ restore_repository_metadata <- function(root, original, restored) {
   if (!length(repaired)) {
     return(invisible(NULL))
   }
-  renv::isolate(project = root)
   library <- renv::paths$library(project = root)
+  # pak keeps a non-package directory here. renv's Windows isolation scans
+  # every entry as a package, so keep the cache outside that scan temporarily.
+  cache <- file.path(library, "_cache")
+  if (dir.exists(cache)) {
+    held_cache <- tempfile("pak-cache-", tmpdir = dirname(library))
+    if (!file.rename(cache, held_cache)) {
+      cli::cli_abort("Cannot move pak's cache aside for library isolation.")
+    }
+    on.exit(
+      {
+        if (!file.rename(held_cache, cache)) {
+          cli::cli_abort("Cannot return pak's cache from {.path {held_cache}}.")
+        }
+      },
+      add = TRUE
+    )
+  }
+  renv::isolate(project = root)
   for (name in repaired) {
     path <- file.path(library, name)
     description <- file.path(path, "DESCRIPTION")

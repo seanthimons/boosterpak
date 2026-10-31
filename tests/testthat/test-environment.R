@@ -236,10 +236,16 @@ test_that("binary index repairs preserve repository identity without changing th
     list(DESCRIPTION = fields, other = TRUE),
     file.path(path, "Meta", "package.rds")
   )
+  cache <- file.path(library, "_cache")
+  dir.create(cache)
+  writeLines("preserve pak cache", file.path(cache, "marker"))
   isolated <- FALSE
+  fail <- FALSE
   local_mocked_bindings(
     isolate = function(project) {
+      expect_false(dir.exists(cache))
       isolated <<- TRUE
+      if (fail) stop("isolation failed")
     },
     .package = "renv"
   )
@@ -252,6 +258,13 @@ test_that("binary index repairs preserve repository identity without changing th
   restored <- list(example = list(Source = "URL"))
   restore_repository_metadata(root, original, restored)
   expect_true(isolated)
+  expect_equal(readLines(file.path(cache, "marker")), "preserve pak cache")
+  fail <- TRUE
+  expect_error(
+    restore_repository_metadata(root, original, restored),
+    "isolation failed"
+  )
+  expect_equal(readLines(file.path(cache, "marker")), "preserve pak cache")
   actual <- read.dcf(file.path(path, "DESCRIPTION"))
   expect_false(any(grepl("^Remote", colnames(actual))))
   expect_equal(unname(actual[1, "Repository"]), "CRAN")
