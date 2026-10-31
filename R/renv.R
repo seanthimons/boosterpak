@@ -347,7 +347,7 @@ ensure_dependency_closure <- function(packages, root = ".", library = "renv") {
 #' @param root Project root.
 #' @return The restored package records, invisibly.
 #' @noRd
-call_renv_restore <- function(root = ".") {
+call_renv_restore <- function(root = ".", require_binaries = character()) {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
   configure_boosterpak_repositories(verbose = FALSE)
@@ -364,8 +364,10 @@ call_renv_restore <- function(root = ".") {
   # repository set has changed (a dead repo was just dropped) and the cache is
   # cold: pak adds CRAN and Bioconductor hosts of its own. Skip it then.
   if (length(dead) == 0) {
+    scope_archived_binary_repos(lockfile$Packages)
     lockfile$Packages <- repair_unreachable_index_urls(lockfile$Packages)
   }
+  check_required_binaries(original_records, require_binaries)
   result <- renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
   restore_repository_metadata(root, original_records, lockfile$Packages)
   invisible(result)

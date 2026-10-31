@@ -51,7 +51,10 @@ test_that("restore_project repairs old lockfiles before exact restore without pa
     pretty = TRUE
   )
   restored <- NULL
-  local_mocked_bindings(call_renv_restore = function(root) {
+  local_mocked_bindings(call_renv_restore = function(
+    root,
+    require_binaries = character()
+  ) {
     restored <<- renv::lockfile_read(
       file = file.path(root, "renv.lock"),
       project = root

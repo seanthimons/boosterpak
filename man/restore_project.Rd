@@ -4,10 +4,13 @@
 \alias{restore_project}
 \title{Restore a project without capability packs}
 \usage{
-restore_project(root = ".")
+restore_project(root = ".", require_binaries = character())
 }
 \arguments{
 \item{root}{Project root containing \code{renv.lock}.}
+
+\item{require_binaries}{Package names that must resolve to binaries. Restore
+stops before installation if a named package would use source.}
 }
 \value{
 The restored package records, invisibly.

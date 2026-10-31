@@ -8,9 +8,11 @@
 #' private overrides, repository dates, and repository opt-outs are preserved.
 #'
 #' @param root Project root containing `renv.lock`.
+#' @param require_binaries Package names that must resolve to binaries. Restore
+#'   stops before installation if a named package would use source.
 #' @return The restored package records, invisibly.
 #' @export
-restore_project <- function(root = ".") {
+restore_project <- function(root = ".", require_binaries = character()) {
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
   if (!file.exists(file.path(root, "renv.lock"))) {
     cli::cli_abort(
@@ -20,7 +22,7 @@ restore_project <- function(root = ".") {
   normalize_lockfile_platform(root)
   configure_boosterpak_repositories(verbose = FALSE)
   add_public_cran_fallback()
-  invisible(call_renv_restore(root))
+  invisible(call_renv_restore(root, require_binaries = require_binaries))
 }
 
 #' Save a portable project snapshot without capability packs
