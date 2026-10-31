@@ -75,10 +75,16 @@ scope_archived_binary_repos <- function(records, envir = parent.frame()) {
   old <- options("repos", "renv.config.repos.override")
   do.call(on.exit, list(bquote(options(.(old))), add = TRUE), envir = envir)
   extra <- stats::setNames(
-    ppm_binary_url(
-      rep(primary(repos), length(dates)),
-      snapshot = dates,
-      rewrite = is_glibc_linux()
+    vapply(
+      dates,
+      function(date) {
+        ppm_binary_url(
+          primary(repos),
+          snapshot = date,
+          rewrite = is_glibc_linux()
+        )
+      },
+      character(1)
     ),
     paste0("P3M_archive_", gsub("-", "_", dates))
   )

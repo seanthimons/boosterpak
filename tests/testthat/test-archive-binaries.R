@@ -18,6 +18,13 @@ test_that("exact compiled pins recover dated binaries without changing shared st
       Repository = "CRAN",
       NeedsCompilation = "yes"
     ),
+    other = list(
+      Package = "other",
+      Version = "1.0",
+      Source = "Repository",
+      Repository = "CRAN",
+      NeedsCompilation = "yes"
+    ),
     private = list(
       Package = "private",
       Version = "1.0",
@@ -39,11 +46,12 @@ test_that("exact compiled pins recover dated binaries without changing shared st
       stopifnot(!"private" %in% packages)
       dated <- any(grepl("2026-09-28$", getOption("repos")))
       data.frame(
-        package = c("duckdb", "cli"),
-        version = c("1.5.5", "3.6.6"),
+        package = c("duckdb", "cli", "other"),
+        version = c("1.5.5", "3.6.6", "1.0"),
         platform = c(
           if (dated) "x86_64-w64-mingw32" else "source",
-          "x86_64-w64-mingw32"
+          "x86_64-w64-mingw32",
+          "source"
         )
       )
     },
@@ -53,6 +61,12 @@ test_that("exact compiled pins recover dated binaries without changing shared st
     },
     pkg_history = function(pkg) {
       asked <<- c(asked, pkg)
+      if (pkg == "other") {
+        return(data.frame(
+          Version = c("1.0", "2.0"),
+          date = c("2026-01-01", "2026-02-01")
+        ))
+      }
       data.frame(
         Version = c("1.5.5", "1.5.6"),
         date = c("2026-07-25", "2026-09-29")
@@ -63,8 +77,12 @@ test_that("exact compiled pins recover dated binaries without changing shared st
   run <- function() {
     scope_archived_binary_repos(records)
     expect_equal(
-      unname(tail(getOption("repos"), 1)),
+      unname(getOption("repos")[["P3M_archive_2026_09_28"]]),
       "https://p3m.dev/cran/2026-09-28"
+    )
+    expect_equal(
+      unname(getOption("repos")[["P3M_archive_2026_01_31"]]),
+      "https://p3m.dev/cran/2026-01-31"
     )
     expect_identical(
       getOption("repos"),
@@ -72,7 +90,7 @@ test_that("exact compiled pins recover dated binaries without changing shared st
     )
   }
   expect_message(run(), "duckdb")
-  expect_identical(asked, "duckdb")
+  expect_identical(asked, c("duckdb", "other"))
   expect_identical(updates, 1L)
   expect_identical(getOption("repos"), old)
   expect_null(getOption("renv.config.repos.override"))
