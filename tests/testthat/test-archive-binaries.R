@@ -1,4 +1,5 @@
 test_that("exact compiled pins recover dated binaries without changing shared state", {
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
   withr::local_options(
     repos = c(CRAN = "https://p3m.dev/cran/latest"),
     renv.config.repos.override = NULL
@@ -102,6 +103,7 @@ test_that("exact compiled pins recover dated binaries without changing shared st
 })
 
 test_that("archive lookup respects dated and private repository policies", {
+  withr::local_envvar(RENV_CONFIG_REPOS_OVERRIDE = NA)
   withr::local_options(
     repos = c(CRAN = "https://p3m.dev/cran/latest"),
     renv.config.repos.override = NULL
