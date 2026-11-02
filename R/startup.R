@@ -268,10 +268,11 @@ use_ppm_linux_binaries <- function() {
 #' Convert Linux Binary Repository URLs to Generic URLs
 #'
 #' @param repos A character vector of repository values.
-#' @return `repos` with manylinux Posit Package Manager URLs made generic.
+#' @return `repos` with Linux Posit Package Manager URLs made generic.
 #' @noRd
 portable_ppm_repos <- function(repos) {
-  sub(ppm_manylinux_pattern(), "\\1/", repos, ignore.case = TRUE)
+  pattern <- sprintf("^(https?://(%s)/[^/]+)/__linux__/[^/]+/", ppm_host_pattern())
+  sub(pattern, "\\1/", repos, ignore.case = TRUE)
 }
 
 #' Check Whether to Configure Repositories

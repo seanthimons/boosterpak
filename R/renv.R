@@ -212,6 +212,9 @@ normalize_lockfile_platform <- function(root = ".") {
   repositories <- lock$R$Repositories %||% list()
   # renv reads the repositories as a list named by repository.
   repo_names <- names(repositories) %||% character()
+  portable_repositories <- lapply(repositories, portable_ppm_repos)
+  repositories_changed <- !identical(repositories, portable_repositories)
+  lock$R$Repositories <- portable_repositories
   repo_urls <- vapply(repositories, function(url) as.character(url)[[1]], character(1))
   repo_urls <- sub("/+$", "", portable_ppm_repos(repo_urls))
 
@@ -242,7 +245,7 @@ normalize_lockfile_platform <- function(root = ".") {
     }
   }
 
-  if (changed > 0L) {
+  if (changed > 0L || repositories_changed) {
     old_options <- options(renv.verbose = FALSE)
     on.exit(options(old_options), add = TRUE)
     renv::lockfile_write(lock, file = path, project = root)
@@ -344,13 +347,15 @@ ensure_dependency_closure <- function(packages, root = ".", library = "renv") {
 #' @param root Project root.
 #' @return The restored package records, invisibly.
 #' @noRd
-call_renv_restore <- function(root = ".") {
+call_renv_restore <- function(root = ".", require_binaries = character()) {
   old <- setwd(root)
   on.exit(setwd(old), add = TRUE)
   configure_boosterpak_repositories(verbose = FALSE)
   configure_boosterpak_install_policy(verbose = FALSE)
   scope_windows_native_tar()
+  scope_binary_platforms()
   lockfile <- renv::lockfile_read(project = ".")
+  original_records <- lockfile$Packages
   lockfile$Packages <- pin_github_commits(lockfile$Packages)
   abort_if_offline_with_missing(lockfile$Packages, root)
   dead <- scope_reachable_repos()
@@ -359,9 +364,13 @@ call_renv_restore <- function(root = ".") {
   # repository set has changed (a dead repo was just dropped) and the cache is
   # cold: pak adds CRAN and Bioconductor hosts of its own. Skip it then.
   if (length(dead) == 0) {
+    scope_archived_binary_repos(lockfile$Packages)
     lockfile$Packages <- repair_unreachable_index_urls(lockfile$Packages)
   }
-  renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
+  check_required_binaries(original_records, require_binaries)
+  result <- renv::restore(project = root, lockfile = lockfile, prompt = FALSE)
+  restore_repository_metadata(root, original_records, lockfile$Packages)
+  invisible(result)
 }
 
 #' Make GitHub Package Records Restore at Their Locked Commit
@@ -395,7 +404,7 @@ pin_github_commits <- function(records) {
 #' For each locked repository package, this looks at the index entries for its
 #' locked version and probes the `Path:` directories they use. If one is
 #' missing, the record is rewritten to the entry's working URL (same version),
-#' or dropped from the lockfile object when no entry works. The lockfile on disk
+#' or kept at its locked version when no entry works. The lockfile on disk
 #' is not changed, and any failure to look up the index leaves `records`
 #' untouched.
 #'
@@ -404,7 +413,7 @@ pin_github_commits <- function(records) {
 #' @param url_ok Function returning whether a URL can be opened.
 #' @param repos Repository URLs; the first is probed to detect being offline.
 #' @return `records`, with affected records rewritten to `url` records or
-#'   removed.
+#'   retained at their locked versions.
 #' @noRd
 repair_unreachable_index_urls <- function(
   records,
@@ -447,7 +456,7 @@ repair_unreachable_index_urls <- function(
   broken[nested] <- !vapply(urls[nested], url_ok, logical(1))
 
   repaired <- character()
-  dropped <- character()
+  unavailable <- character()
   for (name in names(records)[from_repo]) {
     same <- rows$package == name & rows$version == records[[name]]$Version
     if (!any(broken & same)) {
@@ -456,8 +465,7 @@ repair_unreachable_index_urls <- function(
     candidates <- urls[same & !broken & !is.na(urls)]
     working <- Find(url_ok, candidates)
     if (is.null(working)) {
-      records[[name]] <- NULL
-      dropped <- c(dropped, name)
+      unavailable <- c(unavailable, name)
     } else {
       records[[name]] <- list(
         Package = name,
@@ -474,10 +482,10 @@ repair_unreachable_index_urls <- function(
       "i" = "Restoring {.pkg {repaired}} from direct URLs: the repository index lists them at a missing directory."
     ))
   }
-  if (length(dropped)) {
+  if (length(unavailable)) {
     cli::cli_warn(c(
-      "Skipping {.pkg {dropped}}: the repository index lists them only at a missing directory.",
-      i = "Install them separately, or restore again once the repository index is fixed."
+      "Keeping the locked request for {.pkg {unavailable}}: the repository index lists them only at a missing directory.",
+      i = "Restore may fail until the repository index is fixed; locked versions will not be dropped."
     ))
   }
   records
@@ -675,6 +683,7 @@ install_via <- function(packages, root = ".", library = "renv") {
 #' @noRd
 pak_install_packages <- function(packages, lib) {
   scope_windows_native_tar()
+  scope_binary_platforms()
   invisible(pak::pkg_install(packages, lib = lib, upgrade = FALSE))
 }
 

@@ -33,18 +33,20 @@ jobs:
           token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Set up R
-        uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
         with:
+          cran: https://p3m.dev/cran/latest
+          extra-repositories: https://cloud.r-project.org
           use-public-rspm: true
 
       - name: Set up pandoc
-        uses: r-lib/actions/setup-pandoc@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        uses: r-lib/actions/setup-pandoc@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
 
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2
 
       - name: Install package dependencies
-        uses: r-lib/actions/setup-r-dependencies@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        uses: r-lib/actions/setup-r-dependencies@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
         with:
           extra-packages: |
             any::desc
