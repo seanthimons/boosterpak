@@ -2,6 +2,21 @@
 
 # boosterpak NEWS
 
+## v0.10.0 (2026-11-02)
+
+#### New features
+
+- support portable renv environments without packs
+  ([28d0b7d](https://github.com/seanthimons/boosterpak/tree/28d0b7d3fc55ae877023bb4e890eb2ff3ba248f6))
+
+#### Other changes
+
+- bump version to 0.10.0 \[skip ci\]
+  ([3ffd286](https://github.com/seanthimons/boosterpak/tree/3ffd2860a2b2c93ac96622e330e32b92e38e03b5))
+
+Full set of changes:
+[`v0.9.4...v0.10.0`](https://github.com/seanthimons/boosterpak/compare/v0.9.4...v0.10.0)
+
 ## v0.9.4 (2026-10-21)
 
 #### Bug fixes
@@ -22,6 +37,11 @@
   ([eba933b](https://github.com/seanthimons/boosterpak/tree/eba933bb5d5533010408df31b6bf5c55ec81c1dd))
 - normalize Linux lockfile records after snapshots
   ([09a0232](https://github.com/seanthimons/boosterpak/tree/09a023286cde3d66755a2a2f2033156c85da142e))
+
+#### Docs
+
+- update NEWS.md for v0.9.4 \[skip ci\]
+  ([732df70](https://github.com/seanthimons/boosterpak/tree/732df701a34c3da25e33dbd681e9324c5110e338))
 
 #### Other changes
 
