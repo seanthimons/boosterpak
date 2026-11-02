@@ -20,6 +20,39 @@ Use `boosterpak` when the reusable thing is not just “these packages”,
 but “these packages plus the helper functions, attachment choices, and
 setup conventions that make this kind of project ready to work in.”
 
+## Environment-only projects
+
+Projects can use boosterpak only to maintain a portable renv
+environment. No packs, `boosters.toml`, or startup attachments are
+required. In an existing renv project, install boosterpak once, then
+use:
+
+``` r
+
+boosterpak::restore_project()   # new machine: restore locked versions
+boosterpak::snapshot_project()  # after intentional dependency changes
+```
+
+Restore repairs existing Linux PPM repository records before
+installation. Public P3M repositories use Cloud CRAN as a binary
+fallback. When a compiled CRAN pin has left the latest binary index,
+restore consults its release history and adds a dated P3M snapshot for
+that operation. Explicit dated repositories, private overrides, and
+custom fallback settings are preserved. To refuse a source build for a
+heavy package, use
+`boosterpak::restore_project(require_binaries = "duckdb")`; this checks
+pak’s resolution before installing anything. Snapshot removes Linux
+metadata after recording the project library. Both preserve snapshot
+dates and custom repositories; restore preserves package versions. The
+configured renv snapshot type still applies, so explicit projects must
+declare boosterpak in DESCRIPTION if it should be included in the
+lockfile. These functions create no startup hooks; run restore
+explicitly for setup. For offline opening, use baseline’s paired
+`setup.R` and `.Rprofile` templates, which load a machine-local prepared
+library instead of bootstrapping renv. A plain
+[`renv::snapshot()`](https://rstudio.github.io/renv/reference/snapshot.html)
+bypasses this cleanup.
+
 ## 1. Install pak
 
 ``` r
@@ -469,7 +502,7 @@ it cleans the package records in `renv.lock`:
 - A `Platform` tag that names Linux, such as
   `x86_64-pc-linux-gnu-manylinux_2_17`, is removed.
 - A `Repository` that is a URL is replaced by the name of the matching
-  repository in the lockfile, such as `CRAN`. A manylinux URL with no
+  repository in the lockfile, such as `CRAN`. A Linux PPM URL with no
   matching repository becomes the generic Package Manager URL.
 
 Packages installed from Package Manager binaries still record
