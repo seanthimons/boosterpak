@@ -1,3 +1,6 @@
+# Copy to .github/workflows/pkgdown.yaml. Builds the pkgdown site on every push/PR
+# and deploys to GitHub Pages on non-PR events via the baseline reusable workflow.
+# One-time setup: Settings > Pages > Build and deployment > Source must be "GitHub Actions".
 name: pkgdown
 
 on:
@@ -17,45 +20,12 @@ concurrency:
 
 jobs:
   pkgdown:
-    runs-on: ubuntu-latest
-    # Only the deploy step needs write; scope it to this job.
+    name: pkgdown
     permissions:
-      contents: write
-
-    env:
-      GITHUB_PAT: ${{ github.token }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-
-      - name: Set up pandoc
-        uses: r-lib/actions/setup-pandoc@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
-
-      - name: Set up R
-        uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
-        with:
-          cran: https://p3m.dev/cran/latest
-          extra-repositories: https://cloud.r-project.org
-          use-public-rspm: true
-
-      - name: Set up Quarto
-        uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2
-
-      - name: Install package dependencies
-        uses: r-lib/actions/setup-r-dependencies@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
-        with:
-          extra-packages: any::pkgdown, local::.
-          needs: website
-
-      - name: Build site
-        run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
-        shell: Rscript {0}
-
-      - name: Deploy to GitHub Pages
-        if: github.event_name != 'pull_request'
-        uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f # v4.8.0
-        with:
-          clean: false
-          branch: gh-pages
-          folder: docs
+      contents: read
+      pages: write
+      id-token: write
+    uses: seanthimons/baseline/.github/workflows/pkgdown.yaml@0a6e332d70f7a15520c62870221b35ef040ef933 # v2.0.0
+    with:
+      # The vignettes are Quarto documents.
+      quarto: true

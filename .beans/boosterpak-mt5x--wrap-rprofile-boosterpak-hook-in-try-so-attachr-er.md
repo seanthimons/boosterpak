@@ -1,13 +1,13 @@
 ---
 # boosterpak-mt5x
 title: Wrap .Rprofile boosterpak hook in try() so attach.R errors don't abort the profile
-status: todo
+status: completed
 type: bug
 priority: critical
 tags:
     - blocker
 created_at: 2026-07-09T18:23:44Z
-updated_at: 2026-07-09T18:23:44Z
+updated_at: 2026-11-13T22:30:00Z
 ---
 
 ## Problem
@@ -31,3 +31,7 @@ Wrap the hook body (at minimum the `source(attach)` call, preferably the whole e
 ## Origin
 
 Surfaced during review of PR #3 (restoring-a-project vignette). The vignette's "these errors are harmless" claim was scoped as a caveat (fix A); this bean is the root-cause fix (fix B). Blocks all development work per owner's direction.
+
+## Resolution
+
+Done on `main`. `rprofile_startup_block()` (R/constants.R) wraps the whole hook in `try()`, and `rprofile_hook_line()` wraps `boosters/attach.R` and each `boosters/fn_*.R` in its own `try()`. `upgrade_project()` replaces older unguarded hook lines. Covered by the test "managed Rprofile hook errors do not abort later profile code" in tests/testthat/test-config.R.

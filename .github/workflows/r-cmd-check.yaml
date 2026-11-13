@@ -6,67 +6,24 @@ on:
     paths-ignore:
       - 'NEWS.md'
       - '**/*.md'
-      - '.planning/**'
   pull_request:
-    branches: [main]
     paths-ignore:
       - 'NEWS.md'
       - '**/*.md'
-      - '.planning/**'
   workflow_dispatch:
-
-permissions:
-  contents: read
 
 concurrency:
   group: r-cmd-check-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   r-cmd-check:
-    if: github.actor != 'github-actions[bot]'
-    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
-    runs-on: ${{ matrix.config.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        config:
-          - { os: ubuntu-latest,  r: release }
-          - { os: windows-latest, r: release }
-          - { os: macos-latest,   r: release }
-
-    env:
-      GITHUB_PAT: ${{ github.token }}
-      R_KEEP_PKG_SOURCE: yes
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up R
-        uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
-        with:
-          r-version: ${{ matrix.config.r }}
-          cran: https://p3m.dev/cran/latest
-          extra-repositories: https://cloud.r-project.org
-          use-public-rspm: true
-
-      - name: Set up pandoc
-        uses: r-lib/actions/setup-pandoc@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
-
-      - name: Set up Quarto
-        uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2
-
-      - name: Install package dependencies
-        uses: r-lib/actions/setup-r-dependencies@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
-        with:
-          extra-packages: any::rcmdcheck
-          needs: check
-
-      - name: Check package
-        uses: r-lib/actions/check-r-package@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2.14.0
-        with:
-          upload-snapshots: true
+    name: R CMD check
+    # Pinned to the baseline v2.0.0 commit. Dependabot bumps this.
+    uses: seanthimons/baseline/.github/workflows/r-cmd-check.yaml@0a6e332d70f7a15520c62870221b35ef040ef933 # v2.0.0
+    with:
+      # The vignettes are Quarto documents.
+      quarto: true
