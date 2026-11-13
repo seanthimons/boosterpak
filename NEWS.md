@@ -2,12 +2,48 @@
 
 # boosterpak NEWS
 
+## v0.11.0 (2026-11-13)
+
+#### New features
+
+- generate the portable renv setup and describe boosterpak’s wider scope
+  (#42)
+  ([98bd5a8](https://github.com/seanthimons/boosterpak/tree/98bd5a81c7dbef6bd37498e03fc06ef3379ca25d))
+
+#### CI
+
+- adopt baseline gitleaks, commit-lint and lint-workflows callers (#41)
+  ([73909f7](https://github.com/seanthimons/boosterpak/tree/73909f7dfb56442d865d6ff3a2abaff542c61132))
+- correct action version comments flagged by zizmor
+  ([4c6206c](https://github.com/seanthimons/boosterpak/tree/4c6206c280fd09a5085c39ca60af3b0937bccc12))
+- add .gitleaks.toml and the dependabot cooldown
+  ([c1a1668](https://github.com/seanthimons/boosterpak/tree/c1a1668a97dd9570e2e6dd136cfd47c80e168c08))
+- add the baseline lint-workflows caller and fix its findings
+  ([8e70038](https://github.com/seanthimons/boosterpak/tree/8e70038497cc8bc281430352002cfa60e47c034d))
+- replace local gitleaks and commit-lint with baseline callers
+  ([cde971b](https://github.com/seanthimons/boosterpak/tree/cde971b9952d08bbaecbac0e3c1622815043cd30))
+
+#### Other changes
+
+- bump version to 0.11.0 \[skip ci\]
+  ([6bee709](https://github.com/seanthimons/boosterpak/tree/6bee7098af4d8d4773809272b68ebb90017aff48))
+- add .gitattributes and normalize line endings
+  ([fafe028](https://github.com/seanthimons/boosterpak/tree/fafe028bd9ce553915842dd54d9cc9f462d31c63))
+
+Full set of changes:
+[`v0.10.0...v0.11.0`](https://github.com/seanthimons/boosterpak/compare/v0.10.0...v0.11.0)
+
 ## v0.10.0 (2026-11-02)
 
 #### New features
 
 - support portable renv environments without packs
   ([28d0b7d](https://github.com/seanthimons/boosterpak/tree/28d0b7d3fc55ae877023bb4e890eb2ff3ba248f6))
+
+#### Docs
+
+- update NEWS.md for v0.10.0 \[skip ci\]
+  ([e8eacb0](https://github.com/seanthimons/boosterpak/tree/e8eacb0fa8d3f488da8aa3be23ac6a6613e81a6f))
 
 #### Other changes
 
