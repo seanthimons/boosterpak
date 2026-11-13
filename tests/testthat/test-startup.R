@@ -870,6 +870,75 @@ test_that("post-activation Linux lines are only planned for Package Manager repo
   expect_false(any(grepl("renv:::renv_ppm_enabled()", lines[seq_len(length(lines) - 3L)], fixed = TRUE)))
 })
 
+test_that("a distro session URL with a manylinux override keeps the override lines", {
+  local_ppm_hosts()
+  withr::local_envvar(
+    RENV_CONFIG_REPOS_OVERRIDE = NA,
+    BOOSTERPAK_CONFIGURE_REPOSITORIES = NA
+  )
+  generic <- "https://packagemanager.posit.co/cran/latest"
+  manylinux <- "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest"
+  trixie <- "https://packagemanager.posit.co/cran/__linux__/trixie/latest"
+  lines_for <- function(repos, override) {
+    withr::local_options(list(
+      repos = repos,
+      renv.config.repos.override = override,
+      boosterpak.configure_repositories = TRUE
+    ))
+    boosterpak:::boosterpak_repository_lines_for_session()
+  }
+  has_override <- function(lines, url = generic) {
+    sprintf('options(renv.config.repos.override = c(CRAN = "%s"))', url) %in%
+      lines
+  }
+  reapplies_override <- function(lines) {
+    any(grepl('c("repos", "renv.config.repos.override")', lines, fixed = TRUE))
+  }
+
+  # renv activation on a supported distro: repos is the distro URL, the
+  # override is manylinux. Both are written back as the generic URL.
+  lines <- lines_for(c(CRAN = trixie), c(CRAN = manylinux))
+  expect_true(has_override(lines))
+  expect_true(
+    'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/latest"))' %in%
+      lines
+  )
+  expect_true(reapplies_override(lines))
+  expect_false(any(grepl("trixie|manylinux_2_28/latest\"", lines[1:3])))
+
+  # Dated snapshots behave the same way.
+  dated <- lines_for(
+    c(
+      CRAN = "https://packagemanager.posit.co/cran/__linux__/trixie/2026-10-01"
+    ),
+    c(
+      CRAN = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/2026-10-01"
+    )
+  )
+  expect_true(has_override(
+    dated,
+    "https://packagemanager.posit.co/cran/2026-10-01"
+  ))
+
+  # Everything generic, as on Fedora, is unchanged.
+  expect_true(has_override(lines_for(c(CRAN = generic), c(CRAN = generic))))
+
+  # A different repository, different names, or no override are not boosterpak's
+  # override, so no override line is written.
+  expect_false(has_override(lines_for(
+    c(CRAN = trixie),
+    c(CRAN = "https://packagemanager.posit.co/cran/2026-10-01")
+  )))
+  expect_false(any(grepl(
+    "renv.config.repos.override",
+    lines_for(c(CRAN = trixie), c(Other = manylinux))
+  )))
+  expect_false(any(grepl(
+    "renv.config.repos.override",
+    lines_for(c(CRAN = trixie), NULL)
+  )))
+})
+
 test_that("the post-activation Linux line is skipped when renv PPM handling is off", {
   skip_if_not(identical(R.version$os, "linux-gnu"))
   skip_if_not_installed("renv")

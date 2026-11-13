@@ -724,9 +724,15 @@ boosterpak_repository_lines_for_session <- function(changes = character()) {
   if (!uses_posit_package_manager(repos)) {
     return(character())
   }
+  # Compare portable forms: after renv activation the repos can be a distro
+  # URL while the override is the manylinux URL, and both mean the same
+  # repository. Raw values would drop the override line.
   include_renv <- "renv" %in%
     changes ||
-    identical(getOption("renv.config.repos.override"), repos)
+    identical(
+      portable_ppm_repos(getOption("renv.config.repos.override")),
+      portable_ppm_repos(repos)
+    )
   c(
     rprofile_repository_lines(repos, include_renv = include_renv),
     rprofile_repository_reapply_lines(
