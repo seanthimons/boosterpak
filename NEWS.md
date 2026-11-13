@@ -2,6 +2,28 @@
 
 # boosterpak NEWS
 
+## v0.11.1 (2026-11-13)
+
+#### New features
+
+- rewrite distro-specific Package Manager URLs to manylinux on Linux
+  (#45)
+  ([48a55b2](https://github.com/seanthimons/boosterpak/tree/48a55b295d7dc38c4d845b5c8dd817697550a30b))
+
+#### Bug fixes
+
+- keep the renv repository override when renv rewrites repos to a distro
+  URL (#44)
+  ([91a120e](https://github.com/seanthimons/boosterpak/tree/91a120e9b43504459cd8ee68ff00371d5105423a))
+
+#### Other changes
+
+- bump version to 0.11.1 \[skip ci\]
+  ([b0140a3](https://github.com/seanthimons/boosterpak/tree/b0140a3d906fc4fccd0b13ff1d68e323e5ee847c))
+
+Full set of changes:
+[`v0.11.0...v0.11.1`](https://github.com/seanthimons/boosterpak/compare/v0.11.0...v0.11.1)
+
 ## v0.11.0 (2026-11-13)
 
 #### New features
@@ -22,6 +44,11 @@
   ([8e70038](https://github.com/seanthimons/boosterpak/tree/8e70038497cc8bc281430352002cfa60e47c034d))
 - replace local gitleaks and commit-lint with baseline callers
   ([cde971b](https://github.com/seanthimons/boosterpak/tree/cde971b9952d08bbaecbac0e3c1622815043cd30))
+
+#### Docs
+
+- update NEWS.md for v0.11.0 \[skip ci\]
+  ([d1411ab](https://github.com/seanthimons/boosterpak/tree/d1411abc51b790a9d7beb1150e84cae23cf68c26))
 
 #### Other changes
 
