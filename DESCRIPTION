@@ -1,6 +1,6 @@
 Package: boosterpak
 Title: Smooth the Rough Edges of Working in R
-Version: 0.10.0
+Version: 0.11.0
 Authors@R: 
     person("Sean", "Thimons", email = "sxthimons@gmail.com", role = c("aut", "cre"))
 Author: Sean Thimons [aut, cre]
