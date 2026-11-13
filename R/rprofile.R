@@ -280,13 +280,22 @@ remove_rprofile_managed_lines <- function(lines, renv = TRUE) {
   lines <- startup$lines
   lines <- lines[!lines %in% c(rprofile_line(), legacy_rprofile_line())]
   lines <- remove_rprofile_boosterpak_setup_blocks(lines)
+  malformed <- startup$malformed
   if (isTRUE(renv)) {
     lines <- lines[!is_rprofile_renv_activation(lines)]
+    # The portable block is the project's renv loader, so it goes with renv.
+    portable <- remove_marked_blocks(
+      lines,
+      rprofile_portable_begin_marker(),
+      rprofile_portable_end_marker()
+    )
+    lines <- portable$lines
+    malformed <- malformed || portable$malformed
   }
   list(
     lines = lines,
     changed = !identical(lines, original),
-    malformed_startup = startup$malformed
+    malformed_startup = malformed
   )
 }
 
@@ -296,8 +305,26 @@ remove_rprofile_managed_lines <- function(lines, renv = TRUE) {
 #' @return A list containing transformed `lines` and a `malformed` flag.
 #' @noRd
 remove_rprofile_startup_blocks <- function(lines) {
-  begin <- rprofile_startup_begin_marker()
-  end <- rprofile_startup_end_marker()
+  removed <- remove_marked_blocks(
+    lines,
+    rprofile_startup_begin_marker(),
+    rprofile_startup_end_marker()
+  )
+  list(lines = removed$lines, malformed = removed$malformed)
+}
+
+#' Remove valid marker-delimited blocks
+#'
+#' Nested, unmatched, or unterminated markers are left in place and reported
+#' as malformed.
+#'
+#' @param lines Character vector of `.Rprofile` lines.
+#' @param begin Exact begin marker line.
+#' @param end Exact end marker line.
+#' @return A list containing transformed `lines`, a `malformed` flag, and the
+#'   logical `keep` vector over the input lines.
+#' @noRd
+remove_marked_blocks <- function(lines, begin, end) {
   keep <- rep(TRUE, length(lines))
   open <- NA_integer_
   nested <- FALSE
@@ -328,7 +355,7 @@ remove_rprofile_startup_blocks <- function(lines) {
     malformed <- TRUE
   }
 
-  list(lines = lines[keep], malformed = malformed)
+  list(lines = lines[keep], malformed = malformed, keep = keep)
 }
 
 #' Identify whole-line renv activation expressions

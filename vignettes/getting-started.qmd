@@ -10,10 +10,23 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+`boosterpak` smooths the rough edges of working in R: choosing compiled or
+prebuilt binaries, differences across operating systems and R versions,
+restoring a project on a new machine, and keeping scripts versioned with the
+project. Packs are one feature of that, and most of this vignette is about them.
 `boosterpak` installs reusable R project packs: typed bundles of package
 dependencies, optional source specs, startup attachment intent, and
 helper-function sidecars that make a project usable without turning it into a
 package. It is less than a package, but more than a fistful of copied files.
+
+A project that only needs a portable `renv` environment, with no packs, does not
+need `boosters.toml` or the pack sections below. `restore_project()` and
+`snapshot_project()` restore and record the locked library, and
+`write_portable_setup()` generates a committed `setup.R` that lets a fresh clone
+restore itself. See the
+[restoring a project](restoring-a-project.html) vignette. Those functions are
+for projects without packs; the rest of this vignette covers pack projects,
+except `deinit()`, which cleans up both.
 
 `boosters.toml` is the project-local control file for those packs. It is not a
 general dependency-manifest standard and `boosterpak` does not depend on one.
@@ -281,7 +294,9 @@ boosterpak::deinit(
 The cleanup is conservative. `.Rprofile` itself and unrelated user lines are
 always retained. A renv activation line is removed only when both `renv` and
 `rprofile` are selected and the activation is a recognized whole-line
-expression. Edited or ownership-unknown `air.toml` files, malformed managed
+expression. The portable startup block that `write_portable_setup()` writes is
+the project's renv loader, so it follows the same rule. A generated `setup.R` is
+not removed. Edited or ownership-unknown `air.toml` files, malformed managed
 startup markers, user/global packs, active user libraries, and session options
 are preserved. If the removed renv library is active, restart R before
 continuing. Repeating the same cleanup is an unprompted no-op.

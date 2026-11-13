@@ -50,9 +50,11 @@ not prompt or require \code{force}.
 \code{air.toml} is removed only when its complete line sequence matches a known
 boosterpak-generated format. \code{.Rprofile} is never deleted: only recognized
 managed startup, repository, and install-policy content is removed, along
-with a whole-line renv activation expression when both \code{renv} and \code{rprofile}
-are \code{TRUE}. Malformed startup markers and all unrelated profile lines are
-preserved.
+with a whole-line renv activation expression or the portable startup block
+from \code{\link[=write_portable_setup]{write_portable_setup()}} when both \code{renv} and \code{rprofile} are \code{TRUE}.
+The portable block is the project's renv loader, so it stays when \code{renv} is
+\code{FALSE}. A generated \code{setup.R} is not removed. Malformed startup markers and
+all unrelated profile lines are preserved.
 }
 \seealso{
 \code{\link[=init]{init()}}

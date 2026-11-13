@@ -1,16 +1,19 @@
 Package: boosterpak
-Title: Reusable Project Capability Packs
+Title: Smooth the Rough Edges of Working in R
 Version: 0.10.0
 Authors@R: 
     person("Sean", "Thimons", email = "sxthimons@gmail.com", role = c("aut", "cre"))
 Author: Sean Thimons [aut, cre]
 Maintainer: Sean Thimons <sxthimons@gmail.com>
-Description: Provides reusable project packs for bootstrapping R workflows. A
-    pack is a typed bundle of package dependencies, optional source
-    specifications, startup attachment intent, helper-function sidecars, and
-    project-local setup conventions. Applies packs with 'pak' to either the
-    active R library or a project-local 'renv' library while leaving exact
-    version restoration to 'renv' lockfiles.
+Description: Smooths the rough edges of working in R: choosing compiled or
+    prebuilt binaries, differences across operating systems and R versions,
+    portable project restores, and versioned scripts. Restores and snapshots
+    portable 'renv' environments, and generates a setup script to commit that
+    lets a project restore itself on a new machine. Reusable project packs are
+    one feature: typed bundles of package dependencies, optional source
+    specifications, startup attachment intent, and helper-function sidecars.
+    Packs apply with 'pak' to either the active R library or a project-local
+    'renv' library while leaving exact version restoration to 'renv' lockfiles.
 License: MIT + file LICENSE
 URL: https://seanthimons.github.io/boosterpak/, https://github.com/seanthimons/boosterpak
 BugReports: https://github.com/seanthimons/boosterpak/issues

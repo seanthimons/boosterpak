@@ -18,6 +18,12 @@ missing workflow packages into the project library, and records the result in
 settings, or your helper functions. The only `boosters.toml` change is the
 `boosters_version` record.
 
+`upgrade_project()` is for pack projects: it stops when `boosters.toml` is
+missing. A project without packs that uses `write_portable_setup()` has no
+`boosters.toml` and no upgrade step. Run `write_portable_setup()` again to
+refresh the pin in `setup.R`, for example after upgrading boosterpak. See the
+[restoring a project](restoring-a-project.html) vignette.
+
 ## Who needs it
 
 A project needs an upgrade when it was last migrated with an older boosterpak.

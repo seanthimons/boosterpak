@@ -265,6 +265,43 @@ on by default.
   so `sync()` restores the environment without re-running project-scaffolding
   side effects such as folder creation.
 
+## Projects without packs: a portable setup
+
+A project that uses boosterpak only for `restore_project()` and
+`snapshot_project()` has no `boosters.toml` and no startup hook. To let a fresh
+clone restore itself, and to open without installing anything before it has
+been set up, generate the portable setup once from the project root:
+
+```{r}
+#| echo: true
+#| eval: false
+boosterpak::write_portable_setup()
+```
+
+Commit the generated `setup.R`. It pins the boosterpak commit that wrote it, so
+the pin cannot drift by hand. On each new machine, run it once from the project
+root:
+
+```sh
+Rscript --vanilla setup.R
+```
+
+It activates renv, installs the pinned boosterpak, runs
+`restore_portable_project()`, and records which library holds renv for that
+machine in `renv/local/startup` (ignored by git). The `.Rprofile` block that
+`write_portable_setup()` adds reads that record when the project opens. Before
+setup, or after an R minor-version or platform change, it installs nothing and
+prints the setup command. After setup, `renv::paths$library()` points at the
+restored project library.
+
+`write_portable_setup()` replaces renv's own `source("renv/activate.R")` line,
+because renv's auto-loader would download renv on open. A later `renv::init()`
+or `renv::activate()` can add that line back; run `write_portable_setup()` again
+to remove it, and to refresh the pin after upgrading boosterpak. It refuses a
+pack project, and refuses to replace a `setup.R` it did not generate unless you
+pass `overwrite = TRUE`. `restore_project()` and `snapshot_project()` never
+write these files.
+
 ## Troubleshooting: boosterpak absent from the lockfile
 
 Projects initialized with boosterpak 0.5, or with `settings.auto_snapshot =

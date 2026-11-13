@@ -2,7 +2,9 @@
 
 <img src="man/figures/boosterpak_hex.png" alt="boosterpak hex logo" align="right" width="140"/>
 
-`boosterpak` installs reusable R project packs: typed bundles of package dependencies, optional source specs, startup attachment intent, and helper-function sidecars that make a project usable without turning it into a package. It is less than a package, but more than a fistful of copied files.
+`boosterpak` smooths the rough edges of working in R: choosing compiled or prebuilt binaries, differences across operating systems and R versions, restoring a project on a new machine, and keeping scripts versioned with the project. A rough edge belongs here when a person on a laptop would hit it too; a CI runner is just another new machine. Packs, described next, are one feature of that, not its definition.
+
+Among its features, `boosterpak` installs reusable R project packs: typed bundles of package dependencies, optional source specs, startup attachment intent, and helper-function sidecars that make a project usable without turning it into a package. It is less than a package, but more than a fistful of copied files.
 
 `boosters.toml` is the project-local control file for those packs. It is not a general dependency-manifest standard and `boosterpak` does not depend on one. `pak` remains the installer, `renv` remains the lockfile and default project-library layer, and `boosterpak` sits above them as a small capability-bundle layer for reusable setup conventions. Existing projects can instead apply packs to an active user or site library without creating a project-local `renv` environment.
 
@@ -32,9 +34,23 @@ preserve snapshot dates and custom repositories; restore preserves package
 versions. The configured renv snapshot type still applies, so explicit projects
 must declare boosterpak in DESCRIPTION if it should be included in the lockfile.
 These functions create no startup hooks; run restore explicitly for setup.
-For offline opening, use baseline's paired `setup.R` and `.Rprofile` templates,
-which load a machine-local prepared library instead of bootstrapping renv.
 A plain `renv::snapshot()` bypasses this cleanup.
+
+To make a project restore itself on a fresh machine and open without installing
+anything, generate its portable setup once and commit `setup.R`:
+
+```r
+boosterpak::write_portable_setup()
+```
+
+This writes `setup.R` (pinned to the boosterpak that generated it) and a managed
+`.Rprofile` block. Each machine then runs `Rscript --vanilla setup.R` once. The
+block loads the machine-local library that setup prepared, and before setup it
+installs nothing and prints that command. It replaces renv's own
+`source("renv/activate.R")` line, whose auto-loader downloads renv on open. Run
+it again to refresh the pin or after a renv command adds that line back. It
+refuses pack projects. `write_portable_setup()` is the only function that writes
+these startup files.
 
 ## 1. Install pak
 

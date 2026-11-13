@@ -169,3 +169,19 @@ rprofile_startup_block <- function() {
 package_version_string <- function() {
   as.character(utils::packageVersion("boosterpak"))
 }
+
+#' Build the managed portable startup block begin marker
+#'
+#' @return The exact begin marker used in `.Rprofile`.
+#' @noRd
+rprofile_portable_begin_marker <- function() {
+  "# BEGIN boosterpak portable startup"
+}
+
+#' Build the managed portable startup block end marker
+#'
+#' @return The exact end marker used in `.Rprofile`.
+#' @noRd
+rprofile_portable_end_marker <- function() {
+  "# END boosterpak portable startup"
+}
