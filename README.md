@@ -2,7 +2,9 @@
 
 <img src="man/figures/boosterpak_hex.png" alt="boosterpak hex logo" align="right" width="140"/>
 
-`boosterpak` installs reusable R project packs: typed bundles of package dependencies, optional source specs, startup attachment intent, and helper-function sidecars that make a project usable without turning it into a package. It is less than a package, but more than a fistful of copied files.
+`boosterpak` smooths the rough edges of working in R: choosing compiled or prebuilt binaries, differences across operating systems and R versions, restoring a project on a new machine, and keeping scripts versioned with the project. A rough edge belongs here when a person on a laptop would hit it too; a CI runner is just another new machine. Packs, described next, are one feature of that, not its definition.
+
+Among its features, `boosterpak` installs reusable R project packs: typed bundles of package dependencies, optional source specs, startup attachment intent, and helper-function sidecars that make a project usable without turning it into a package. It is less than a package, but more than a fistful of copied files.
 
 `boosters.toml` is the project-local control file for those packs. It is not a general dependency-manifest standard and `boosterpak` does not depend on one. `pak` remains the installer, `renv` remains the lockfile and default project-library layer, and `boosterpak` sits above them as a small capability-bundle layer for reusable setup conventions. Existing projects can instead apply packs to an active user or site library without creating a project-local `renv` environment.
 

@@ -18,11 +18,17 @@ tool's own documentation before you decide.
 
 ## Where boosterpak fits
 
-boosterpak is a layer on top of {renv} and {pak}, and it requires both. In its
-default mode, {renv} owns the project library and `renv.lock`, {pak} installs
-packages, and boosterpak adds reusable project packs: package bundles, startup
-attachment rules, and helper-function files. It works at the project level. It
-does not manage the R version or anything outside R packages.
+boosterpak smooths the rough edges of working in R: compiled versus prebuilt
+binaries, differences across operating systems and R versions, restoring a
+project on a new machine, and versioned scripts. It is a layer on top of {renv}
+and {pak}, and it requires both. In its default mode, {renv} owns the project
+library and `renv.lock`, {pak} installs packages, and boosterpak adds what
+smooths the rest: Linux binary handling, `restore_project()` and
+`snapshot_project()` for portable environments, a generated `setup.R` that lets
+a project without packs restore itself on a new machine, and reusable project
+packs (package bundles, startup attachment rules, and helper-function files). It works at the
+project level. It does not manage the R version or anything outside R
+packages.
 
 {rix}, rv, and uvr are not layers that boosterpak runs on top of. {rix} works at
 the level of the whole software environment, and boosterpak does not use it. rv
@@ -40,10 +46,14 @@ packages into your current R libraries and writes no lockfile. See the
 
 The tools in the post mostly answer one question: which package versions, and
 sometimes which R version or system environment, does this work use? boosterpak answers a
-different one: what does every project of mine start with? It does not replace
-the version-pinning layer. It sits on {renv} for that (in its default mode) and adds the setup that
+different one: what does every project of mine start with, and what trips me up
+when I move it to another machine? It does not replace the version-pinning layer. It sits on {renv} for that (in its default mode) and adds the setup that
 you would otherwise repeat by hand in each project:
 
+- **Portable restores.** `restore_project()` and `snapshot_project()` restore and
+  record an {renv} environment without packs, and `write_portable_setup()`
+  generates a `setup.R` to commit, so a fresh clone restores itself and opens
+  without installing anything. It is for projects without packs.
 - **Packs.** A pack is a named bundle of packages, optional GitHub sources,
   startup attachment rules, and helper-function files. Packs can extend other
   packs. You build a pack once (for example with `save_pack()` from a set of
@@ -167,6 +177,8 @@ boosterpak has no interaction with rig.
 
 - You already use {renv}, or plan to, and want each project to match a declared
   set of packages, startup attachment, and helper functions.
+- You have an {renv} project with no packs and want it to restore the same way
+  on a new machine, with the Linux binary handling built in.
 - You reuse the same setup across projects and want it captured as a pack that
   you can review, promote, and add to another project with `add_pack()`.
 - Your team commits `renv.lock` and you want the Linux binary handling described
