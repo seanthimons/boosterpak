@@ -177,9 +177,11 @@ because `renv::load()` resets the repositories to the lockfile URLs. It runs onl
 while renv's Package Manager handling is on, so the lockfile keeps the generic
 URL. The re-applied block also restores the Package Manager URL on every OS when
 `renv::load()` left a default CRAN mirror, such as `https://cran.rstudio.com`, in
-`repos`. Custom mirrors are left alone. Distribution-specific URLs such as
-`.../cran/__linux__/noble/latest` are left alone. Rerun `init()` or `upgrade_project()`
-to replace the line written by an earlier boosterpak version.
+`repos`. Custom mirrors are left alone. A distribution-specific Package Manager
+URL such as `.../cran/__linux__/noble/latest`, which renv writes on a distribution
+Package Manager lists, is rewritten to the manylinux URL as well, so every glibc
+machine uses the same binaries. Rerun `init()` or `upgrade_project()` to replace
+the line written by an earlier boosterpak version, which left those URLs alone.
 
 **When it applies.**
 
@@ -190,7 +192,8 @@ to replace the line written by an earlier boosterpak version.
   glibc 2.28 or newer (check with `ldd --version`). boosterpak does not test for
   this, so on an older or unusual system use the opt-out below.
 - The repository URL is `<host>/<repo>/latest` or `<host>/<repo>/<YYYY-MM-DD>`,
-  with no trailing slash, on
+  optionally with one `__linux__/<distribution>` segment, and has no trailing
+  slash, on
   `packagemanager.posit.co`, `packagemanager.rstudio.com`, or `p3m.dev`.
 - For a self-hosted Package Manager, boosterpak also recognizes the host of
   `BOOSTERPAK_PPM_REPO` and hosts listed in `BOOSTERPAK_PPM_HOSTS` or

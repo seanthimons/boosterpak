@@ -427,12 +427,17 @@ test_that("init upgrades an existing generic PPM .Rprofile on Linux", {
   expect_true(user_line %in% lines)
 })
 
-test_that("Linux binary rewrite leaves custom and distro PPM URLs alone", {
+test_that("Linux binary rewrite maps distro PPM URLs to manylinux and leaves custom URLs alone", {
   local_mocked_bindings(is_glibc_linux = function() TRUE)
+  manylinux <- "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28"
   repos <- c(
     CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
+    Dated = "https://packagemanager.posit.co/cran/__linux__/trixie/2026-01-03",
     Snap = "https://packagemanager.posit.co/cran/2026-01-02",
-    Internal = "https://example.test/cran/latest"
+    Done = paste0(manylinux, "/latest"),
+    Internal = "https://example.test/cran/latest",
+    InternalDistro = "https://example.test/cran/__linux__/noble/latest",
+    Trailing = "https://packagemanager.posit.co/cran/__linux__/noble/latest/"
   )
   withr::local_options(list(repos = repos, renv.config.repos.override = NULL))
 
@@ -441,12 +446,35 @@ test_that("Linux binary rewrite leaves custom and distro PPM URLs alone", {
   expect_equal(
     getOption("repos"),
     c(
-      CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest",
-      Snap = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/2026-01-02",
-      Internal = "https://example.test/cran/latest"
+      CRAN = paste0(manylinux, "/latest"),
+      Dated = paste0(manylinux, "/2026-01-03"),
+      Snap = paste0(manylinux, "/2026-01-02"),
+      Done = paste0(manylinux, "/latest"),
+      Internal = "https://example.test/cran/latest",
+      InternalDistro = "https://example.test/cran/__linux__/noble/latest",
+      Trailing = "https://packagemanager.posit.co/cran/__linux__/noble/latest/"
     )
   )
   expect_null(getOption("renv.config.repos.override"))
+
+  # Running it again changes nothing.
+  again <- getOption("repos")
+  boosterpak:::use_ppm_linux_binaries()
+  expect_equal(getOption("repos"), again)
+})
+
+test_that("Linux binary rewrite also maps a distro renv override to manylinux", {
+  local_mocked_bindings(is_glibc_linux = function() TRUE)
+  distro <- c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest")
+  withr::local_options(list(repos = distro, renv.config.repos.override = distro))
+
+  boosterpak:::use_ppm_linux_binaries()
+
+  expected <- c(
+    CRAN = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/latest"
+  )
+  expect_equal(getOption("repos"), expected)
+  expect_equal(getOption("renv.config.repos.override"), expected)
 })
 
 test_that("Linux binary rewrite covers p3m.dev and any repository name", {
