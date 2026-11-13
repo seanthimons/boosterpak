@@ -2,6 +2,22 @@
 
 # boosterpak NEWS
 
+## v0.12.0 (2026-11-13)
+
+#### New features
+
+- warn when boosterpak and the project’s recorded version drift apart
+  (#46)
+  ([da84f0f](https://github.com/seanthimons/boosterpak/tree/da84f0ffa974f7d4505110556859ead36217e8f4))
+
+#### Other changes
+
+- bump version to 0.12.0 \[skip ci\]
+  ([0e05ac9](https://github.com/seanthimons/boosterpak/tree/0e05ac954bb9626a3d0e340ecd8a76a742b2950d))
+
+Full set of changes:
+[`v0.11.1...v0.12.0`](https://github.com/seanthimons/boosterpak/compare/v0.11.1...v0.12.0)
+
 ## v0.11.1 (2026-11-13)
 
 #### New features
@@ -15,6 +31,11 @@
 - keep the renv repository override when renv rewrites repos to a distro
   URL (#44)
   ([91a120e](https://github.com/seanthimons/boosterpak/tree/91a120e9b43504459cd8ee68ff00371d5105423a))
+
+#### Docs
+
+- update NEWS.md for v0.11.1 \[skip ci\]
+  ([4b0e5a7](https://github.com/seanthimons/boosterpak/tree/4b0e5a7b58a479097845f714c411aca5aa073ff0))
 
 #### Other changes
 
