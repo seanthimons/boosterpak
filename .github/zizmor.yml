@@ -7,6 +7,3 @@ rules:
       # Pushes to main with a token (git push origin main), so it needs
       # persisted credentials.
       - release.yaml:28
-      # The gh-pages deploy action pushes with the persisted checkout token.
-      # It runs on push to main only, which PR CI cannot test.
-      - pkgdown.yaml:29
