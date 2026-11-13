@@ -35,3 +35,11 @@ Resolved package names, invisibly.
 \description{
 Synchronize a boosterpak project
 }
+\details{
+Both modes compare \verb{[project].boosters_version} with the installed
+boosterpak. When the record is newer, they warn (class
+\code{boosterpak_version_newer}); when it is older, they suggest
+\code{\link[=upgrade_project]{upgrade_project()}} in interactive sessions. Restore mode checks after
+restoring, because \code{renv.lock} can install a newer boosterpak; then it asks
+you to restart R instead.
+}

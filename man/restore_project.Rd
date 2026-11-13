@@ -25,3 +25,8 @@ function that does, and only when asked.
 Public P3M repositories use Cloud CRAN as a binary fallback. Explicit
 private overrides, repository dates, and repository opt-outs are preserved.
 }
+\details{
+In a project that also has \code{boosters.toml}, restore then compares its
+\verb{[project].boosters_version} record with boosterpak, as \code{\link[=sync]{sync()}} does.
+Projects without packs have no record and get no message.
+}

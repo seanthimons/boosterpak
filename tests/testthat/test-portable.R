@@ -401,3 +401,26 @@ test_that("deinit keeps the portable block as the renv activation when asked", {
     unlist(result$preserved)
   )))
 })
+
+test_that("the pin is read back only from a generated setup.R", {
+  root <- local_portable_project()
+  expect_null(portable_setup_pin(root))
+  write_portable_setup(root, ref = sha, verbose = FALSE)
+  expect_identical(portable_setup_pin(root), sha)
+
+  writeLines(sprintf('ref <- "%s"', sha), file.path(root, "setup.R"))
+  expect_null(portable_setup_pin(root))
+})
+
+test_that("installed_boosterpak_sha reads only GitHub installs", {
+  expect_identical(
+    installed_boosterpak_sha(list(RemoteType = "github", RemoteSha = sha)),
+    sha
+  )
+  expect_true(is.na(installed_boosterpak_sha(list(RemoteType = "local"))))
+  expect_true(is.na(installed_boosterpak_sha(list(Version = "1.0.0"))))
+  expect_true(is.na(installed_boosterpak_sha(list(
+    RemoteType = "github",
+    RemoteSha = NA_character_
+  ))))
+})

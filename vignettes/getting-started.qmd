@@ -494,7 +494,9 @@ the project was last migrated with. It is a record, not a lock:
 - `upgrade_project()` writes it after a real run that reports no warnings.
 - `sync()` does not change it.
 
-`status()` warns when the record is older than the installed boosterpak. A missing
+`status()` warns when the record is older than the installed boosterpak, and
+`sync()` prints the same hint in interactive sessions. A record newer than the
+installed boosterpak is a warning from `status()` and `sync()` alike. A missing
 record is reported as "no version recorded" without a warning, and
 `upgrade_needed` is still `TRUE`. The warning says to run `boosterpak::upgrade_project(dry_run = TRUE)`
 first, then `boosterpak::upgrade_project()`. Review the result with `git diff`

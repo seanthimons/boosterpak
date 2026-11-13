@@ -281,3 +281,22 @@ test_that("binary index repairs preserve repository identity without changing th
   restore_repository_metadata(root, restored, restored)
   expect_false(isolated)
 })
+
+test_that("restore_project warns only when a boosters.toml record is newer", {
+  root <- withr::local_tempdir()
+  writeLines("{}", file.path(root, "renv.lock"))
+  local_mocked_bindings(
+    normalize_lockfile_platform = function(root) invisible(NULL),
+    configure_boosterpak_repositories = function(...) invisible(character()),
+    add_public_cran_fallback = function() invisible(NULL),
+    call_renv_restore = function(root, require_binaries = character()) "records"
+  )
+
+  expect_no_warning(expect_identical(restore_project(root), "records"))
+
+  writeLines(
+    c("[project]", 'name = "x"', 'boosters_version = "99.0.0"'),
+    file.path(root, "boosters.toml")
+  )
+  expect_warning(restore_project(root), class = "boosterpak_version_newer")
+})

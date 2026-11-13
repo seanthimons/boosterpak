@@ -302,6 +302,11 @@ pack project, and refuses to replace a `setup.R` it did not generate unless you
 pass `overwrite = TRUE`. `restore_project()` and `snapshot_project()` never
 write these files.
 
+`status()` shows whether the pin in `setup.R` matches the boosterpak installed
+in the session (`setup_pin_current` in its result). A different pin is
+information, not a warning: keeping an older pin is a valid way to stay on a
+known boosterpak. Run `write_portable_setup()` to move it.
+
 ## Troubleshooting: boosterpak absent from the lockfile
 
 Projects initialized with boosterpak 0.5, or with `settings.auto_snapshot =

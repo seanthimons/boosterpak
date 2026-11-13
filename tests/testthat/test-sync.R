@@ -396,3 +396,82 @@ test_that("hard dependency detection finds missing imports from installed descri
 
   expect_equal(missing, "pkgB")
 })
+
+test_that("sync reports a boosters_version record that differs from boosterpak", {
+  root <- withr::local_tempdir()
+  active_lib <- file.path(root, "active-library")
+  dir.create(active_lib)
+  old_libpaths <- .libPaths()
+  withr::defer(.libPaths(old_libpaths))
+  .libPaths(c(active_lib, old_libpaths))
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  boosterpak:::set_boosters_version(root)
+  set_record <- function(version) {
+    path <- file.path(root, "boosters.toml")
+    lines <- readLines(path, warn = FALSE)
+    at <- grep("^boosters_version = ", lines)
+    lines[at] <- sprintf('boosters_version = "%s"', version)
+    writeLines(lines, path)
+  }
+  local_mocked_bindings(
+    missing_packages = function(packages, root = ".", library = "renv") character(),
+    install_via = function(specs, root = ".", library = "renv") TRUE,
+    source_attach = function(root = ".", verbose = NULL) invisible(TRUE),
+    .package = "boosterpak"
+  )
+  drift_messages <- function(verbose) {
+    messages <- testthat::capture_messages(
+      sync(root = root, library = "active", verbose = verbose)
+    )
+    grep("last migrated|Restart R", messages, value = TRUE)
+  }
+
+  # Current record: nothing.
+  expect_no_warning(expect_length(drift_messages(TRUE), 0L))
+
+  # Older record: a hint to upgrade, in verbose sessions only.
+  set_record("0.1.0")
+  expect_match(drift_messages(TRUE), "upgrade_project(dry_run = TRUE)", fixed = TRUE)
+  expect_length(drift_messages(FALSE), 0L)
+
+  # Newer record: a classed warning, even when quiet.
+  set_record("99.0.0")
+  expect_warning(
+    sync(root = root, library = "active", verbose = FALSE),
+    class = "boosterpak_version_newer"
+  )
+})
+
+test_that("sync restore checks the record after restoring", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  boosterpak:::set_boosters_version(root)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines[grep("^boosters_version = ", lines)] <- 'boosters_version = "99.0.0"'
+  writeLines(lines, path)
+  writeLines("{}", file.path(root, "renv.lock"))
+  restored <- FALSE
+  installed <- NULL
+  local_mocked_bindings(
+    call_renv_restore = function(root = ".") {
+      # The lockfile installs a newer boosterpak into the project library.
+      restored <<- TRUE
+      installed <<- package_version("99.0.0")
+      TRUE
+    },
+    library_boosterpak_version = function(lib) {
+      # The project library must be searched first.
+      expect_identical(lib[[1]], renv::paths$library(project = root))
+      installed
+    },
+    warn_missing_lock_packages = function(...) invisible(NULL),
+    .package = "boosterpak"
+  )
+
+  messages <- expect_no_warning(testthat::capture_messages(
+    sync(mode = "restore", root = root, verbose = TRUE)
+  ))
+  expect_true(restored)
+  expect_match(paste(messages, collapse = ""), "Restart R to use it", fixed = TRUE)
+})

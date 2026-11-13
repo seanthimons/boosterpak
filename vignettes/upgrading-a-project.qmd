@@ -44,6 +44,15 @@ boosterpak. A missing record is reported as "no version recorded" without a
 warning, and `upgrade_needed` is still `TRUE`. You do not need to know which layout a
 project has. The dry run below shows what would change.
 
+You do not have to run `status()` to find out. In an interactive session,
+`sync()` and `restore_project()` print the same upgrade hint when the record is
+older. The other direction is a warning everywhere: when the record is newer
+than the installed boosterpak, `status()`, `sync()`, and `restore_project()`
+warn (class `boosterpak_version_newer`) and ask you to install that version or
+later, because an older boosterpak can write outdated project files. Restore
+checks after restoring, since `renv.lock` can install the newer boosterpak; then
+it asks you to restart R instead.
+
 `sync()` does not update the recorded version. A project that only ran `sync()`
 after an upgrade of boosterpak still needs `upgrade_project()`.
 
