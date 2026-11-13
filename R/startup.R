@@ -121,6 +121,24 @@ ppm_snapshot_pattern <- function() {
   )
 }
 
+#' Build the Package Manager Linux Rewrite Pattern
+#'
+#' Matches `<host>/<repo>/<latest|YYYY-MM-DD>` and the same URL with one
+#' distro-specific segment, such as `<host>/cran/__linux__/noble/latest`, which
+#' renv's own Package Manager handling writes on a listed distro. Group 1 is the
+#' repository URL, group 3 is the optional `__linux__` segment, and group 4 is
+#' the snapshot. An existing manylinux URL matches too, so the rewrite is
+#' idempotent.
+#'
+#' @return A regular expression.
+#' @noRd
+ppm_linux_rewrite_pattern <- function() {
+  sprintf(
+    "^(https?://(%s)/[^/]+)(/__linux__/[^/]+)?/(latest|[0-9]{4}-[0-9]{2}-[0-9]{2})$",
+    ppm_host_pattern()
+  )
+}
+
 #' Build the Package Manager Binary URL Pattern
 #'
 #' @return A regular expression matching the manylinux repository prefix.
@@ -137,7 +155,9 @@ ppm_manylinux_pattern <- function() {
 #' The generic Posit Package Manager URL only serves Linux binaries on distros
 #' it recognizes, so on glibc Linux the `<repo>/<snapshot>` URLs are rewritten
 #' to the manylinux binary URL and the R user agent Package Manager requires is
-#' set. The persisted repository URLs stay generic so a shared `.Rprofile`
+#' set. A distro-specific URL, which renv writes on a listed distro, is
+#' rewritten to the manylinux URL too, so every glibc machine gets the same
+#' binaries. The persisted repository URLs stay generic so a shared `.Rprofile`
 #' works on every platform.
 #'
 #' @param include_renv Whether to rewrite the renv repository override.
@@ -149,8 +169,8 @@ ppm_linux_binary_options_code <- function(include_renv = TRUE) {
   rewrite <- function(option) {
     sprintf(
       'sub("%s", "%s", getOption("%s"), ignore.case = TRUE)',
-      escape_r_string(ppm_snapshot_pattern()),
-      escape_r_string("\\1/__linux__/manylinux_2_28/\\3"),
+      escape_r_string(ppm_linux_rewrite_pattern()),
+      escape_r_string("\\1/__linux__/manylinux_2_28/\\4"),
       option
     )
   }
