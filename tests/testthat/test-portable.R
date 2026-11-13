@@ -20,25 +20,21 @@ local_portable_project <- function(
   root
 }
 
+# Runs `expr` in a vanilla Rscript started in `root`. The code goes through a
+# script file so quoting is the same on every platform.
 run_vanilla <- function(root, expr) {
-  out <- suppressWarnings(
+  script <- withr::local_tempfile(fileext = ".R")
+  withr::local_dir(root)
+  writeLines(expr, script)
+  suppressWarnings(
     system2(
       file.path(R.home("bin"), "Rscript"),
-      c("--vanilla", "-e", shQuote(expr)),
+      c("--vanilla", shQuote(script)),
       stdout = TRUE,
-      stderr = TRUE,
-      env = "R_PROFILE_USER=",
-      wait = TRUE
+      stderr = TRUE
     ),
     classes = "warning"
   )
-  out
-}
-
-in_project <- function(root, code) {
-  old <- setwd(root)
-  on.exit(setwd(old))
-  force(code)
 }
 
 test_that("pin comes from the installed GitHub commit and follows forks", {
@@ -223,12 +219,9 @@ test_that("opening the project before setup installs nothing and prints the hint
   root <- local_portable_project()
   write_portable_setup(root, ref = sha, verbose = FALSE)
   files <- sort(list.files(root, recursive = TRUE, all.files = TRUE))
-  out <- in_project(
+  out <- run_vanilla(
     root,
-    run_vanilla(
-      root,
-      'source(".Rprofile"); cat("RENV:", isNamespaceLoaded("renv"), "\\n")'
-    )
+    'source(".Rprofile"); cat("RENV:", isNamespaceLoaded("renv"), "\\n")'
   )
   expect_match(out, "Rscript --vanilla setup.R", fixed = TRUE, all = FALSE)
   expect_match(out, "RENV: FALSE", fixed = TRUE, all = FALSE)
@@ -243,12 +236,9 @@ test_that("opening the project before setup installs nothing and prints the hint
     c(dirname(find.package("renv")), "another-platform", portable_r_minor()),
     file.path(root, "renv", "local", "startup")
   )
-  out <- in_project(
+  out <- run_vanilla(
     root,
-    run_vanilla(
-      root,
-      'source(".Rprofile"); cat("RENV:", isNamespaceLoaded("renv"), "\\n")'
-    )
+    'source(".Rprofile"); cat("RENV:", isNamespaceLoaded("renv"), "\\n")'
   )
   expect_match(out, "Rscript --vanilla setup.R", fixed = TRUE, all = FALSE)
   expect_match(out, "RENV: FALSE", fixed = TRUE, all = FALSE)
@@ -262,16 +252,13 @@ test_that("a prepared project loads renv from the machine-local marker", {
     c(dirname(find.package("renv")), R.version$platform, portable_r_minor()),
     file.path(root, "renv", "local", "startup")
   )
-  out <- in_project(
+  out <- run_vanilla(
     root,
-    run_vanilla(
-      root,
-      paste(
-        'source(".Rprofile")',
-        'cat("RENV:", isNamespaceLoaded("renv"), "\\n")',
-        'cat("LIB:", renv::paths$library(project = getwd()), "\\n")',
-        sep = "; "
-      )
+    paste(
+      'source(".Rprofile")',
+      'cat("RENV:", isNamespaceLoaded("renv"), "\\n")',
+      'cat("LIB:", renv::paths$library(project = getwd()), "\\n")',
+      sep = "; "
     )
   )
   expect_match(out, "RENV: TRUE", fixed = TRUE, all = FALSE)
@@ -282,7 +269,7 @@ test_that("a prepared project loads renv from the machine-local marker", {
 test_that("setup.R stops outside a project root", {
   root <- local_portable_project(lock = FALSE)
   write_portable_setup(root, ref = sha, verbose = FALSE)
-  out <- in_project(root, run_vanilla(root, 'source("setup.R")'))
+  out <- run_vanilla(root, 'source("setup.R")')
   expect_match(
     out,
     "Run setup.R from a project root",
