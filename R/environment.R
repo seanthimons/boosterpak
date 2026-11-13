@@ -3,7 +3,9 @@
 #' Restores the exact versions in `renv.lock`. Before restoration, normalizes
 #' Posit Package Manager Linux URLs in the lockfile and removes Linux Platform
 #' tags. Package versions and non-PPM repositories are preserved. No
-#' `boosters.toml`, packs, or attachment hooks are required or created.
+#' `boosters.toml`, packs, or attachment hooks are required or created, and
+#' restore writes no startup files. [write_portable_setup()] is the one
+#' function that does, and only when asked.
 #' Public P3M repositories use Cloud CRAN as a binary fallback. Explicit
 #' private overrides, repository dates, and repository opt-outs are preserved.
 #'
@@ -29,7 +31,8 @@ restore_project <- function(root = ".", require_binaries = character()) {
 #'
 #' Records the active project library using the project's renv snapshot type,
 #' then normalizes Posit Package Manager Linux URLs and Linux Platform tags.
-#' No `boosters.toml`, packs, or attachment hooks are required or created.
+#' No `boosters.toml`, packs, or attachment hooks are required or created, and
+#' snapshot writes no startup files.
 #' This records installed versions; use [restore_project()] on a new machine.
 #'
 #' @param root Project root with an active project-local renv library.

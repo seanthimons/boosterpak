@@ -11,9 +11,11 @@
 #' `air.toml` is removed only when its complete line sequence matches a known
 #' boosterpak-generated format. `.Rprofile` is never deleted: only recognized
 #' managed startup, repository, and install-policy content is removed, along
-#' with a whole-line renv activation expression when both `renv` and `rprofile`
-#' are `TRUE`. Malformed startup markers and all unrelated profile lines are
-#' preserved.
+#' with a whole-line renv activation expression or the portable startup block
+#' from [write_portable_setup()] when both `renv` and `rprofile` are `TRUE`.
+#' The portable block is the project's renv loader, so it stays when `renv` is
+#' `FALSE`. A generated `setup.R` is not removed. Malformed startup markers and
+#' all unrelated profile lines are preserved.
 #'
 #' @param root Existing project root.
 #' @param renv Whether to remove the project-local `renv/` directory.
@@ -292,7 +294,8 @@ deinit <- function(
     ))
   }
   lines <- readLines(path, warn = FALSE)
-  renv_activation_present <- any(is_rprofile_renv_activation(lines))
+  renv_activation_present <- any(is_rprofile_renv_activation(lines)) ||
+    any(lines == rprofile_portable_begin_marker())
   transformed <- remove_rprofile_managed_lines(lines, renv = remove_renv)
   list(
     path = path,

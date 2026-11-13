@@ -15,6 +15,7 @@ The snapshot result, invisibly.
 \description{
 Records the active project library using the project's renv snapshot type,
 then normalizes Posit Package Manager Linux URLs and Linux Platform tags.
-No \code{boosters.toml}, packs, or attachment hooks are required or created.
+No \code{boosters.toml}, packs, or attachment hooks are required or created, and
+snapshot writes no startup files.
 This records installed versions; use \code{\link[=restore_project]{restore_project()}} on a new machine.
 }

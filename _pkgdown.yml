@@ -38,6 +38,8 @@ reference:
       - sync
       - restore_project
       - snapshot_project
+      - write_portable_setup
+      - restore_portable_project
       - write_attach
       - status
       - check_binary_repos
