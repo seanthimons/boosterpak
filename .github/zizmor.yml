@@ -1,0 +1,12 @@
+# Time-boxed ignores for the artipacked findings in the two workflows that
+# Phase 3 of the baseline rollout replaces. Remove when Phase 3 replaces this
+# workflow with the baseline caller.
+rules:
+  artipacked:
+    ignore:
+      # Pushes to main with a token (git push origin main), so it needs
+      # persisted credentials.
+      - release.yaml:28
+      # The gh-pages deploy action pushes with the persisted checkout token.
+      # It runs on push to main only, which PR CI cannot test.
+      - pkgdown.yaml:29
