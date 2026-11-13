@@ -376,3 +376,52 @@ test_that("github_source_specs keeps owner/repo specs and skips other remotes", 
     c("seanthimons/ComptoxR", "r-lib/pak@v0.9", "owner/repo/subdir", "owner/repo/subdir@main")
   )
 })
+
+test_that("status warns when the record is newer than the installed boosterpak", {
+  root <- withr::local_tempdir()
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  boosterpak:::set_boosters_version(root)
+  write_stale_record(root, "99.0.0")
+
+  expect_false(status(root = root, verbose = FALSE)$upgrade_needed)
+  messages <- status_messages(root)
+  expect_match(messages, "newer than the installed boosterpak", fixed = TRUE)
+  expect_match(messages, "Install boosterpak 99.0.0 or later", fixed = TRUE)
+  expect_no_match(messages, "upgrade_project(dry_run = TRUE)", fixed = TRUE)
+})
+
+test_that("status compares a generated setup.R pin with the installed boosterpak", {
+  root <- withr::local_tempdir()
+  dir.create(file.path(root, "renv"))
+  writeLines("", file.path(root, "renv", "activate.R"))
+  pin <- strrep("a", 40)
+  write_portable_setup(root, ref = pin, verbose = FALSE)
+
+  local_mocked_bindings(installed_boosterpak_sha = function(desc) pin)
+  expect_true(status(root = root, verbose = FALSE)$setup_pin_current)
+  expect_match(
+    status_messages(root),
+    "setup.R pin: matches the installed boosterpak",
+    fixed = TRUE
+  )
+
+  local_mocked_bindings(installed_boosterpak_sha = function(desc) strrep("b", 40))
+  expect_false(status(root = root, verbose = FALSE)$setup_pin_current)
+  messages <- status_messages(root)
+  expect_match(messages, "setup.R pin: differs", fixed = TRUE)
+  expect_match(messages, "pins boosterpak aaaaaaa; the installed copy is bbbbbbb", fixed = TRUE)
+  expect_match(messages, "write_portable_setup()", fixed = TRUE)
+
+  local_mocked_bindings(installed_boosterpak_sha = function(desc) NA_character_)
+  expect_true(is.na(status(root = root, verbose = FALSE)$setup_pin_current))
+  expect_match(status_messages(root), "no commit SHA to compare", fixed = TRUE)
+})
+
+test_that("status reports no pin without a generated setup.R", {
+  root <- withr::local_tempdir()
+  writeLines(sprintf('ref <- "%s"', strrep("a", 40)), file.path(root, "setup.R"))
+  local_mocked_bindings(installed_boosterpak_sha = function(desc) strrep("a", 40))
+
+  expect_true(is.na(status(root = root, verbose = FALSE)$setup_pin_current))
+  expect_no_match(status_messages(root), "setup.R pin", fixed = TRUE)
+})

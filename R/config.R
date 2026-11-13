@@ -309,6 +309,85 @@ boosters_version_state <- function(root = ".") {
   }
 }
 
+#' Report a mismatch between the project record and boosterpak
+#'
+#' Compares `[project].boosters_version` with the installed boosterpak and the
+#' boosterpak loaded in this session. Does nothing without `boosters.toml` or a
+#' readable record; `status()` reports those cases.
+#'
+#' * Installed older than the record: a warning of class
+#'   `boosterpak_version_newer`, always, because an older boosterpak can write
+#'   outdated project files.
+#' * Installed at or above the record but the loaded copy older (for example
+#'   right after a restore installed a newer boosterpak): a note to restart R.
+#' * Record older than the installed boosterpak: a note to run
+#'   `upgrade_project()`.
+#'
+#' The notes print only when `verbose` allows routine output.
+#'
+#' @param root Project root.
+#' @param verbose Whether to print routine output.
+#' @param lib `NULL` to compare with the boosterpak running in this session,
+#'   or libraries to read the installed boosterpak from. Restore callers pass
+#'   the project library first, because a restore can install a newer
+#'   boosterpak that the session has not loaded, and the session may not have
+#'   that library on `.libPaths()` yet.
+#' @return `NULL`, invisibly.
+#' @noRd
+version_drift_hint <- function(root = ".", verbose = NULL, lib = NULL) {
+  if (!file.exists(boosters_file(root))) {
+    return(invisible(NULL))
+  }
+  recorded <- recorded_boosters_version(root)
+  if (is.null(recorded)) {
+    return(invisible(NULL))
+  }
+  loaded <- package_version(unname(getNamespaceVersion("boosterpak")))
+  installed <- if (is.null(lib)) {
+    loaded
+  } else {
+    library_boosterpak_version(lib) %||% loaded
+  }
+  recorded_label <- as.character(recorded)
+  if (installed < recorded) {
+    cli::cli_warn(
+      c(
+        "This project was last migrated with boosterpak {recorded_label}, newer than the installed {as.character(installed)}.",
+        "i" = "An older boosterpak may write outdated project files. Install boosterpak {recorded_label} or later."
+      ),
+      class = "boosterpak_version_newer",
+      call = NULL
+    )
+  } else if (loaded < recorded) {
+    if (should_emit(verbose)) {
+      cli::cli_alert_info(
+        "boosterpak {as.character(installed)} is installed but {as.character(loaded)} is loaded. Restart R to use it."
+      )
+    }
+  } else if (recorded < installed && should_emit(verbose)) {
+    cli::cli_alert_info(paste(
+      "This project was last migrated with boosterpak {recorded_label}; {as.character(installed)} is installed.",
+      "Run {.code boosterpak::upgrade_project(dry_run = TRUE)}, then {.code boosterpak::upgrade_project()}, to update its generated files."
+    ))
+  }
+  invisible(NULL)
+}
+
+#' Read the boosterpak version installed in a set of libraries
+#'
+#' @param lib Library paths, searched in order.
+#' @return A `package_version`, or `NULL` when boosterpak is not found there.
+#' @noRd
+library_boosterpak_version <- function(lib) {
+  version <- suppressWarnings(
+    utils::packageDescription("boosterpak", lib.loc = lib, fields = "Version")
+  )
+  if (!is.character(version) || length(version) != 1L || is.na(version)) {
+    return(NULL)
+  }
+  package_version(version)
+}
+
 #' Check whether a project was last migrated with an older boosterpak
 #'
 #' A project is behind when `boosters.toml` exists and its record is missing,

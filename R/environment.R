@@ -12,6 +12,10 @@
 #' @param root Project root containing `renv.lock`.
 #' @param require_binaries Package names that must resolve to binaries. Restore
 #'   stops before installation if a named package would use source.
+#' @details
+#' In a project that also has `boosters.toml`, restore then compares its
+#' `[project].boosters_version` record with boosterpak, as [sync()] does.
+#' Projects without packs have no record and get no message.
 #' @return The restored package records, invisibly.
 #' @export
 restore_project <- function(root = ".", require_binaries = character()) {
@@ -24,7 +28,12 @@ restore_project <- function(root = ".", require_binaries = character()) {
   normalize_lockfile_platform(root)
   configure_boosterpak_repositories(verbose = FALSE)
   add_public_cran_fallback()
-  invisible(call_renv_restore(root, require_binaries = require_binaries))
+  result <- call_renv_restore(root, require_binaries = require_binaries)
+  version_drift_hint(
+    root,
+    lib = c(renv::paths$library(project = root), .libPaths())
+  )
+  invisible(result)
 }
 
 #' Save a portable project snapshot without capability packs

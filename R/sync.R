@@ -11,6 +11,13 @@
 #' @param library Package-library strategy for apply mode: `"renv"` uses the
 #'   project-local renv library, while `"active"` uses the first writable entry
 #'   in `.libPaths()`. `NULL` uses `[settings].library`, defaulting to `"renv"`.
+#' @details
+#' Both modes compare `[project].boosters_version` with the installed
+#' boosterpak. When the record is newer, they warn (class
+#' `boosterpak_version_newer`); when it is older, they suggest
+#' [upgrade_project()] in interactive sessions. Restore mode checks after
+#' restoring, because `renv.lock` can install a newer boosterpak; then it asks
+#' you to restart R instead.
 #' @return Resolved package names, invisibly.
 #' @export
 sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbose = NULL, library = NULL) {
@@ -22,6 +29,7 @@ sync <- function(mode = c("apply", "restore"), root = ".", hydrate = TRUE, verbo
     return(sync_restore(root, verbose))
   }
 
+  version_drift_hint(root, verbose)
   config <- read_config(root)
   validate_config(config, root)
   library <- resolve_library_strategy(library, config)
@@ -74,6 +82,11 @@ sync_restore <- function(root, verbose = NULL) {
   }
 
   call_renv_restore(root)
+  version_drift_hint(
+    root,
+    verbose,
+    lib = c(renv::paths$library(project = root), .libPaths())
+  )
   config <- read_config(root)
   validate_config(config, root)
   packages <- resolve_config_packages(config, root)
