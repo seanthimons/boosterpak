@@ -1,14 +1,39 @@
 
 
-# boosterpak NEWS
 
-## v0.12.0 (2026-11-13)
+## boosterpak v0.13.0 (2026-11-16)
+
+#### New features
+
+- refresh portable pins in upgrade_project and check drift before pack
+  writes (#48)
+  ([e8be1c7](https://github.com/seanthimons/boosterpak/tree/e8be1c7a40f1ea9e262282b1cb074fe54dea2add))
+
+#### CI
+
+- migrate the remaining workflows to baseline v2.0.0 callers (#47)
+  ([dd08e29](https://github.com/seanthimons/boosterpak/tree/dd08e29321cfee417367c866d0a7873c756568fd))
+
+#### Other changes
+
+- release v0.13.0 \[skip ci\]
+  ([c900393](https://github.com/seanthimons/boosterpak/tree/c900393d9f6d6c0897348a209095c167f77dccb7))
+
+Full set of changes:
+[`v0.12.0...v0.13.0`](https://github.com/seanthimons/boosterpak/compare/v0.12.0...v0.13.0)
+
+## boosterpak v0.12.0 (2026-11-13)
 
 #### New features
 
 - warn when boosterpak and the project’s recorded version drift apart
   (#46)
   ([da84f0f](https://github.com/seanthimons/boosterpak/tree/da84f0ffa974f7d4505110556859ead36217e8f4))
+
+#### Docs
+
+- update NEWS.md for v0.12.0 \[skip ci\]
+  ([76406f3](https://github.com/seanthimons/boosterpak/tree/76406f3eef010ee79e9d31c84a5a26fdb22ec1c6))
 
 #### Other changes
 
@@ -18,7 +43,7 @@
 Full set of changes:
 [`v0.11.1...v0.12.0`](https://github.com/seanthimons/boosterpak/compare/v0.11.1...v0.12.0)
 
-## v0.11.1 (2026-11-13)
+## boosterpak v0.11.1 (2026-11-13)
 
 #### New features
 
@@ -45,7 +70,7 @@ Full set of changes:
 Full set of changes:
 [`v0.11.0...v0.11.1`](https://github.com/seanthimons/boosterpak/compare/v0.11.0...v0.11.1)
 
-## v0.11.0 (2026-11-13)
+## boosterpak v0.11.0 (2026-11-13)
 
 #### New features
 
@@ -81,7 +106,7 @@ Full set of changes:
 Full set of changes:
 [`v0.10.0...v0.11.0`](https://github.com/seanthimons/boosterpak/compare/v0.10.0...v0.11.0)
 
-## v0.10.0 (2026-11-02)
+## boosterpak v0.10.0 (2026-11-02)
 
 #### New features
 
@@ -101,7 +126,7 @@ Full set of changes:
 Full set of changes:
 [`v0.9.4...v0.10.0`](https://github.com/seanthimons/boosterpak/compare/v0.9.4...v0.10.0)
 
-## v0.9.4 (2026-10-21)
+## boosterpak v0.9.4 (2026-10-21)
 
 #### Bug fixes
 
@@ -137,7 +162,7 @@ Full set of changes:
 Full set of changes:
 [`v0.9.3...v0.9.4`](https://github.com/seanthimons/boosterpak/compare/v0.9.3...v0.9.4)
 
-## v0.9.3 (2026-10-17)
+## boosterpak v0.9.3 (2026-10-17)
 
 #### New features
 
@@ -200,7 +225,7 @@ Full set of changes:
 Full set of changes:
 [`v0.9.2...v0.9.3`](https://github.com/seanthimons/boosterpak/compare/v0.9.2...v0.9.3)
 
-## v0.9.2 (2026-10-05)
+## boosterpak v0.9.2 (2026-10-05)
 
 #### Bug fixes
 
@@ -220,7 +245,7 @@ Full set of changes:
 Full set of changes:
 [`v0.9.1...v0.9.2`](https://github.com/seanthimons/boosterpak/compare/v0.9.1...v0.9.2)
 
-## v0.9.1 (2026-08-31)
+## boosterpak v0.9.1 (2026-08-31)
 
 #### Bug fixes
 
@@ -242,7 +267,7 @@ Full set of changes:
 Full set of changes:
 [`v0.9.0...v0.9.1`](https://github.com/seanthimons/boosterpak/compare/v0.9.0...v0.9.1)
 
-## v0.9.0 (2026-08-13)
+## boosterpak v0.9.0 (2026-08-13)
 
 #### Bug fixes
 
@@ -266,7 +291,7 @@ Full set of changes:
 Full set of changes:
 [`v0.8.0...v0.9.0`](https://github.com/seanthimons/boosterpak/compare/v0.8.0...v0.9.0)
 
-## v0.8.0 (2026-08-12)
+## boosterpak v0.8.0 (2026-08-12)
 
 #### New features
 
@@ -286,7 +311,7 @@ Full set of changes:
 Full set of changes:
 [`v0.7.0...v0.8.0`](https://github.com/seanthimons/boosterpak/compare/v0.7.0...v0.8.0)
 
-## v0.7.0 (2026-07-21)
+## boosterpak v0.7.0 (2026-07-21)
 
 #### Docs
 
@@ -303,7 +328,7 @@ Full set of changes:
 Full set of changes:
 [`v0.6.5...v0.7.0`](https://github.com/seanthimons/boosterpak/compare/v0.6.5...v0.7.0)
 
-## v0.6.5 (2026-07-20)
+## boosterpak v0.6.5 (2026-07-20)
 
 #### New features
 
@@ -341,7 +366,7 @@ Full set of changes:
 Full set of changes:
 [`v0.6.4...v0.6.5`](https://github.com/seanthimons/boosterpak/compare/v0.6.4...v0.6.5)
 
-## v0.6.4 (2026-07-10)
+## boosterpak v0.6.4 (2026-07-10)
 
 #### Other changes
 
@@ -355,7 +380,7 @@ Full set of changes:
 Full set of changes:
 [`v0.6.3...v0.6.4`](https://github.com/seanthimons/boosterpak/compare/v0.6.3...v0.6.4)
 
-## v0.6.3 (2026-07-10)
+## boosterpak v0.6.3 (2026-07-10)
 
 #### Bug fixes
 
@@ -370,7 +395,7 @@ Full set of changes:
 Full set of changes:
 [`v0.6.2...v0.6.3`](https://github.com/seanthimons/boosterpak/compare/v0.6.2...v0.6.3)
 
-## v0.6.2 (2026-07-10)
+## boosterpak v0.6.2 (2026-07-10)
 
 #### New features
 
@@ -385,7 +410,7 @@ Full set of changes:
 Full set of changes:
 [`v0.6.1...v0.6.2`](https://github.com/seanthimons/boosterpak/compare/v0.6.1...v0.6.2)
 
-## v0.6.1 (2026-07-09)
+## boosterpak v0.6.1 (2026-07-09)
 
 #### New features
 
