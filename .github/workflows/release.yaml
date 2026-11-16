@@ -36,7 +36,7 @@ jobs:
     name: Release
     permissions:
       contents: write
-    uses: seanthimons/baseline/.github/workflows/release-r-package.yaml@0a6e332d70f7a15520c62870221b35ef040ef933 # v2.0.0
+    uses: seanthimons/baseline/.github/workflows/release-r-package.yaml@ad7b0409c5ae8d28f293826fef0819bd74c7b9e0 # v2.2.0
     with:
       # Push events have no inputs. An empty version-type would override the
       # callee's patch default and fail its validation, so fall back here.

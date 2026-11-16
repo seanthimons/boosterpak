@@ -25,7 +25,7 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    uses: seanthimons/baseline/.github/workflows/pkgdown.yaml@0a6e332d70f7a15520c62870221b35ef040ef933 # v2.0.0
+    uses: seanthimons/baseline/.github/workflows/pkgdown.yaml@ad7b0409c5ae8d28f293826fef0819bd74c7b9e0 # v2.2.0
     with:
       # The vignettes are Quarto documents.
       quarto: true
