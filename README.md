@@ -755,7 +755,7 @@ boosterpak::upgrade_project(dry_run = TRUE)
 boosterpak::upgrade_project()
 ```
 
-`upgrade_project()` repairs existing boosterpak projects only; it expects `boosters.toml` to already exist. It rewrites the managed startup setup, reapplies the Posit Package Manager repository policy (including the [Linux binary rewrite](#linux-binary-packages), and replacing the managed lines written by earlier versions), enables the `renv` pak backend, and installs missing workflow packages. Its internal helper, `boosterpak:::.rescue()`, does the same work; use `upgrade_project()` instead of calling the helper directly.
+`upgrade_project()` repairs existing boosterpak projects only; it expects `boosters.toml` to already exist, except in a project without packs that has a `setup.R` from `write_portable_setup()`, where it only moves the `setup.R` pin to the installed boosterpak and repairs the portable `.Rprofile` block. For pack projects, it rewrites the managed startup setup, reapplies the Posit Package Manager repository policy (including the [Linux binary rewrite](#linux-binary-packages), and replacing the managed lines written by earlier versions), enables the `renv` pak backend, and installs missing workflow packages. Its internal helper, `boosterpak:::.rescue()`, does the same work; use `upgrade_project()` instead of calling the helper directly.
 
 ## Troubleshooting 0.5 init projects
 

@@ -7,7 +7,8 @@
 upgrade_project(root = ".", dry_run = FALSE, snapshot = TRUE, verbose = NULL)
 }
 \arguments{
-\item{root}{Project root containing an existing \code{boosters.toml} file.}
+\item{root}{Project root containing an existing \code{boosters.toml} file, or,
+for a project without packs, a \code{setup.R} from \code{\link[=write_portable_setup]{write_portable_setup()}}.}
 
 \item{dry_run}{Whether to report planned changes without modifying files,
 the project library, or the active session. Default \code{FALSE}.}
@@ -55,6 +56,16 @@ workflow packages cannot be repaired without it. A run that is not clean
 repairs what it can, leaves the record as it was, and reports why. A dry run
 changes nothing. It lists \code{boosters.toml} among the files a real run would
 touch when that run would record the version.
+
+A project without packs has no \code{boosters.toml}. When it has a \code{setup.R}
+from \code{\link[=write_portable_setup]{write_portable_setup()}}, \code{upgrade_project()} refreshes that instead:
+it moves the pin in \code{setup.R} to the installed boosterpak commit and repairs
+the \code{.Rprofile} startup block. Nothing else runs, and \code{snapshot} is ignored.
+The installed boosterpak must come from GitHub, so it has a commit SHA. The
+pin never moves to an older boosterpak version: when \code{setup.R} was generated
+by a newer version, the report warns and leaves \code{setup.R} and \code{.Rprofile}
+unchanged. Use
+\code{\link[=write_portable_setup]{write_portable_setup()}} with \code{ref} to pin an older commit on purpose.
 
 Review the result with \verb{git diff} (or your version control) before
 committing. When an install fails with a GitHub rate limit, or with an HTTP

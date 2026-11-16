@@ -30,12 +30,23 @@
 #' changes nothing. It lists `boosters.toml` among the files a real run would
 #' touch when that run would record the version.
 #'
+#' A project without packs has no `boosters.toml`. When it has a `setup.R`
+#' from [write_portable_setup()], `upgrade_project()` refreshes that instead:
+#' it moves the pin in `setup.R` to the installed boosterpak commit and repairs
+#' the `.Rprofile` startup block. Nothing else runs, and `snapshot` is ignored.
+#' The installed boosterpak must come from GitHub, so it has a commit SHA. The
+#' pin never moves to an older boosterpak version: when `setup.R` was generated
+#' by a newer version, the report warns and leaves `setup.R` and `.Rprofile`
+#' unchanged. Use
+#' [write_portable_setup()] with `ref` to pin an older commit on purpose.
+#'
 #' Review the result with `git diff` (or your version control) before
 #' committing. When an install fails with a GitHub rate limit, or with an HTTP
 #' 403 or 429 from GitHub that may be a rate limit, the error includes a hint
 #' about supplying a GitHub token. The hint never prints a token value.
 #'
-#' @param root Project root containing an existing `boosters.toml` file.
+#' @param root Project root containing an existing `boosters.toml` file, or,
+#'   for a project without packs, a `setup.R` from [write_portable_setup()].
 #' @param dry_run Whether to report planned changes without modifying files,
 #'   the project library, or the active session. Default `FALSE`.
 #' @param snapshot Whether to write workflow packages to `renv.lock`. With

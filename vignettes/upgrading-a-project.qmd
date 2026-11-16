@@ -18,11 +18,14 @@ missing workflow packages into the project library, and records the result in
 settings, or your helper functions. The only `boosters.toml` change is the
 `boosters_version` record.
 
-`upgrade_project()` is for pack projects: it stops when `boosters.toml` is
-missing. A project without packs that uses `write_portable_setup()` has no
-`boosters.toml` and no upgrade step. Run `write_portable_setup()` again to
-refresh the pin in `setup.R`, for example after upgrading boosterpak. See the
-[restoring a project](restoring-a-project.html) vignette.
+Most of this vignette is about pack projects. A project without packs that
+uses `write_portable_setup()` has no `boosters.toml`. For it, `upgrade_project()`
+only refreshes the portable setup: it moves the pin in `setup.R` to the
+installed boosterpak commit and repairs the `.Rprofile` startup block. Run it
+after upgrading boosterpak. It needs boosterpak installed from GitHub, and it
+never moves the pin to an older version; it warns and leaves `setup.R` and
+`.Rprofile` unchanged instead. See the [restoring a project](restoring-a-project.html)
+vignette.
 
 ## Who needs it
 
@@ -49,7 +52,9 @@ You do not have to run `status()` to find out. In an interactive session,
 older. The other direction is a warning everywhere: when the record is newer
 than the installed boosterpak, `status()`, `sync()`, and `restore_project()`
 warn (class `boosterpak_version_newer`) and ask you to install that version or
-later, because an older boosterpak can write outdated project files. Restore
+later, because an older boosterpak can write outdated project files.
+`add_pack()`, `remove_pack()`, and `add_github_pack()` check before they write
+anything, also with `sync = FALSE`. Restore
 checks after restoring, since `renv.lock` can install the newer boosterpak; then
 it asks you to restart R instead.
 
@@ -273,7 +278,9 @@ line. The first entry is an error that stops the run.
 
 **`boosters.toml does not exist`.** The directory is not a boosterpak project,
 or `boosters.toml` was deleted. `upgrade_project()` repairs existing projects
-only. Use `init()` for a new project, or restore the file from git.
+only. Use `init()` for a new project, or restore the file from git. A project
+without packs gets this error only when it has no `setup.R` from
+`write_portable_setup()`.
 
 **`workflow package repair skipped: no project renv found`.** The project has no
 project-local renv. The `.Rprofile` and `attach.R` repairs still run, but the

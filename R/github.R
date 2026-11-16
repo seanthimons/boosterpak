@@ -21,6 +21,10 @@
 #' @param verbose Whether to print routine summaries.
 #' @param library Package-library strategy passed to [sync()]. `NULL` uses the
 #'   project configuration.
+#' @details
+#' Before cloning or writing any file, it compares `[project].boosters_version` with the
+#' installed boosterpak, as [sync()] does, also when `sync = FALSE`. The
+#' [sync()] it runs afterwards does not repeat the check.
 #' @return Updated declared pack names, invisibly.
 #' @export
 add_github_pack <- function(
@@ -42,6 +46,7 @@ add_github_pack <- function(
   path <- validate_remote_pack_path(path)
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
   read_config(root)
+  check_version_drift_once(root, verbose)
 
   clone_dir <- clone_github_pack_repo(repo_url)
   on.exit(unlink(clone_dir, recursive = TRUE, force = TRUE), add = TRUE)

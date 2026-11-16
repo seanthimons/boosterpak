@@ -85,7 +85,7 @@ sync_restore <- function(root, verbose = NULL) {
   version_drift_hint(
     root,
     verbose,
-    lib = c(renv::paths$library(project = root), .libPaths())
+    lib = renv::paths$library(project = root)
   )
   config <- read_config(root)
   validate_config(config, root)

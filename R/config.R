@@ -329,12 +329,20 @@ boosters_version_state <- function(root = ".") {
 #' @param verbose Whether to print routine output.
 #' @param lib `NULL` to compare with the boosterpak running in this session,
 #'   or libraries to read the installed boosterpak from. Restore callers pass
-#'   the project library first, because a restore can install a newer
-#'   boosterpak that the session has not loaded, and the session may not have
-#'   that library on `.libPaths()` yet.
+#'   only the project library, because a restore can install a newer
+#'   boosterpak that the session has not loaded, and the project library is
+#'   the one R uses after a restart. When it has no boosterpak, the running
+#'   copy is compared instead. Other libraries on `.libPaths()` are not read:
+#'   an old copy there (for example a user library under `load_all()`) would
+#'   give a false warning. The cost is one missed note: a session that updated
+#'   boosterpak in a non-project library without restarting gets the
+#'   installed-older warning instead of the restart note.
 #' @return `NULL`, invisibly.
 #' @noRd
 version_drift_hint <- function(root = ".", verbose = NULL, lib = NULL) {
+  if (isTRUE(drift_hint_state$checked)) {
+    return(invisible(NULL))
+  }
   if (!file.exists(boosters_file(root))) {
     return(invisible(NULL))
   }
@@ -370,6 +378,36 @@ version_drift_hint <- function(root = ".", verbose = NULL, lib = NULL) {
       "Run {.code boosterpak::upgrade_project(dry_run = TRUE)}, then {.code boosterpak::upgrade_project()}, to update its generated files."
     ))
   }
+  invisible(NULL)
+}
+
+#' State shared by version-drift checks within one operation
+#'
+#' `checked` is `TRUE` while an operation that already ran the check is in
+#' progress, so nested [sync()] calls skip it.
+#' @noRd
+drift_hint_state <- new.env(parent = emptyenv())
+drift_hint_state$checked <- FALSE
+
+#' Run the version-drift check once for a whole operation
+#'
+#' Pack mutations write `boosters.toml` and pack files before they call
+#' [sync()]. They run the check first, so a newer-record warning arrives before
+#' any write, and the check is then skipped by every nested call until
+#' `frame` exits.
+#'
+#' @param root Project root.
+#' @param verbose Whether to print routine output.
+#' @param frame Frame whose exit ends the operation.
+#' @return `NULL`, invisibly.
+#' @noRd
+check_version_drift_once <- function(
+  root,
+  verbose = NULL,
+  frame = parent.frame()
+) {
+  version_drift_hint(root, verbose)
+  rlang::local_bindings(checked = TRUE, .env = drift_hint_state, .frame = frame)
   invisible(NULL)
 }
 

@@ -43,4 +43,8 @@ Removing a pack does not uninstall anything. Packages it provided stay in
 \code{renv.lock} and the project library; run \code{renv::snapshot()} to drop them
 from the lockfile and \code{renv::remove()} to uninstall them. A note saying so
 is printed unless \code{verbose = FALSE}.
+
+Before writing any file, it compares \verb{[project].boosters_version} with the
+installed boosterpak, as \code{\link[=sync]{sync()}} does, also when \code{sync = FALSE}. The
+\code{\link[=sync]{sync()}} it runs afterwards does not repeat the check.
 }

@@ -300,3 +300,35 @@ test_that("restore_project warns only when a boosters.toml record is newer", {
   )
   expect_warning(restore_project(root), class = "boosterpak_version_newer")
 })
+
+test_that("restore_project ignores an old boosterpak outside the project library", {
+  root <- withr::local_tempdir()
+  writeLines("{}", file.path(root, "renv.lock"))
+  writeLines(
+    c(
+      "[project]",
+      'name = "x"',
+      sprintf('boosters_version = "%s"', boosterpak:::package_version_string())
+    ),
+    file.path(root, "boosters.toml")
+  )
+  local_mocked_bindings(
+    normalize_lockfile_platform = function(root) invisible(NULL),
+    configure_boosterpak_repositories = function(...) invisible(character()),
+    add_public_cran_fallback = function() invisible(NULL),
+    call_renv_restore = function(root, require_binaries = character()) {
+      "records"
+    },
+    # The project library has no boosterpak; any other library has an old one,
+    # as under load_all() with an outdated user-library copy.
+    library_boosterpak_version = function(lib) {
+      if (identical(lib, renv::paths$library(project = root))) {
+        NULL
+      } else {
+        package_version("0.0.1")
+      }
+    }
+  )
+
+  expect_no_warning(restore_project(root))
+})

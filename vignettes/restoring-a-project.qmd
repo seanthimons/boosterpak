@@ -305,7 +305,9 @@ write these files.
 `status()` shows whether the pin in `setup.R` matches the boosterpak installed
 in the session (`setup_pin_current` in its result). A different pin is
 information, not a warning: keeping an older pin is a valid way to stay on a
-known boosterpak. Run `write_portable_setup()` to move it.
+known boosterpak. Run `upgrade_project()` to move it to the installed
+boosterpak; it never moves the pin to an older version. To pin a specific
+commit, run `write_portable_setup(ref = "<commit SHA>")`.
 
 ## Troubleshooting: boosterpak absent from the lockfile
 

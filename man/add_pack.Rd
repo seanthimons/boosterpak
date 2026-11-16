@@ -39,3 +39,8 @@ Updated declared pack names, invisibly.
 \description{
 Add a pack declaration
 }
+\details{
+Before writing any file, it compares \verb{[project].boosters_version} with the
+installed boosterpak, as \code{\link[=sync]{sync()}} does, also when \code{sync = FALSE}. The
+\code{\link[=sync]{sync()}} it runs afterwards does not repeat the check.
+}

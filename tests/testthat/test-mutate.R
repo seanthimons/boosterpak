@@ -398,3 +398,76 @@ test_that("remove_pack keeps tables with quoted or numeric keys that follow its 
   expect_true("keep_numeric = 1" %in% lines)
 })
 
+
+test_that("pack changes check the version record once, before any write", {
+  root <- withr::local_tempdir()
+  active_lib <- file.path(root, "active-library")
+  dir.create(active_lib)
+  old_libpaths <- .libPaths()
+  withr::defer(.libPaths(old_libpaths))
+  .libPaths(c(active_lib, old_libpaths))
+  init(root = root, renv = "no", rprofile = "no", verbose = FALSE)
+  boosterpak:::set_boosters_version(root)
+  path <- file.path(root, "boosters.toml")
+  lines <- readLines(path, warn = FALSE)
+  lines[grep("^boosters_version = ", lines)] <- 'boosters_version = "99.0.0"'
+  writeLines(lines, path)
+  local_mocked_bindings(
+    missing_packages = function(packages, root = ".", library = "renv") {
+      character()
+    },
+    install_via = function(specs, root = ".", library = "renv") TRUE,
+    source_attach = function(root = ".", verbose = NULL) invisible(TRUE),
+    .package = "boosterpak"
+  )
+  # Records the declared packs each time the warning fires.
+  declared_at_warning <- list()
+  run <- function(expr) {
+    withCallingHandlers(
+      expr,
+      boosterpak_version_newer = function(cnd) {
+        declared_at_warning[[length(declared_at_warning) + 1L]] <<-
+          boosterpak:::read_config(root)$packs$declared
+        invokeRestart("muffleWarning")
+      }
+    )
+  }
+  before <- boosterpak:::read_config(root)$packs$declared
+
+  # The real sync() runs inside add_pack(); it must not warn again.
+  run(add_pack(
+    "example",
+    root = root,
+    sync = TRUE,
+    library = "active",
+    verbose = FALSE
+  ))
+  expect_length(declared_at_warning, 1L)
+  expect_identical(declared_at_warning[[1]], before)
+  expect_true("example" %in% boosterpak:::read_config(root)$packs$declared)
+  expect_false(boosterpak:::drift_hint_state$checked)
+
+  # Without sync the files are still written, so the check still runs.
+  declared_at_warning <- list()
+  run(remove_pack("example", root = root, sync = FALSE, verbose = FALSE))
+  expect_length(declared_at_warning, 1L)
+  expect_true("example" %in% declared_at_warning[[1]])
+
+  # The flag resets when the operation fails after the check.
+  declared_at_warning <- list()
+  expect_error(
+    run(add_pack(
+      "no-such-pack",
+      root = root,
+      sync = FALSE,
+      verbose = FALSE
+    )),
+    "is not a known pack"
+  )
+  expect_length(declared_at_warning, 1L)
+  expect_false(boosterpak:::drift_hint_state$checked)
+  expect_warning(
+    sync(root = root, library = "active", verbose = FALSE),
+    class = "boosterpak_version_newer"
+  )
+})

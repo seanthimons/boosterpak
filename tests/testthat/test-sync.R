@@ -461,8 +461,8 @@ test_that("sync restore checks the record after restoring", {
       TRUE
     },
     library_boosterpak_version = function(lib) {
-      # The project library must be searched first.
-      expect_identical(lib[[1]], renv::paths$library(project = root))
+      # Only the project library is searched.
+      expect_identical(lib, renv::paths$library(project = root))
       installed
     },
     warn_missing_lock_packages = function(...) invisible(NULL),
