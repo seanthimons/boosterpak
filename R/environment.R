@@ -31,7 +31,7 @@ restore_project <- function(root = ".", require_binaries = character()) {
   result <- call_renv_restore(root, require_binaries = require_binaries)
   version_drift_hint(
     root,
-    lib = c(renv::paths$library(project = root), .libPaths())
+    lib = renv::paths$library(project = root)
   )
   invisible(result)
 }

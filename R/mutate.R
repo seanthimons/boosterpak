@@ -30,6 +30,7 @@ mutate_pack <- function(
   root <- normalizePath(root, winslash = "/", mustWork = TRUE)
   config <- read_config(root)
   validate_config(config, root)
+  check_version_drift_once(root, verbose)
 
   if (identical(action, "add")) {
     load_pack(name, root)
@@ -249,6 +250,10 @@ report_pack_removal <- function(name, removal, verbose = NULL) {
 #' @param verbose Whether to print routine summaries.
 #' @param library Package-library strategy passed to [sync()]. `NULL` uses the
 #'   project configuration.
+#' @details
+#' Before writing any file, it compares `[project].boosters_version` with the
+#' installed boosterpak, as [sync()] does, also when `sync = FALSE`. The
+#' [sync()] it runs afterwards does not repeat the check.
 #' @return Updated declared pack names, invisibly.
 #' @export
 add_pack <- function(
@@ -293,6 +298,10 @@ add_pack <- function(
 #'   packages that remain installed. `FALSE` suppresses both.
 #' @param library Package-library strategy passed to [sync()]. `NULL` uses the
 #'   project configuration.
+#' @details
+#' Before writing any file, it compares `[project].boosters_version` with the
+#' installed boosterpak, as [sync()] does, also when `sync = FALSE`. The
+#' [sync()] it runs afterwards does not repeat the check.
 #' @return Updated declared pack names, invisibly.
 #' @export
 remove_pack <- function(

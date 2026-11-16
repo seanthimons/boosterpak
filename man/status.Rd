@@ -43,7 +43,8 @@ that version or later; \code{upgrade_needed} stays \code{FALSE} then.
 \code{\link[=write_portable_setup]{write_portable_setup()}} and the installed boosterpak came from GitHub. Then
 it is \code{TRUE} when the pinned commit is the installed one and \code{FALSE} when
 they differ. A difference is reported as information, not a warning: an
-older pin can be deliberate. Run \code{\link[=write_portable_setup]{write_portable_setup()}} to move the pin.
+older pin can be deliberate. Run \code{\link[=upgrade_project]{upgrade_project()}} or
+\code{\link[=write_portable_setup]{write_portable_setup()}} to move the pin.
 
 \code{github_token_visible} is \code{NA} unless the project declares GitHub sources
 (\code{owner/repo} specifications from \verb{[extras].declared} or from pack

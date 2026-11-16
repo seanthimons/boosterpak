@@ -33,7 +33,8 @@
 #'   [write_portable_setup()] and the installed boosterpak came from GitHub. Then
 #'   it is `TRUE` when the pinned commit is the installed one and `FALSE` when
 #'   they differ. A difference is reported as information, not a warning: an
-#'   older pin can be deliberate. Run [write_portable_setup()] to move the pin.
+#'   older pin can be deliberate. Run [upgrade_project()] or
+#'   [write_portable_setup()] to move the pin.
 #'
 #'   `github_token_visible` is `NA` unless the project declares GitHub sources
 #'   (`owner/repo` specifications from `[extras].declared` or from pack
@@ -220,9 +221,20 @@ status <- function(root = ".", verbose = NULL) {
       }
       cli::cli_li("setup.R pin: {pin_label}")
       if (identical(out$setup_pin_current, FALSE)) {
+        generated_by <- portable_setup_version(
+          readLines(file.path(root, "setup.R"), warn = FALSE)
+        )
+        move <- if (
+          !is.null(generated_by) &&
+            generated_by > package_version(package_version_string())
+        ) {
+          "Install boosterpak {as.character(generated_by)} or later to use it; {.code boosterpak::upgrade_project()} does not move a pin to an older version."
+        } else {
+          "Run {.code boosterpak::upgrade_project()} (or {.code boosterpak::write_portable_setup()}) to move the pin, or keep it to stay on the pinned commit."
+        }
         cli::cli_alert_info(paste(
           "setup.R pins boosterpak {substr(setup_pin, 1, 7)}; the installed copy is {substr(installed_sha, 1, 7)}.",
-          "Run {.code boosterpak::write_portable_setup()} to move the pin, or keep it to stay on the pinned commit."
+          move
         ))
       }
     }

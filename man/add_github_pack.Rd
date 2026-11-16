@@ -55,3 +55,8 @@ under \code{path}, copies selected packs into the current project's
 \verb{boosters/packs/} directory, declares them in \code{boosters.toml}, and
 optionally runs the normal additive sync flow.
 }
+\details{
+Before cloning or writing any file, it compares \verb{[project].boosters_version} with the
+installed boosterpak, as \code{\link[=sync]{sync()}} does, also when \code{sync = FALSE}. The
+\code{\link[=sync]{sync()}} it runs afterwards does not repeat the check.
+}

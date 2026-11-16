@@ -411,6 +411,16 @@ test_that("status compares a generated setup.R pin with the installed boosterpak
   expect_match(messages, "setup.R pin: differs", fixed = TRUE)
   expect_match(messages, "pins boosterpak aaaaaaa; the installed copy is bbbbbbb", fixed = TRUE)
   expect_match(messages, "write_portable_setup()", fixed = TRUE)
+  expect_match(messages, "upgrade_project()", fixed = TRUE)
+
+  # A setup.R from a newer boosterpak: upgrade_project() would not move it.
+  path <- file.path(root, "setup.R")
+  lines <- readLines(path)
+  lines[[1]] <- sub("boosterpak [^ ]+\\. ", "boosterpak 99.0.0. ", lines[[1]])
+  writeLines(lines, path)
+  messages <- status_messages(root)
+  expect_match(messages, "Install boosterpak 99.0.0 or later", fixed = TRUE)
+  expect_no_match(messages, "to move the pin", fixed = TRUE)
 
   local_mocked_bindings(installed_boosterpak_sha = function(desc) NA_character_)
   expect_true(is.na(status(root = root, verbose = FALSE)$setup_pin_current))
