@@ -22,8 +22,8 @@ permissions:
 jobs:
   r-cmd-check:
     name: R CMD check
-    # Pinned to the baseline v2.0.0 commit. Dependabot bumps this.
-    uses: seanthimons/baseline/.github/workflows/r-cmd-check.yaml@0a6e332d70f7a15520c62870221b35ef040ef933 # v2.0.0
+    # Pinned to the baseline v2.2.0 commit. Dependabot bumps this.
+    uses: seanthimons/baseline/.github/workflows/r-cmd-check.yaml@ad7b0409c5ae8d28f293826fef0819bd74c7b9e0 # v2.2.0
     with:
       # The vignettes are Quarto documents.
       quarto: true
