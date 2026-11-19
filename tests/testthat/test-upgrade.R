@@ -609,6 +609,36 @@ test_that("normalize_lockfile_platform leaves a portable lockfile untouched", {
   expect_identical(normalize_lockfile_platform(withr::local_tempdir()), 0L)
 })
 
+test_that("normalize_lockfile_platform drops packages that ship with R", {
+  skip_if_not_installed("renv")
+  root <- withr::local_tempdir()
+  lock <- list(
+    R = list(Version = "4.6.1", Repositories = list(list(Name = "CRAN", URL = "https://cran.rstudio.com/"))),
+    Packages = list(
+      MASS = list(Package = "MASS", Version = "7.3-65", Source = "Repository", Repository = "CRAN", Priority = "recommended"),
+      lattice = list(Package = "lattice", Version = "0.23-0", Source = "Repository", Repository = "CRAN", Priority = "recommended"),
+      class = list(Package = "class", Version = "7.3-23", Source = "GitHub", RemoteType = "github", RemoteUsername = "cran", RemoteRepo = "class", RemoteSha = "0123456789abcdef0123456789abcdef01234567"),
+      boot = list(Package = "boot", Source = "Repository", Repository = "CRAN"),
+      cli = list(Package = "cli", Version = "3.6.6", Source = "Repository", Repository = "CRAN")
+    )
+  )
+  jsonlite::write_json(lock, file.path(root, "renv.lock"), auto_unbox = TRUE, pretty = TRUE)
+  # A GitHub install and a record without a version are not R's own copies.
+  # The system copy of lattice is older, so its pinned version stays.
+  system <- c(MASS = "7.3-65", lattice = "0.22-7", class = "7.3-23", boot = "1.3-32", stats = "4.6.1")
+
+  expect_identical(normalize_lockfile_platform(root, system = system), 1L)
+  records <- renv::lockfile_read(file = file.path(root, "renv.lock"), project = root)$Packages
+  expect_setequal(names(records), c("lattice", "class", "boot", "cli"))
+  expect_identical(normalize_lockfile_platform(root, system = system), 0L)
+})
+
+test_that("system_priority_versions lists base and recommended packages", {
+  versions <- system_priority_versions()
+  expect_identical(unname(versions[names(versions) == "stats"]), as.character(getRversion()))
+  expect_false("cli" %in% names(versions))
+})
+
 test_that("renv_ppm_handling_enabled reads renv's own setting and fails closed", {
   skip_if_not_installed("renv")
   withr::local_options(list(renv.config.ppm.enabled = FALSE))

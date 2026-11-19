@@ -1,8 +1,10 @@
 #' Restore a project without capability packs
 #'
 #' Restores the exact versions in `renv.lock`. Before restoration, normalizes
-#' Posit Package Manager Linux URLs in the lockfile and removes Linux Platform
-#' tags. Package versions and non-PPM repositories are preserved. No
+#' Posit Package Manager Linux URLs in the lockfile, removes Linux Platform
+#' tags, and drops records for base and recommended packages whose exact
+#' version ships with R. Other package versions and non-PPM repositories are
+#' preserved. No
 #' `boosters.toml`, packs, or attachment hooks are required or created, and
 #' restore writes no startup files. [write_portable_setup()] is the one
 #' function that does, and only when asked.
@@ -39,7 +41,9 @@ restore_project <- function(root = ".", require_binaries = character()) {
 #' Save a portable project snapshot without capability packs
 #'
 #' Records the active project library using the project's renv snapshot type,
-#' then normalizes Posit Package Manager Linux URLs and Linux Platform tags.
+#' then normalizes Posit Package Manager Linux URLs and Linux Platform tags and
+#' drops records for base and recommended packages whose exact version ships
+#' with R.
 #' No `boosters.toml`, packs, or attachment hooks are required or created, and
 #' snapshot writes no startup files.
 #' This records installed versions; use [restore_project()] on a new machine.
