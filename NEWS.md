@@ -1,6 +1,26 @@
 
 
 
+## boosterpak v0.13.1 (2026-11-19)
+
+#### Bug fixes
+
+- drop lockfile records for packages that ship with R
+  ([2cb2d34](https://github.com/seanthimons/boosterpak/tree/2cb2d3430a3c0aa53b85a509290ce292f942803d))
+
+#### CI
+
+- track baseline releases (#50)
+  ([d21b1a5](https://github.com/seanthimons/boosterpak/tree/d21b1a5b1758969c7f0bc9cad3fb4c1e5d93fe56))
+
+#### Other changes
+
+- release v0.13.1 \[skip ci\]
+  ([658ee3c](https://github.com/seanthimons/boosterpak/tree/658ee3c37b0072a163dd4e61f6d949d55abbd607))
+
+Full set of changes:
+[`v0.13.0...v0.13.1`](https://github.com/seanthimons/boosterpak/compare/v0.13.0...v0.13.1)
+
 ## boosterpak v0.13.0 (2026-11-16)
 
 #### New features
@@ -11,13 +31,15 @@
 
 #### CI
 
+- pin baseline callers to v2.2.0
+  ([4e2a4cb](https://github.com/seanthimons/boosterpak/tree/4e2a4cbbc61dca854e45baf319c610738b309dfb))
 - migrate the remaining workflows to baseline v2.0.0 callers (#47)
   ([dd08e29](https://github.com/seanthimons/boosterpak/tree/dd08e29321cfee417367c866d0a7873c756568fd))
 
 #### Other changes
 
 - release v0.13.0 \[skip ci\]
-  ([c900393](https://github.com/seanthimons/boosterpak/tree/c900393d9f6d6c0897348a209095c167f77dccb7))
+  ([7097731](https://github.com/seanthimons/boosterpak/tree/70977316060f374dfbdae956a4f62ac4be878d6d))
 
 Full set of changes:
 [`v0.12.0...v0.13.0`](https://github.com/seanthimons/boosterpak/compare/v0.12.0...v0.13.0)
