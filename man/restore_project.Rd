@@ -17,8 +17,10 @@ The restored package records, invisibly.
 }
 \description{
 Restores the exact versions in \code{renv.lock}. Before restoration, normalizes
-Posit Package Manager Linux URLs in the lockfile and removes Linux Platform
-tags. Package versions and non-PPM repositories are preserved. No
+Posit Package Manager Linux URLs in the lockfile, removes Linux Platform
+tags, and drops records for base and recommended packages whose exact
+version ships with R. Other package versions and non-PPM repositories are
+preserved. No
 \code{boosters.toml}, packs, or attachment hooks are required or created, and
 restore writes no startup files. \code{\link[=write_portable_setup]{write_portable_setup()}} is the one
 function that does, and only when asked.

@@ -197,13 +197,18 @@ call_renv_snapshot <- function(root = ".", packages = NULL, update = FALSE) {
 #' a `Platform` tag, and a record's `Repository` can be a manylinux URL instead
 #' of a repository name. This drops the Linux `Platform` tag and maps a
 #' `Repository` URL back to the name of the matching lockfile repository, or to
-#' the generic Package Manager URL when no repository matches. The lockfile is
-#' rewritten only when a record changes.
+#' the generic Package Manager URL when no repository matches. It also drops
+#' repository records for base and recommended packages whose exact version
+#' ships in the R system library: R already provides them, and pak refuses to solve a restore
+#' that asks to install them again. The lockfile is rewritten only when a
+#' record changes.
 #'
 #' @param root Project root.
+#' @param system Named character vector of base and recommended package
+#'   versions in the R system libraries.
 #' @return The number of package records that changed, invisibly.
 #' @noRd
-normalize_lockfile_platform <- function(root = ".") {
+normalize_lockfile_platform <- function(root = ".", system = system_priority_versions()) {
   path <- file.path(root, "renv.lock")
   if (!file.exists(path)) {
     return(invisible(0L))
@@ -221,6 +226,14 @@ normalize_lockfile_platform <- function(root = ".") {
   changed <- 0L
   for (name in names(lock$Packages)) {
     record <- lock$Packages[[name]]
+    if (
+      identical(record$Source, "Repository") &&
+        as.character(record$Version %||% NA)[[1]] %in% system[names(system) == name]
+    ) {
+      lock$Packages[[name]] <- NULL
+      changed <- changed + 1L
+      next
+    }
     before <- record
 
     platform <- record$Platform
@@ -251,6 +264,18 @@ normalize_lockfile_platform <- function(root = ".") {
     renv::lockfile_write(lock, file = path, project = root)
   }
   invisible(changed)
+}
+
+#' Get versions of base and recommended packages in the R system library
+#'
+#' @return A named character vector of versions. A package installed in more
+#'   than one system library appears once per copy.
+#' @noRd
+system_priority_versions <- function() {
+  lib_loc <- unique(c(.Library, .Library.site))
+  db <- utils::installed.packages(lib.loc = lib_loc[file.exists(lib_loc)])
+  db <- db[db[, "Priority"] %in% c("base", "recommended"), , drop = FALSE]
+  stats::setNames(db[, "Version"], db[, "Package"])
 }
 
 #' Read installed package metadata for dependency checks
