@@ -549,7 +549,7 @@ flowchart TD
 ```
 
 The usual loop is to initialize once, add packs and helper functions as project capability intent, run `sync()`, then capture a useful baseline with `save_pack()`. Additive installs hydrate plain-name packages from local/user libraries before downloading, install any remaining packages with `pak`, and write `boosters/attach.R` for startup `library()` calls. Package-only packs stay flat at `boosters/packs/<name>.toml`; packs that carry copied helper files use `boosters/packs/<name>/<name>.toml` plus `boosters/packs/<name>/functions/`.
-For an already initialized repo clone, do not re-run `init()`; follow the restore path with `renv::restore()`, restart R, then `boosterpak::sync(mode = "restore")`.
+For an already initialized repo clone, do not re-run `init()`; follow the restore path with `renv::restore(packages = "boosterpak")`, restart R, then `boosterpak::sync(mode = "restore")`.
 
 A pack is deliberately typed and reviewable. Today that means packages, optional `[sources]`, optional `attach` and `attach_mode`, optional copied helper functions, and optional extension from other packs. It is not an arbitrary file sprinkler; project-specific mess stays in the project, and only reusable setup invariants belong in a pack.
 
@@ -734,7 +734,7 @@ The rows for `{renv}`, `{rix}`, rv, uvr, ir, and rig summarize Isabella Velásqu
 boosterpak::sync(mode = "restore")
 ```
 
-`sync(mode = "apply")` treats `boosters.toml` as reusable setup intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`, then writes `boosters/attach.R` before snapshot. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate. For restoring a freshly cloned project on a new machine, see the "Restoring a project on a new machine" vignette: run `renv::restore()` first (on default settings it installs `boosterpak` itself from the lockfile), restart R, then `boosterpak::sync(mode = "restore")`.
+`sync(mode = "apply")` treats `boosters.toml` as reusable setup intent and `renv.lock` as downstream output. It may hydrate from local libraries before installing the remaining declared packages with `pak`, then writes `boosters/attach.R` before snapshot. `sync(mode = "restore")` is the explicit path for exact lockfile restoration and does not hydrate. For restoring a freshly cloned project on a new machine, see the "Restoring a project on a new machine" vignette: run `renv::restore(packages = "boosterpak")` first, restart R, then `boosterpak::sync(mode = "restore")`. A full plain `renv::restore()` asks pak for R's own recommended packages (Matrix, lattice) at their exact, often archived, versions and compiles them; `sync(mode = "restore")` leaves those out.
 
 ## Emergency rescue
 

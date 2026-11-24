@@ -20,7 +20,7 @@ The short version:
 #| echo: true
 #| eval: false
 # In R, from the cloned project directory:
-renv::restore()
+renv::restore(packages = "boosterpak")
 
 # Restart R, then:
 boosterpak::sync(mode = "restore")
@@ -69,16 +69,22 @@ of `.Rprofile`, and the helper files still load.
 ## 2. Restore the library from the lockfile
 
 `boosterpak` itself is not installed on this machine yet, so nothing
-boosterpak-shaped can run first. Restore through renv, which installs
-everything in the lockfile, including `boosterpak`. `init()` snapshots
-`renv`, `pak`, and `boosterpak` into the lockfile (unless `settings.auto_snapshot`
-is disabled) precisely so that a clone can bootstrap this way.
+boosterpak-shaped can run first. Restore only `boosterpak` through renv.
+`init()` snapshots `renv`, `pak`, and `boosterpak` into the lockfile (unless
+`settings.auto_snapshot` is disabled) precisely so that a clone can bootstrap
+this way.
 
 ```{r}
 #| echo: true
 #| eval: false
-renv::restore()
+renv::restore(packages = "boosterpak")
 ```
+
+With renv's pak backend on, this pins only `boosterpak`; its dependencies come
+from the current repository and step 3 puts them back to the locked versions.
+Avoid a full plain `renv::restore()` here: it asks pak for R's own base and
+recommended packages (such as Matrix and lattice) at the exact versions in the
+lockfile, which are often archived on CRAN and so compile from source.
 
 ## 3. Reconcile the boosterpak layer
 
@@ -92,7 +98,9 @@ boosterpak::sync(mode = "restore")
 ```
 
 Restore mode requires both `boosters.toml` and `renv.lock`, calls
-`renv::restore()`, validates the project config, and warns if direct declared
+`renv::restore()` without the lockfile records for packages whose exact version
+already ships with this R, and caps parallel install workers at two unless
+`options(Ncpus = )` is set. It then validates the project config, and warns if direct declared
 packages are absent from the lockfile. It is lockfile-exact: it does not
 hydrate from local libraries, does not install anything beyond the lockfile,
 and does not rewrite `boosters/attach.R` or helper files. Helper functions and
