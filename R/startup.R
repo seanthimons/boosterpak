@@ -360,9 +360,9 @@ configure_boosterpak_install_policy <- function(verbose = TRUE) {
 
   if (isTRUE(verbose) && length(changed) > 0) {
     cli::cli_inform(c(
-      "i" = "boosterpak is configuring package installs to prefer pak. On Windows and macOS, it also avoids compiling from source when binaries are available.",
+      "i" = "boosterpak is configuring package installs to use pak.",
       " " = "renv pak backend: {getOption('renv.config.pak.enabled')}",
-      " " = "compile from source: {getOption('install.packages.compile.from.source')}"
+      " " = "{.code install.packages()} compile from source: {getOption('install.packages.compile.from.source')} (pak does not read this option)"
     ))
   }
 

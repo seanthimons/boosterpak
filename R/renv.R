@@ -214,12 +214,36 @@ normalize_lockfile_platform <- function(root = ".", system = system_priority_ver
     return(invisible(0L))
   }
   lock <- renv::lockfile_read(file = path, project = root)
+  result <- portable_lockfile(lock, system)
+  if (result$changed > 0L || result$repositories_changed) {
+    old_options <- options(renv.verbose = FALSE)
+    on.exit(options(old_options), add = TRUE)
+    renv::lockfile_write(result$lock, file = path, project = root)
+  }
+  invisible(result$changed)
+}
+
+#' Make a Lockfile Object Portable
+#'
+#' The in-memory part of [normalize_lockfile_platform()], also applied by
+#' [call_renv_restore()] so a lockfile written by plain `renv::snapshot()`
+#' restores without rebuilding R's own packages from archived sources.
+#'
+#' @param lock A lockfile object from `renv::lockfile_read()`.
+#' @param system Named character vector of base and recommended package
+#'   versions in the R system libraries.
+#' @return A list with the updated `lock`, the number of `changed` package
+#'   records, and whether the repositories changed (`repositories_changed`).
+#' @noRd
+portable_lockfile <- function(lock, system = system_priority_versions()) {
   repositories <- lock$R$Repositories %||% list()
   # renv reads the repositories as a list named by repository.
   repo_names <- names(repositories) %||% character()
   portable_repositories <- lapply(repositories, portable_ppm_repos)
   repositories_changed <- !identical(repositories, portable_repositories)
-  lock$R$Repositories <- portable_repositories
+  if (repositories_changed) {
+    lock$R$Repositories <- portable_repositories
+  }
   repo_urls <- vapply(repositories, function(url) as.character(url)[[1]], character(1))
   repo_urls <- sub("/+$", "", portable_ppm_repos(repo_urls))
 
@@ -257,13 +281,7 @@ normalize_lockfile_platform <- function(root = ".", system = system_priority_ver
       changed <- changed + 1L
     }
   }
-
-  if (changed > 0L || repositories_changed) {
-    old_options <- options(renv.verbose = FALSE)
-    on.exit(options(old_options), add = TRUE)
-    renv::lockfile_write(lock, file = path, project = root)
-  }
-  invisible(changed)
+  list(lock = lock, changed = changed, repositories_changed = repositories_changed)
 }
 
 #' Get versions of base and recommended packages in the R system library
@@ -379,7 +397,16 @@ call_renv_restore <- function(root = ".", require_binaries = character()) {
   configure_boosterpak_install_policy(verbose = FALSE)
   scope_windows_native_tar()
   scope_binary_platforms()
+  scope_install_workers()
   lockfile <- renv::lockfile_read(project = ".")
+  # In memory only: R's own base and recommended packages would otherwise be
+  # requested at their (often archived) exact versions and built from source.
+  portable <- portable_lockfile(lockfile)$lock
+  require_binaries <- setdiff(
+    require_binaries,
+    setdiff(names(lockfile$Packages), names(portable$Packages))
+  )
+  lockfile <- portable
   original_records <- lockfile$Packages
   lockfile$Packages <- pin_github_commits(lockfile$Packages)
   abort_if_offline_with_missing(lockfile$Packages, root)
@@ -700,6 +727,28 @@ install_via <- function(packages, root = ".", library = "renv") {
   invisible(packages)
 }
 
+#' Cap pak's parallel install workers for the calling frame
+#'
+#' pak starts one install worker per logical CPU unless `Ncpus` is set
+#' (`?pak-config`), and parallel source builds can exhaust memory. An explicit
+#' `Ncpus` is left alone. The option is restored on exit.
+#'
+#' @param envir Calling frame in which to register option restoration.
+#' @param workers Number of workers to use when `Ncpus` is unset.
+#' @return NULL, invisibly.
+#' @noRd
+scope_install_workers <- function(envir = parent.frame(), workers = 2L) {
+  # ponytail: fixed cap of 2 trades binary-install speed on big machines for
+  # bounded memory; set options(Ncpus = n) to override.
+  if (!is.null(getOption("Ncpus"))) {
+    return(invisible(NULL))
+  }
+  old <- options(Ncpus = workers)
+  restore <- bquote(options(.(old)))
+  do.call(on.exit, list(restore, add = TRUE), envir = envir)
+  invisible(NULL)
+}
+
 #' Install Packages with Pak into One Library
 #'
 #' @param packages Character vector of package specifications to install.
@@ -709,6 +758,7 @@ install_via <- function(packages, root = ".", library = "renv") {
 pak_install_packages <- function(packages, lib) {
   scope_windows_native_tar()
   scope_binary_platforms()
+  scope_install_workers()
   invisible(pak::pkg_install(packages, lib = lib, upgrade = FALSE))
 }
 

@@ -748,6 +748,64 @@ test_that("call_renv_restore skips the index repair when a repository was droppe
   expect_false(repaired)
 })
 
+test_that("call_renv_restore drops packages that ship with R and portable-izes URLs", {
+  root <- withr::local_tempdir()
+  restore_args <- NULL
+  required <- NULL
+
+  local_mocked_bindings(
+    configure_boosterpak_repositories = function(verbose = TRUE) invisible(character()),
+    configure_boosterpak_install_policy = function(verbose = TRUE) invisible(character()),
+    scope_windows_native_tar = function(envir = parent.frame()) invisible(NULL),
+    abort_if_offline_with_missing = function(...) invisible(NULL),
+    scope_reachable_repos = function(...) character(),
+    scope_archived_binary_repos = function(...) invisible(NULL),
+    repair_unreachable_index_urls = function(records, ...) records,
+    check_required_binaries = function(records, packages) required <<- packages,
+    system_priority_versions = function() c(Matrix = "1.7-5", lattice = "0.22-9"),
+    .package = "boosterpak"
+  )
+  local_mocked_bindings(
+    lockfile_read = function(...) {
+      list(
+        R = list(Repositories = list(CRAN = "https://packagemanager.posit.co/cran/2026-10-16")),
+        Packages = list(
+          Matrix = list(Package = "Matrix", Version = "1.7-5", Source = "Repository", Repository = "CRAN"),
+          lattice = list(Package = "lattice", Version = "0.23-1", Source = "Repository", Repository = "CRAN"),
+          magick = list(
+            Package = "magick", Version = "2.9.1", Source = "Repository",
+            Repository = "https://packagemanager.posit.co/cran/__linux__/manylinux_2_28/2026-10-16"
+          )
+        )
+      )
+    },
+    restore = function(...) restore_args <<- list(...),
+    .package = "renv"
+  )
+
+  call_renv_restore(root, require_binaries = c("Matrix", "magick"))
+
+  packages <- restore_args$lockfile$Packages
+  expect_setequal(names(packages), c("lattice", "magick"))
+  expect_identical(packages$magick$Repository, "CRAN")
+  expect_identical(required, "magick")
+})
+
+test_that("scope_install_workers caps Ncpus only when unset", {
+  withr::local_options(Ncpus = NULL)
+  local({
+    scope_install_workers()
+    expect_identical(getOption("Ncpus"), 2L)
+  })
+  expect_null(getOption("Ncpus"))
+
+  withr::local_options(Ncpus = 8L)
+  local({
+    scope_install_workers()
+    expect_identical(getOption("Ncpus"), 8L)
+  })
+})
+
 test_that("scope_windows_native_tar is a no-op off Windows", {
   skip_on_os("windows")
   withr::local_envvar(TAR = NA)
