@@ -1,6 +1,26 @@
 
 
 
+## boosterpak v0.13.2 (2026-11-24)
+
+#### Bug fixes
+
+- skip R’s own packages on restore and cap pak workers
+  ([1ef4b8a](https://github.com/seanthimons/boosterpak/tree/1ef4b8ab70bcf1c598a49d11c0bb778a69fcab08))
+
+#### Docs
+
+- restore new machines through sync(mode = “restore”)
+  ([996d3c0](https://github.com/seanthimons/boosterpak/tree/996d3c03b0423b06de267f4d6a9125b415e55f08))
+
+#### Other changes
+
+- release v0.13.2 \[skip ci\]
+  ([cddd699](https://github.com/seanthimons/boosterpak/tree/cddd699d42ed84e369bf67e38fbf8e6a02c5c9eb))
+
+Full set of changes:
+[`v0.13.2...v0.13.2`](https://github.com/seanthimons/boosterpak/compare/v0.13.2...v0.13.2)
+
 ## boosterpak v0.13.1 (2026-11-19)
 
 #### Bug fixes
@@ -16,7 +36,7 @@
 #### Other changes
 
 - release v0.13.1 \[skip ci\]
-  ([658ee3c](https://github.com/seanthimons/boosterpak/tree/658ee3c37b0072a163dd4e61f6d949d55abbd607))
+  ([9a5e669](https://github.com/seanthimons/boosterpak/tree/9a5e669197e60802be372f7ac028328aeeae321f))
 
 Full set of changes:
 [`v0.13.0...v0.13.1`](https://github.com/seanthimons/boosterpak/compare/v0.13.0...v0.13.1)
